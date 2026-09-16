@@ -1,26 +1,138 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+  --font-heading: var(--font-space-grotesk);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --color-void: var(--void);
+  --color-console: var(--console);
+  --color-console-2: var(--console-2);
+  --color-console-3: var(--console-3);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-signal: var(--signal);
+  --color-signal-solid: var(--signal-solid);
+  --color-signal-dim: var(--signal-dim);
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-clear: var(--clear);
+  --color-clear-dim: var(--clear-dim);
+  --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-ink-faint: var(--ink-faint);
+  --font-display: var(--font-space-grotesk);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+
+:root {
+  /* Control Lead — tema console dark unico (contrato visual da demo aceita) */
+  --void: #060B14;
+  --console: #0D1729;
+  --console-2: #131F38;
+  --console-3: #182848;
+  --line: #1E2E4A;
+  --line-soft: #16233C;
+  --signal: #5B9BFF;
+  --signal-solid: #1D5FD1;
+  --signal-dim: rgba(91, 155, 255, 0.13);
+  --amber: #F5A623;
+  --amber-dim: rgba(245, 166, 35, 0.14);
+  --clear: #2FE3A6;
+  --clear-dim: rgba(47, 227, 166, 0.13);
+  --danger: #FF5C7A;
+  --danger-dim: rgba(255, 92, 122, 0.13);
+  --ink: #EAF2FF;
+  --ink-dim: #93A7C9;
+  --ink-faint: #5C7093;
+
+  --background: var(--void);
+  --foreground: var(--ink);
+  --card: var(--console);
+  --card-foreground: var(--ink);
+  --popover: var(--console-2);
+  --popover-foreground: var(--ink);
+  --primary: var(--signal);
+  --primary-foreground: #06101F;
+  --secondary: var(--console-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--console-2);
+  --muted-foreground: var(--ink-dim);
+  --accent: var(--console-3);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--signal);
+  --chart-1: var(--signal);
+  --chart-2: var(--clear);
+  --chart-3: var(--amber);
+  --chart-4: var(--danger);
+  --chart-5: var(--ink-faint);
+  --radius: 0.625rem;
+  --sidebar: #0A1220;
+  --sidebar-foreground: var(--ink-dim);
+  --sidebar-primary: var(--signal);
+  --sidebar-primary-foreground: #06101F;
+  --sidebar-accent: var(--signal-dim);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line-soft);
+  --sidebar-ring: var(--signal);
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
