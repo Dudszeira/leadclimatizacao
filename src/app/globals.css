@@ -136,3 +136,29 @@
     @apply font-sans;
   }
 }
+
+/* ----------------------------------------------------------------------------
+ * Momento orquestrado único (MASTER.md): entrada dos cards do dashboard com
+ * stagger sutil, CSS only — o delay vem de --enter-delay inline em cada card.
+ * -------------------------------------------------------------------------- */
+@keyframes console-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.console-enter {
+  animation: console-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--enter-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-enter {
+    animation: none;
+  }
+}

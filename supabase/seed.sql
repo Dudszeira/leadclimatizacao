@@ -219,7 +219,7 @@ insert into public.pmoc_plans
 on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------------------
--- 7. Ordens de serviço (15) — números 1001..1015
+-- 7. Ordens de serviço — 15 nominais (1001..1015) + lote histórico (901..930)
 -- ----------------------------------------------------------------------------
 insert into public.service_orders
   (id, numero, tipo, prioridade, status, origem, building_id, equipment_id, pmoc_plan_id,
@@ -382,6 +382,60 @@ insert into public.service_orders
    'Self da área de vendas com odor — cliente cancelou: problema era na exaustão da rotisseria.',
    null, null, null, null, null, null, '{}', '{}', null, null, null,
    'a0000000-0000-4000-8000-000000000002', (current_date - 8)::timestamptz + interval '10 hours')
+on conflict (id) do nothing;
+
+-- Lote: 30 OS concluídas nos 4 meses anteriores (números 901..930) — histórico
+-- da série "chamados por mês" do dashboard. Distribuição decrescente por mês
+-- (9/8/7/6) e tipos variados, tudo determinístico em g (espelhado em
+-- src/lib/fixtures/service-orders.ts). Não toca no mês corrente nem no anterior.
+insert into public.service_orders
+  (id, numero, tipo, prioridade, status, origem, building_id, equipment_id,
+   technician_id, descricao, scheduled_at, concluded_at, created_by, created_at)
+select
+  format('50000000-0000-4000-8000-0000000009%s', lpad(g::text, 2, '0'))::uuid,
+  900 + g,
+  t.tipo::public.os_type,
+  (case when t.tipo = 'corretiva' and g % 3 = 0 then 'alta' else 'media' end)::public.os_priority,
+  'concluido'::public.os_status,
+  (case when t.tipo = 'preventiva_pmoc' then 'pmoc_auto' else 'manual' end)::public.os_origin,
+  (array['b0000000-0000-4000-8000-000000000001',
+         'b0000000-0000-4000-8000-000000000003',
+         'b0000000-0000-4000-8000-000000000005',
+         'b0000000-0000-4000-8000-000000000007',
+         'b0000000-0000-4000-8000-000000000014',
+         'b0000000-0000-4000-8000-000000000009'])[(g % 6) + 1]::uuid,
+  case when t.tipo in ('instalacao', 'orcamento') then null
+       else (array['e0000000-0000-4000-8000-000000000003',
+                   'e0000000-0000-4000-8000-000000000006',
+                   'e0000000-0000-4000-8000-000000000008',
+                   'e0000000-0000-4000-8000-000000000010',
+                   'e0000000-0000-4000-8000-000000000011',
+                   'e0000000-0000-4000-8000-000000000013'])[(g % 6) + 1]::uuid end,
+  (array['a0000000-0000-4000-8000-000000000003',
+         'a0000000-0000-4000-8000-000000000004',
+         'a0000000-0000-4000-8000-000000000005'])[(g % 3) + 1]::uuid,
+  case t.tipo
+    when 'preventiva_pmoc' then 'Manutenção preventiva PMOC — ciclo mensal concluído (histórico).'
+    when 'corretiva'       then 'Atendimento corretivo concluído (histórico).'
+    when 'instalacao'      then 'Instalação de equipamento concluída (histórico).'
+    else                        'Visita técnica de orçamento realizada (histórico).'
+  end,
+  t.criado + interval '1 day',
+  t.criado + interval '1 day 3 hours',
+  'a0000000-0000-4000-8000-000000000002',
+  t.criado
+from generate_series(1, 30) g
+cross join lateral (
+  select
+    (array['preventiva_pmoc','corretiva','preventiva_pmoc','corretiva',
+           'instalacao','preventiva_pmoc','corretiva','orcamento'])[(g % 8) + 1] as tipo,
+    date_trunc('month', current_date)
+      - make_interval(months => case when g <= 9 then 5
+                                     when g <= 17 then 4
+                                     when g <= 24 then 3
+                                     else 2 end)
+      + make_interval(days => 1 + (g * 7) % 24, hours => 8 + g % 8) as criado
+) t
 on conflict (id) do nothing;
 
 -- alinha a sequence ao maior número já usado

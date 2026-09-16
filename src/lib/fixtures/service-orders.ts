@@ -1,5 +1,5 @@
-import type { ServiceOrder } from "@/lib/types";
-import { atHour, isoAgo } from "./dates";
+import type { OsType, ServiceOrder } from "@/lib/types";
+import { addDays, atHour, isoAgo, monthStart, parseDateOnly } from "./dates";
 
 const base = {
   checkin_lat: null as number | null,
@@ -17,8 +17,8 @@ function stamps(createdAt: string) {
   return { created_at: createdAt, updated_at: createdAt };
 }
 
-/** 15 ordens de serviço (números 1001..1015) — espelho da seção 7 do seed.sql. */
-export const serviceOrdersFixture: ServiceOrder[] = [
+/** 15 ordens de serviço nominais (números 1001..1015) — espelho da seção 7 do seed.sql. */
+const ordensNominais: ServiceOrder[] = [
   // CONCLUÍDAS ---------------------------------------------------------------
   {
     ...base,
@@ -364,4 +364,89 @@ export const serviceOrdersFixture: ServiceOrder[] = [
     created_by: "a0000000-0000-4000-8000-000000000002",
     ...stamps(atHour(-8, 10)),
   },
+];
+
+// ----------------------------------------------------------------------------
+// Lote programático: 30 OS concluídas nos 4 meses anteriores (números 901..930)
+// — espelho fiel do generate_series(1, 30) da seção 7 do seed.sql. Alimenta a
+// série "chamados por mês" do dashboard sem alterar o mês corrente/anterior.
+// ----------------------------------------------------------------------------
+
+/** (array[...])[(g % 8) + 1] do seed — 3 preventivas, 3 corretivas, 1 instalação, 1 orçamento a cada 8. */
+const historicoTipos: OsType[] = [
+  "preventiva_pmoc", // g % 8 === 0
+  "corretiva",
+  "preventiva_pmoc",
+  "corretiva",
+  "instalacao",
+  "preventiva_pmoc",
+  "corretiva",
+  "orcamento",
+];
+
+/** (array[...])[(g % 6) + 1] do seed — pares prédio/equipamento existentes. */
+const historicoPares: Array<{ building_id: string; equipment_id: string }> = [
+  { building_id: "b0000000-0000-4000-8000-000000000001", equipment_id: "e0000000-0000-4000-8000-000000000003" }, // g % 6 === 0
+  { building_id: "b0000000-0000-4000-8000-000000000003", equipment_id: "e0000000-0000-4000-8000-000000000006" },
+  { building_id: "b0000000-0000-4000-8000-000000000005", equipment_id: "e0000000-0000-4000-8000-000000000008" },
+  { building_id: "b0000000-0000-4000-8000-000000000007", equipment_id: "e0000000-0000-4000-8000-000000000010" },
+  { building_id: "b0000000-0000-4000-8000-000000000014", equipment_id: "e0000000-0000-4000-8000-000000000011" },
+  { building_id: "b0000000-0000-4000-8000-000000000009", equipment_id: "e0000000-0000-4000-8000-000000000013" },
+];
+
+/** (array[...])[(g % 3) + 1] do seed. */
+const historicoTecnicos = [
+  "a0000000-0000-4000-8000-000000000003", // g % 3 === 0
+  "a0000000-0000-4000-8000-000000000004",
+  "a0000000-0000-4000-8000-000000000005",
+];
+
+const historicoDescricoes: Record<OsType, string> = {
+  preventiva_pmoc: "Manutenção preventiva PMOC — ciclo mensal concluído (histórico).",
+  corretiva: "Atendimento corretivo concluído (histórico).",
+  instalacao: "Instalação de equipamento concluída (histórico).",
+  orcamento: "Visita técnica de orçamento realizada (histórico).",
+};
+
+/** date_trunc('month', current_date) - mb meses + (1 + (g*7)%24) dias + (8 + g%8) horas. */
+function historicoCriadoEm(g: number): Date {
+  const monthsBack = g <= 9 ? 5 : g <= 17 ? 4 : g <= 24 ? 3 : 2;
+  const d = addDays(parseDateOnly(monthStart(monthsBack)), 1 + ((g * 7) % 24));
+  d.setHours(8 + (g % 8), 0, 0, 0);
+  return d;
+}
+
+const ordensHistoricas: ServiceOrder[] = Array.from({ length: 30 }, (_, i) => {
+  const g = i + 1;
+  const tipo = historicoTipos[g % 8];
+  const par = historicoPares[g % 6];
+  const criado = historicoCriadoEm(g);
+  const agendado = addDays(criado, 1);
+  const concluido = new Date(agendado.getTime() + 3 * 3_600_000);
+  const semEquipamento = tipo === "instalacao" || tipo === "orcamento";
+  return {
+    ...base,
+    id: `50000000-0000-4000-8000-0000000009${String(g).padStart(2, "0")}`,
+    numero: 900 + g,
+    tipo,
+    prioridade: tipo === "corretiva" && g % 3 === 0 ? "alta" : "media",
+    status: "concluido",
+    origem: tipo === "preventiva_pmoc" ? "pmoc_auto" : "manual",
+    building_id: par.building_id,
+    equipment_id: semEquipamento ? null : par.equipment_id,
+    pmoc_plan_id: null,
+    technician_id: historicoTecnicos[g % 3],
+    descricao: historicoDescricoes[tipo],
+    scheduled_at: agendado.toISOString(),
+    checklist_template_id: null,
+    concluded_at: concluido.toISOString(),
+    created_by: "a0000000-0000-4000-8000-000000000002",
+    ...stamps(criado.toISOString()),
+  };
+});
+
+/** 45 ordens de serviço — 15 nominais + 30 do lote histórico (espelho do seed.sql). */
+export const serviceOrdersFixture: ServiceOrder[] = [
+  ...ordensNominais,
+  ...ordensHistoricas,
 ];
