@@ -119,7 +119,7 @@
   --sidebar-primary: var(--signal);
   --sidebar-primary-foreground: #06101F;
   --sidebar-accent: var(--signal-dim);
-  --sidebar-accent-foreground: var(--ink);
+  --sidebar-accent-foreground: var(--signal);
   --sidebar-border: var(--line-soft);
   --sidebar-ring: var(--signal);
 }
