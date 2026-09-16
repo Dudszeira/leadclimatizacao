@@ -11,6 +11,7 @@ import { contractsFixture, demoClient, invoicesFixture } from "./_demo";
 import {
   failWith,
   matchesSearch,
+  monthStartDate,
   ok,
   pageRange,
   paginate,
@@ -137,5 +138,94 @@ export async function getInvoice(
     return ok((data ?? null) as InvoiceWithContract | null);
   } catch (error) {
     return failWith("getInvoice", error, "Não foi possível carregar a fatura. Tente novamente.");
+  }
+}
+
+// ----------------------------------------------------------------------------
+// KPIs do módulo Financeiro
+// ----------------------------------------------------------------------------
+
+/** Agregados dos 4 cards do topo de /financeiro. */
+export interface FinanceiroKpis {
+  /** Soma das faturas não canceladas com competência no mês corrente. */
+  faturamento_previsto_mes: number;
+  /** Valor em atraso ÷ valor faturado não cancelado (12 meses), em % 0-100. */
+  inadimplencia_pct: number | null;
+  /** Soma das faturas com status "atrasado" (janela de 12 meses). */
+  valor_em_atraso: number;
+  /** Faturas com NFS-e emitida (nf_numero) na competência do mês corrente. */
+  notas_emitidas_mes: number;
+  /** Recebido conciliado (pago com método pix/boleto) ÷ previsto do mês, %. */
+  recebido_conciliado_pct: number | null;
+  recebido_pix_mes: number;
+  recebido_boleto_mes: number;
+}
+
+interface KpiInvoiceRow {
+  competencia: string;
+  valor: number;
+  status: InvoiceStatus;
+  metodo: "pix" | "boleto" | null;
+  nf_numero: string | null;
+}
+
+function buildFinanceiroKpis(rows: KpiInvoiceRow[]): FinanceiroKpis {
+  const mesAtual = monthStartDate(0);
+  let previstoMes = 0;
+  let faturadoJanela = 0;
+  let emAtraso = 0;
+  let notasMes = 0;
+  let recebidoPix = 0;
+  let recebidoBoleto = 0;
+
+  for (const i of rows) {
+    if (i.status !== "cancelado") faturadoJanela += i.valor;
+    if (i.status === "atrasado") emAtraso += i.valor;
+    if (i.competencia !== mesAtual) continue;
+    if (i.status !== "cancelado") previstoMes += i.valor;
+    if (i.nf_numero) notasMes += 1;
+    if (i.status === "pago" && i.metodo === "pix") recebidoPix += i.valor;
+    if (i.status === "pago" && i.metodo === "boleto") recebidoBoleto += i.valor;
+  }
+
+  const recebidoConciliado = recebidoPix + recebidoBoleto;
+  const pct = (numerador: number, denominador: number) =>
+    denominador === 0 ? null : Math.round((numerador / denominador) * 1000) / 10;
+
+  return {
+    faturamento_previsto_mes: previstoMes,
+    inadimplencia_pct: pct(emAtraso, faturadoJanela),
+    valor_em_atraso: emAtraso,
+    notas_emitidas_mes: notasMes,
+    recebido_conciliado_pct: pct(recebidoConciliado, previstoMes),
+    recebido_pix_mes: recebidoPix,
+    recebido_boleto_mes: recebidoBoleto,
+  };
+}
+
+/** KPIs do topo do Financeiro (janela: competências dos últimos 12 meses). */
+export async function getFinanceiroKpis(): Promise<Result<FinanceiroKpis>> {
+  try {
+    const desde = monthStartDate(11);
+
+    if (isDemoMode) {
+      return ok(
+        buildFinanceiroKpis(
+          invoicesFixture.filter((i) => i.competencia >= desde),
+        ),
+      );
+    }
+
+    const supabase = await createSupabase();
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("competencia, valor, status, metodo, nf_numero")
+      .gte("competencia", desde);
+    if (error) {
+      return failWith("getFinanceiroKpis", error, "Não foi possível carregar os indicadores financeiros. Tente novamente.");
+    }
+    return ok(buildFinanceiroKpis((data ?? []) as KpiInvoiceRow[]));
+  } catch (error) {
+    return failWith("getFinanceiroKpis", error, "Não foi possível carregar os indicadores financeiros. Tente novamente.");
   }
 }

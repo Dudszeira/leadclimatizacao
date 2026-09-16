@@ -6,6 +6,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   ASAAS_API_KEY: z.string().optional(),
   ASAAS_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
 });
 
 export const env = envSchema.parse({
@@ -14,6 +15,7 @@ export const env = envSchema.parse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   ASAAS_API_KEY: process.env.ASAAS_API_KEY,
   ASAAS_ENV: process.env.ASAAS_ENV,
+  ASAAS_WEBHOOK_TOKEN: process.env.ASAAS_WEBHOOK_TOKEN,
 });
 
 /**
