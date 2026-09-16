@@ -24,3 +24,8 @@ Ease `cubic-bezier(0.22,1,0.36,1)`. Um momento orquestrado: entrada do dashboard
 
 ## Risco aceito
 Tema dark único (sem light) nesta fase — é o que a demo vendeu; contraste AA verificado sobre #0D1729.
+
+## Semântica de cores de status (decidido no polish)
+- "Cancelado" é NEUTRO (ink-faint) em OS e faturas — danger fica reservado pra atrasado/urgente/risco.
+- "Em campo / técnico em campo" é SIGNAL (azul) em todas as telas — contrato do mapa da demo.
+- `--ink-faint` ajustado #5C7093 → #7288AC para AA (4,5:1) em texto pequeno sobre --console.

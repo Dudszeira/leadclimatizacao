@@ -17,7 +17,8 @@ import {
   listPmocPlanDetails,
 } from "@/server/pmoc"
 import { buttonVariants } from "@/components/ui/button"
-import { DataError } from "@/components/clientes/data-error"
+import { DataError } from "@/components/data-error"
+import { EmptyState } from "@/components/empty-state"
 import { AtencaoImediata } from "@/components/pmoc/atencao-imediata"
 import { PmocCalendar } from "@/components/pmoc/calendar"
 import { situacaoDoEvento, type PmocEvento } from "@/components/pmoc/evento"
@@ -150,22 +151,11 @@ async function PmocSection({
 
   if (detalhes.data.length === 0 && concluidas.data.length === 0) {
     return (
-      <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-        <div
-          className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-          aria-hidden="true"
-        >
-          <CalendarCheckIcon className="size-7 text-ink-faint" />
-        </div>
-        <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-          Nenhum plano PMOC ativo
-        </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-          Cadastre a periodicidade de manutenção nos equipamentos dos clientes:
-          as visitas aparecem aqui e as OS preventivas passam a ser geradas
-          automaticamente.
-        </p>
-      </section>
+      <EmptyState
+        icon={CalendarCheckIcon}
+        title="Nenhum plano PMOC ativo"
+        description="Cadastre a periodicidade de manutenção nos equipamentos dos clientes: as visitas aparecem aqui e as OS preventivas passam a ser geradas automaticamente."
+      />
     )
   }
 

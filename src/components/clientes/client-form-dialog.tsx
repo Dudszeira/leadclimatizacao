@@ -23,12 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  isValidCnpj,
-  maskCnpj,
-  maskPhone,
-  onlyDigits,
-} from "@/components/clientes/format"
+import { isValidCnpj, maskCnpj, maskPhone, onlyDigits } from "@/lib/format"
 
 const INITIAL_STATE: ClientActionState = { status: "idle" }
 

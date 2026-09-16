@@ -6,8 +6,8 @@ import {
 } from "lucide-react"
 
 import { getPmocContadores } from "@/server/dashboard"
-import { BlockError } from "./block-error"
-import { formatInteiro } from "./formatters"
+import { DataError } from "@/components/data-error"
+import { formatInteiro } from "@/lib/format"
 import { StatCard } from "./stat-card"
 
 function delay(s: number): CSSProperties {
@@ -18,7 +18,7 @@ function delay(s: number): CSSProperties {
 export async function PmocSituacaoCards() {
   const result = await getPmocContadores()
   if (result.error !== null) {
-    return <BlockError message={result.error} />
+    return <DataError message={result.error} compact />
   }
   const contadores = result.data
 
@@ -29,7 +29,7 @@ export async function PmocSituacaoCards() {
     >
       <StatCard
         style={delay(0.24)}
-        label="PMOC em dia"
+        label="PMOCs em dia"
         value={formatInteiro(contadores.em_dia)}
         icon={CircleCheckIcon}
         sub={`de ${formatInteiro(contadores.total)} planos ativos`}
@@ -38,7 +38,7 @@ export async function PmocSituacaoCards() {
       />
       <StatCard
         style={delay(0.3)}
-        label="Vencendo em 7 dias"
+        label="Vencendo nos próximos 7 dias"
         value={formatInteiro(contadores.vencendo_7d)}
         icon={CalendarClockIcon}
         sub={contadores.vencendo_7d > 0 ? "precisa agendar" : "nada a agendar por ora"}

@@ -40,20 +40,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { OrderActions } from "@/components/chamados/order-actions"
-import { DataError } from "@/components/clientes/data-error"
 import {
   fileBasename,
   formatDateTimeFullBR,
   formatHourBR,
   formatOsNumero,
   initials,
+} from "@/lib/format"
+import {
+  EQUIPMENT_TYPE_LABELS,
   OS_ORIGIN_META,
   OS_PRIORITY_META,
   OS_STATUS_META,
   OS_TYPE_META,
-} from "@/components/chamados/format"
-import { EQUIPMENT_TYPE_LABELS } from "@/components/clientes/format"
+} from "@/lib/status-meta"
+import { OrderActions } from "@/components/chamados/order-actions"
+import { DataError } from "@/components/data-error"
 
 type PageParams = { params: Promise<{ id: string }> }
 

@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getChamadosPorMes } from "@/server/dashboard"
-import { BlockError } from "./block-error"
+import { DataError } from "@/components/data-error"
 import { ChamadosChart } from "./chamados-chart"
 
 /** Gráfico "Chamados abertos · últimos 6 meses" (série por tipo de OS). */
@@ -25,7 +25,7 @@ export async function ChamadosChartCard() {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-end">
         {result.error !== null ? (
-          <BlockError message={result.error} />
+          <DataError message={result.error} compact />
         ) : result.data.every((p) => p.total === 0) ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <BarChart3Icon className="size-6 text-ink-faint" aria-hidden="true" />

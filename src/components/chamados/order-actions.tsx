@@ -46,7 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatDateTimeFullBR } from "@/components/chamados/format"
+import { formatDateTimeFullBR } from "@/lib/format"
 
 export type TechnicianOption = { id: string; label: string }
 

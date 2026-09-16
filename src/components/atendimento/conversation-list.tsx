@@ -5,14 +5,9 @@ import { UserRoundIcon } from "lucide-react"
 import type { ConversationWithMessages } from "@/lib/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { initials } from "@/components/chamados/format"
-import {
-  CONVERSATION_STATUS_META,
-  conversationName,
-  formatListTime,
-  formatTelefoneBR,
-  lastMessage,
-} from "@/components/atendimento/format"
+import { formatListTime, formatTelefoneBR, initials } from "@/lib/format"
+import { CONVERSATION_STATUS_META } from "@/lib/status-meta"
+import { conversationName, lastMessage } from "@/components/atendimento/format"
 
 type ConversationListProps = {
   conversations: ConversationWithMessages[]

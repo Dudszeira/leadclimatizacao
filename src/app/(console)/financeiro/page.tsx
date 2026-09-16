@@ -4,8 +4,6 @@ import { Suspense } from "react"
 import { cn } from "cn"
 import {
   BarcodeIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   FileTextIcon,
   FileWarningIcon,
   QrCodeIcon,
@@ -17,6 +15,20 @@ import {
 } from "lucide-react"
 
 import type { InvoiceStatus } from "@/lib/types"
+import {
+  formatBRL,
+  formatBRLInteiro,
+  formatCompetencia,
+  formatCompetenciaLonga,
+  formatDateBR,
+  formatPct,
+} from "@/lib/format"
+import {
+  CONTRACT_STATUS_META,
+  CONTRACT_TYPE_META,
+  INVOICE_STATUS_META,
+  PAYMENT_METHOD_META,
+} from "@/lib/status-meta"
 import { listContracts } from "@/server/contracts"
 import { getFinanceiroKpis, listInvoices } from "@/server/invoices"
 import { monthStartDate } from "@/server/_shared"
@@ -30,32 +42,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { BlockError } from "@/components/dashboard/block-error"
 import { StatCard } from "@/components/dashboard/stat-card"
-import { DataError } from "@/components/clientes/data-error"
+import { DataError } from "@/components/data-error"
+import { EmptyState } from "@/components/empty-state"
 import {
   FaturasToolbar,
   type CompetenciaOption,
   type StatusParam,
 } from "@/components/financeiro/faturas-toolbar"
-import {
-  CONTRACT_STATUS_META,
-  CONTRACT_TYPE_META,
-  formatBRL,
-  formatBRLInteiro,
-  formatCompetencia,
-  formatCompetenciaLonga,
-  formatDateBR,
-  formatPct,
-  INVOICE_STATUS_META,
-  PAYMENT_METHOD_META,
-} from "@/components/financeiro/format"
 import { InvoiceActions } from "@/components/financeiro/invoice-actions"
 import {
   ContratosSkeleton,
   FaturasTableSkeleton,
   FinanceiroKpisSkeleton,
 } from "@/components/financeiro/skeletons"
+import { TablePagination } from "@/components/table-pagination"
 
 export const metadata: Metadata = {
   title: "Financeiro",
@@ -173,7 +174,7 @@ export default async function FinanceiroPage({
 async function KpisSection() {
   const result = await getFinanceiroKpis()
   if (result.error !== null) {
-    return <BlockError message={result.error} className="min-h-28" />
+    return <DataError message={result.error} compact className="min-h-28" />
   }
   const kpis = result.data
   const recebidoConciliado = kpis.recebido_pix_mes + kpis.recebido_boleto_mes
@@ -286,51 +287,33 @@ async function FaturasSection({ filters }: { filters: Filters }) {
   if (total === 0) {
     if (hasFilters) {
       return (
-        <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-          <div
-            className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-            aria-hidden="true"
-          >
-            <SearchXIcon className="size-7 text-ink-faint" />
-          </div>
-          <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-            Nenhuma fatura encontrada
-          </h3>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-            Nenhum resultado para a busca e os filtros atuais. Ajuste os termos
-            ou limpe os filtros.
-          </p>
+        <EmptyState
+          icon={SearchXIcon}
+          title="Nenhuma fatura encontrada"
+          description="Nenhum resultado para a busca e os filtros atuais. Ajuste os termos ou limpe os filtros."
+        >
           <Link
             href="/financeiro"
             className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
           >
             Limpar filtros
           </Link>
-        </section>
+        </EmptyState>
       )
     }
     return (
-      <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-        <div
-          className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-          aria-hidden="true"
-        >
-          <ReceiptTextIcon className="size-7 text-ink-faint" />
-        </div>
-        <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-          Nenhuma fatura registrada
-        </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-          As faturas nascem dos contratos ativos: cadastre um contrato na aba
-          Contratos e as competências mensais aparecem aqui.
-        </p>
+      <EmptyState
+        icon={ReceiptTextIcon}
+        title="Nenhuma fatura registrada"
+        description="As faturas nascem dos contratos ativos: cadastre um contrato na aba Contratos e as competências mensais aparecem aqui."
+      >
         <Link
           href={buildHref({ aba: "contratos", q: "", status: "todos", competencia: "", page: 1 })}
           className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
         >
           Ver contratos
         </Link>
-      </section>
+      </EmptyState>
     )
   }
 
@@ -443,38 +426,18 @@ async function FaturasSection({ filters }: { filters: Filters }) {
           })}
         </TableBody>
       </Table>
-      <nav
-        aria-label="Paginação de faturas"
-        className="flex items-center justify-between gap-3 border-t border-line-soft px-4 py-3"
-      >
-        <p className="text-xs text-ink-dim">
-          Mostrando{" "}
-          <span className="font-mono text-ink tabular-nums">
-            {from}–{to}
-          </span>{" "}
-          de <span className="font-mono text-ink tabular-nums">{total}</span>{" "}
-          {total === 1 ? "fatura" : "faturas"}
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="hidden font-mono text-xs text-ink-faint tabular-nums sm:block">
-            Página {page} de {pageCount}
-          </span>
-          <PaginationLink
-            href={buildHref({ ...filters, page: page - 1 })}
-            disabled={page <= 1}
-            label="Página anterior"
-          >
-            <ChevronLeftIcon aria-hidden="true" />
-          </PaginationLink>
-          <PaginationLink
-            href={buildHref({ ...filters, page: page + 1 })}
-            disabled={page >= pageCount}
-            label="Próxima página"
-          >
-            <ChevronRightIcon aria-hidden="true" />
-          </PaginationLink>
-        </div>
-      </nav>
+      <TablePagination
+        ariaLabel="Paginação de faturas"
+        from={from}
+        to={to}
+        total={total}
+        page={page}
+        pageCount={pageCount}
+        singular="fatura"
+        plural="faturas"
+        prevHref={buildHref({ ...filters, page: page - 1 })}
+        nextHref={buildHref({ ...filters, page: page + 1 })}
+      />
     </div>
   )
 }
@@ -493,21 +456,11 @@ async function ContratosSection() {
   const contratos = result.data.items
   if (contratos.length === 0) {
     return (
-      <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-        <div
-          className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-          aria-hidden="true"
-        >
-          <RepeatIcon className="size-7 text-ink-faint" />
-        </div>
-        <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-          Nenhum contrato cadastrado
-        </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-          Cadastre os contratos PMOC recorrentes, corretivas avulsas e
-          instalações para gerar as faturas mensais automaticamente.
-        </p>
-      </section>
+      <EmptyState
+        icon={RepeatIcon}
+        title="Nenhum contrato cadastrado"
+        description="Cadastre os contratos PMOC recorrentes, corretivas avulsas e instalações para gerar as faturas mensais automaticamente."
+      />
     )
   }
 
@@ -612,37 +565,5 @@ async function ContratosSection() {
         </Table>
       </div>
     </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-
-function PaginationLink({
-  href,
-  disabled,
-  label,
-  children,
-}: {
-  href: string
-  disabled: boolean
-  label: string
-  children: React.ReactNode
-}) {
-  const className = cn(
-    buttonVariants({ variant: "outline", size: "icon" }),
-    "size-9 max-md:size-11",
-    disabled && "pointer-events-none opacity-50",
-  )
-  if (disabled) {
-    return (
-      <span className={className} aria-disabled="true" aria-label={label}>
-        {children}
-      </span>
-    )
-  }
-  return (
-    <Link href={href} className={className} aria-label={label}>
-      {children}
-    </Link>
   )
 }

@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { StatCardSkeleton } from "@/components/stat-card-skeleton"
 
 /** Skeleton dos 3 cards + grid do calendário + lista de atenção imediata. */
 export function PmocSectionSkeleton() {
@@ -6,7 +7,7 @@ export function PmocSectionSkeleton() {
     <div className="flex flex-1 flex-col gap-4" aria-hidden="true">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-xl" />
+          <StatCardSkeleton key={i} />
         ))}
       </div>
 

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card"
 import type { ServiceOrderListItem } from "@/lib/types"
 import { getProximosChamados } from "@/server/dashboard"
-import { BlockError } from "./block-error"
+import { DataError } from "@/components/data-error"
 
 function pillDoChamado(os: ServiceOrderListItem): { label: string; className: string } {
   if (os.prioridade === "urgente") {
@@ -54,7 +54,7 @@ export async function ChamadosRecentes() {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
         {result.error !== null ? (
-          <BlockError message={result.error} />
+          <DataError message={result.error} compact />
         ) : result.data.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-center">
             <InboxIcon className="size-6 text-ink-faint" aria-hidden="true" />

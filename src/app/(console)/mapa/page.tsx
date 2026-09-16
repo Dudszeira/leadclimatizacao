@@ -4,7 +4,7 @@ import { MapPinnedIcon } from "lucide-react"
 import type { EquipmentWithBuilding, Result } from "@/lib/types"
 import { listBuildingsForMap } from "@/server/buildings"
 import { listEquipment } from "@/server/equipment"
-import { DataError } from "@/components/clientes/data-error"
+import { DataError } from "@/components/data-error"
 import { MapaView } from "@/components/mapa/mapa-view"
 import {
   derivePinStatus,

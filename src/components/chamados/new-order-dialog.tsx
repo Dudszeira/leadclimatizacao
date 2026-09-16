@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { OS_PRIORITY_META, OS_TYPE_META } from "@/components/chamados/format"
+import { OS_PRIORITY_META, OS_TYPE_META } from "@/lib/status-meta"
 
 const INITIAL_STATE: NewOsActionState = { status: "idle" }
 

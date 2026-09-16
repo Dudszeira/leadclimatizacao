@@ -5,8 +5,6 @@ import { cn } from "cn"
 import {
   BotIcon,
   CalendarClockIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   SearchXIcon,
   UserRoundIcon,
   WrenchIcon,
@@ -14,6 +12,13 @@ import {
 } from "lucide-react"
 
 import type { OsOrigin, OsPriority, OsStatus, OsType } from "@/lib/types"
+import { formatDateTimeBR, formatOsNumero, initials } from "@/lib/format"
+import {
+  OS_ORIGIN_META,
+  OS_PRIORITY_META,
+  OS_STATUS_META,
+  OS_TYPE_META,
+} from "@/lib/status-meta"
 import { listBuildings } from "@/server/buildings"
 import { listEquipment } from "@/server/equipment"
 import { listServiceOrders } from "@/server/service-orders"
@@ -39,7 +44,6 @@ import {
   type StatusParam,
   type TipoParam,
 } from "@/components/chamados/chamados-toolbar"
-import { DataError } from "@/components/clientes/data-error"
 import {
   NewOrderDialog,
   type ClienteOption,
@@ -47,15 +51,9 @@ import {
   type PredioOption,
 } from "@/components/chamados/new-order-dialog"
 import { ChamadosTableSkeleton } from "@/components/chamados/skeletons"
-import {
-  formatDateTimeBR,
-  formatOsNumero,
-  initials,
-  OS_ORIGIN_META,
-  OS_PRIORITY_META,
-  OS_STATUS_META,
-  OS_TYPE_META,
-} from "@/components/chamados/format"
+import { DataError } from "@/components/data-error"
+import { EmptyState } from "@/components/empty-state"
+import { TablePagination } from "@/components/table-pagination"
 
 export const metadata: Metadata = {
   title: "Chamados",
@@ -282,50 +280,32 @@ async function ChamadosSection({ filters }: { filters: Filters }) {
   if (total === 0) {
     if (hasFilters) {
       return (
-        <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-          <div
-            className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-            aria-hidden="true"
-          >
-            <SearchXIcon className="size-7 text-ink-faint" />
-          </div>
-          <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-            Nenhum chamado encontrado
-          </h3>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-            Nenhum resultado para a busca e os filtros atuais. Ajuste os termos
-            ou limpe os filtros.
-          </p>
+        <EmptyState
+          icon={SearchXIcon}
+          title="Nenhum chamado encontrado"
+          description="Nenhum resultado para a busca e os filtros atuais. Ajuste os termos ou limpe os filtros."
+        >
           <Link
             href="/chamados"
             className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
           >
             Limpar filtros
           </Link>
-        </section>
+        </EmptyState>
       )
     }
     return (
-      <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-        <div
-          className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-          aria-hidden="true"
-        >
-          <WrenchIcon className="size-7 text-ink-faint" />
-        </div>
-        <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-          Nenhum chamado registrado
-        </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-          Abra a primeira ordem de serviço: preventiva PMOC, corretiva,
-          instalação ou visita de orçamento.
-        </p>
+      <EmptyState
+        icon={WrenchIcon}
+        title="Nenhum chamado registrado"
+        description="Abra a primeira ordem de serviço: preventiva PMOC, corretiva, instalação ou visita de orçamento."
+      >
         <div className="mt-6">
           <Suspense fallback={null}>
             <NewOrderDialogLoader />
           </Suspense>
         </div>
-      </section>
+      </EmptyState>
     )
   }
 
@@ -464,68 +444,18 @@ async function ChamadosSection({ filters }: { filters: Filters }) {
           })}
         </TableBody>
       </Table>
-      <nav
-        aria-label="Paginação de chamados"
-        className="flex items-center justify-between gap-3 border-t border-line-soft px-4 py-3"
-      >
-        <p className="text-xs text-ink-dim">
-          Mostrando{" "}
-          <span className="font-mono text-ink tabular-nums">
-            {from}–{to}
-          </span>{" "}
-          de <span className="font-mono text-ink tabular-nums">{total}</span>{" "}
-          {total === 1 ? "chamado" : "chamados"}
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="hidden font-mono text-xs text-ink-faint tabular-nums sm:block">
-            Página {page} de {pageCount}
-          </span>
-          <PaginationLink
-            href={buildHref({ ...filters, page: page - 1 })}
-            disabled={page <= 1}
-            label="Página anterior"
-          >
-            <ChevronLeftIcon aria-hidden="true" />
-          </PaginationLink>
-          <PaginationLink
-            href={buildHref({ ...filters, page: page + 1 })}
-            disabled={page >= pageCount}
-            label="Próxima página"
-          >
-            <ChevronRightIcon aria-hidden="true" />
-          </PaginationLink>
-        </div>
-      </nav>
+      <TablePagination
+        ariaLabel="Paginação de chamados"
+        from={from}
+        to={to}
+        total={total}
+        page={page}
+        pageCount={pageCount}
+        singular="chamado"
+        plural="chamados"
+        prevHref={buildHref({ ...filters, page: page - 1 })}
+        nextHref={buildHref({ ...filters, page: page + 1 })}
+      />
     </div>
-  )
-}
-
-function PaginationLink({
-  href,
-  disabled,
-  label,
-  children,
-}: {
-  href: string
-  disabled: boolean
-  label: string
-  children: React.ReactNode
-}) {
-  const className = cn(
-    buttonVariants({ variant: "outline", size: "icon" }),
-    "size-9 max-md:size-11",
-    disabled && "pointer-events-none opacity-50",
-  )
-  if (disabled) {
-    return (
-      <span className={className} aria-disabled="true" aria-label={label}>
-        {children}
-      </span>
-    )
-  }
-  return (
-    <Link href={href} className={className} aria-label={label}>
-      {children}
-    </Link>
   )
 }

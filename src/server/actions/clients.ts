@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
-import { isValidCnpj, maskCnpj, onlyDigits } from "@/components/clientes/format"
+import { isValidCnpj, maskCnpj, onlyDigits } from "@/lib/format"
 
 export interface ClientFieldErrors {
   razao_social?: string

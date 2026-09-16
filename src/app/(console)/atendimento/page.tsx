@@ -16,9 +16,10 @@ import {
   listConversations,
   type ConversationOsRef,
 } from "@/server/conversations"
+import { OS_PRIORITY_META } from "@/lib/status-meta"
 import { buttonVariants } from "@/components/ui/button"
-import { OS_PRIORITY_META } from "@/components/chamados/format"
-import { DataError } from "@/components/clientes/data-error"
+import { DataError } from "@/components/data-error"
+import { EmptyState } from "@/components/empty-state"
 import { AiPanel, type AiStep } from "@/components/atendimento/ai-panel"
 import { ConversationList } from "@/components/atendimento/conversation-list"
 import {
@@ -280,50 +281,32 @@ function StatusTabs({ filters }: { filters: Filters }) {
 
 function EmptyFiltered() {
   return (
-    <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-      <div
-        className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-        aria-hidden="true"
-      >
-        <SearchXIcon className="size-7 text-ink-faint" />
-      </div>
-      <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-        Nenhuma conversa encontrada
-      </h3>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-        Nenhum resultado para a busca e o filtro atuais. Ajuste o termo ou
-        limpe os filtros.
-      </p>
+    <EmptyState
+      icon={SearchXIcon}
+      title="Nenhuma conversa encontrada"
+      description="Nenhum resultado para a busca e o filtro atuais. Ajuste o termo ou limpe os filtros."
+    >
       <Link
         href="/atendimento"
         className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
       >
         Limpar filtros
       </Link>
-    </section>
+    </EmptyState>
   )
 }
 
 function EmptyNoConversations() {
   return (
-    <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-      <div
-        className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-        aria-hidden="true"
-      >
-        <BotMessageSquareIcon className="size-7 text-ink-faint" />
-      </div>
-      <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
-        Nenhuma conversa ainda
-      </h3>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-        Quando o WhatsApp for conectado, as conversas dos clientes com a IA
-        aparecem aqui em tempo real — com chamados abertos automaticamente.
-      </p>
+    <EmptyState
+      icon={BotMessageSquareIcon}
+      title="Nenhuma conversa ainda"
+      description="Quando o WhatsApp for conectado, as conversas dos clientes com a IA aparecem aqui em tempo real — com chamados abertos automaticamente."
+    >
       <p className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
         <MessageSquareTextIcon className="size-4" aria-hidden="true" />
         Arquitetura pronta: basta plugar o provedor (src/lib/messaging).
       </p>
-    </section>
+    </EmptyState>
   )
 }

@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { getFunilDoMes } from "@/server/dashboard"
-import { BlockError } from "./block-error"
-import { formatBRL, formatInteiro, formatPct } from "./formatters"
+import { DataError } from "@/components/data-error"
+import { formatBRLInteiro, formatInteiro, formatPct } from "@/lib/format"
 
 type Estagio = {
   label: string
@@ -84,7 +84,7 @@ export async function FunilComercial() {
       </CardHeader>
       <CardContent>
         {result.error !== null ? (
-          <BlockError message={result.error} />
+          <DataError message={result.error} compact />
         ) : result.data.leads_total === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <UsersIcon className="size-6 text-ink-faint" aria-hidden="true" />
@@ -135,7 +135,7 @@ export async function FunilComercial() {
                 <CircleDollarSignIcon className="size-4 text-clear" aria-hidden="true" />
                 <span className="text-xs text-ink-faint">Valor convertido no mês</span>
                 <span className="font-mono text-sm font-semibold text-clear tabular-nums">
-                  {formatBRL(result.data.valor_convertido)}
+                  {formatBRLInteiro(result.data.valor_convertido)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -148,7 +148,7 @@ export async function FunilComercial() {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-ink-faint">Em negociação no funil</span>
                 <span className="font-mono text-sm font-semibold text-ink-dim tabular-nums">
-                  {formatBRL(result.data.valor_em_funil)}
+                  {formatBRLInteiro(result.data.valor_em_funil)}
                 </span>
               </div>
             </div>

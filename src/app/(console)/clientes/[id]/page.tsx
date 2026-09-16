@@ -39,21 +39,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ClientFormDialog } from "@/components/clientes/client-form-dialog"
-import { DataError } from "@/components/clientes/data-error"
+import { formatBRL, formatBtu, formatDateBR, maskCnpj } from "@/lib/format"
 import {
   CLIENT_STATUS_META,
   CONTRACT_STATUS_META,
   CONTRACT_TYPE_LABELS,
   EQUIPMENT_STATUS_META,
   EQUIPMENT_TYPE_LABELS,
-  formatBRL,
-  formatBtu,
-  formatDateBR,
-  maskCnpj,
   regiaoLabel,
   segmentoLabel,
-} from "@/components/clientes/format"
+} from "@/lib/status-meta"
+import { ClientFormDialog } from "@/components/clientes/client-form-dialog"
+import { DataError } from "@/components/data-error"
 
 type PageParams = { params: Promise<{ id: string }> }
 
@@ -105,7 +102,7 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-xl font-bold tracking-tight text-ink">
+                <h2 className="font-display text-lg font-bold tracking-tight text-ink">
                   {client.razao_social}
                 </h2>
                 <Badge

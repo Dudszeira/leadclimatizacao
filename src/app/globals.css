@@ -88,7 +88,7 @@
   --danger-dim: rgba(255, 92, 122, 0.13);
   --ink: #EAF2FF;
   --ink-dim: #93A7C9;
-  --ink-faint: #5C7093;
+  --ink-faint: #7288AC;
 
   --background: var(--void);
   --foreground: var(--ink);
@@ -265,4 +265,16 @@
 
 .leaflet-control-attribution a {
   color: var(--ink-dim);
+}
+/* Superfícies do navegador no tema console (craft floor) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+::selection {
+  background: var(--signal-dim);
+  color: var(--ink);
+}
+input, textarea {
+  caret-color: var(--signal);
 }

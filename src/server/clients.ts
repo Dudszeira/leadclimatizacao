@@ -3,6 +3,7 @@ import { createClient as createSupabase } from "@/lib/supabase/server";
 import type {
   Client,
   ClientWithRelations,
+  ContractType,
   PageParams,
   Paginated,
   Result,
@@ -73,6 +74,114 @@ export async function listClients(
     return ok(toPaginated((data ?? []) as Client[], count, params));
   } catch (error) {
     return failWith("listClients", error, "Não foi possível carregar os clientes. Tente novamente.");
+  }
+}
+
+/** Resumo agregado por cliente para a listagem (regiões, contrato, equipamentos). */
+export interface ClientSummary {
+  /** Regiões distintas dos prédios do cliente. */
+  regioes: string[];
+  /** Contrato de referência: o ativo de maior valor, senão o de maior valor. */
+  contrato: { tipo: ContractType; valor_mensal: number } | null;
+  equip_count: number;
+}
+
+function emptySummary(): ClientSummary {
+  return { regioes: [], contrato: null, equip_count: 0 };
+}
+
+/**
+ * Resumos da lista de clientes em 3 consultas batch no total (em vez de
+ * 3 por cliente): prédios, contratos e equipamentos agregados por client_id.
+ */
+export async function listClientsSummary(
+  clientIds: string[],
+): Promise<Result<Record<string, ClientSummary>>> {
+  try {
+    const summaries: Record<string, ClientSummary> = {};
+    for (const id of clientIds) summaries[id] = emptySummary();
+    if (clientIds.length === 0) return ok(summaries);
+    const idSet = new Set(clientIds);
+
+    // Contratos ordenados por valor desc: primeiro ativo do cliente, senão o 1º.
+    const pickContract = (
+      rows: Array<{ client_id: string; tipo: ContractType; valor_mensal: number; status: string }>,
+    ) => {
+      const sorted = [...rows].sort((a, b) => b.valor_mensal - a.valor_mensal);
+      for (const status of ["ativo", null] as const) {
+        for (const c of sorted) {
+          const summary = summaries[c.client_id];
+          if (!summary || summary.contrato) continue;
+          if (status === "ativo" && c.status !== "ativo") continue;
+          summary.contrato = { tipo: c.tipo, valor_mensal: c.valor_mensal };
+        }
+      }
+    };
+
+    if (isDemoMode) {
+      const buildingClient = new Map<string, string>();
+      const orderedBuildings = [...buildingsFixture].sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR"),
+      );
+      for (const b of orderedBuildings) {
+        if (!idSet.has(b.client_id)) continue;
+        buildingClient.set(b.id, b.client_id);
+        if (b.regiao && !summaries[b.client_id].regioes.includes(b.regiao)) {
+          summaries[b.client_id].regioes.push(b.regiao);
+        }
+      }
+      pickContract(contractsFixture.filter((c) => idSet.has(c.client_id)));
+      for (const e of equipmentFixture) {
+        const clientId = buildingClient.get(e.building_id);
+        if (clientId) summaries[clientId].equip_count += 1;
+      }
+      return ok(summaries);
+    }
+
+    const supabase = await createSupabase();
+    const [buildings, contracts, equipment] = await Promise.all([
+      supabase
+        .from("buildings")
+        .select("client_id, regiao")
+        .in("client_id", clientIds)
+        .order("nome", { ascending: true }),
+      supabase
+        .from("contracts")
+        .select("client_id, tipo, valor_mensal, status")
+        .in("client_id", clientIds),
+      supabase
+        .from("equipment")
+        .select("id, building:buildings!inner(client_id)")
+        .in("building.client_id", clientIds),
+    ]);
+    const error = buildings.error ?? contracts.error ?? equipment.error;
+    if (error) {
+      return failWith("listClientsSummary", error, "Não foi possível carregar os clientes. Tente novamente.");
+    }
+
+    for (const b of (buildings.data ?? []) as Array<{ client_id: string; regiao: string | null }>) {
+      const summary = summaries[b.client_id];
+      if (summary && b.regiao && !summary.regioes.includes(b.regiao)) {
+        summary.regioes.push(b.regiao);
+      }
+    }
+    pickContract(
+      (contracts.data ?? []) as Array<{
+        client_id: string;
+        tipo: ContractType;
+        valor_mensal: number;
+        status: string;
+      }>,
+    );
+    for (const e of (equipment.data ?? []) as unknown as Array<{
+      building: { client_id: string } | null;
+    }>) {
+      const clientId = e.building?.client_id;
+      if (clientId && summaries[clientId]) summaries[clientId].equip_count += 1;
+    }
+    return ok(summaries);
+  } catch (error) {
+    return failWith("listClientsSummary", error, "Não foi possível carregar os clientes. Tente novamente.");
   }
 }
 

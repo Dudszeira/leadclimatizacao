@@ -9,8 +9,8 @@ import {
 } from "lucide-react"
 
 import { getDashboardKpis } from "@/server/dashboard"
-import { BlockError } from "./block-error"
-import { formatInteiro, formatMinutos, formatPct } from "./formatters"
+import { DataError } from "@/components/data-error"
+import { formatInteiro, formatMinutos, formatPct } from "@/lib/format"
 import { StatCard } from "./stat-card"
 
 function delay(s: number): CSSProperties {
@@ -21,7 +21,7 @@ function delay(s: number): CSSProperties {
 export async function KpiCards() {
   const result = await getDashboardKpis()
   if (result.error !== null) {
-    return <BlockError message={result.error} />
+    return <DataError message={result.error} compact />
   }
   const kpis = result.data
 

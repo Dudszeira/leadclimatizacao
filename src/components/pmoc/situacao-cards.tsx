@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 
 import type { PmocContadores } from "@/lib/types"
-import { formatInteiro } from "@/components/dashboard/formatters"
+import { formatInteiro } from "@/lib/format"
 import { StatCard } from "@/components/dashboard/stat-card"
 
 function delay(s: number): CSSProperties {

@@ -10,12 +10,12 @@ import { cn } from "cn"
 import { ArrowUpRightIcon } from "lucide-react"
 
 import type { EquipmentStatus } from "@/lib/types"
+import { EQUIPMENT_STATUS_META } from "@/lib/status-meta"
 import { buttonVariants } from "@/components/ui/button"
 import {
   buildingAddress,
   clientName,
   LEGEND_ORDER,
-  STATUS_META,
   type MapaBuilding,
 } from "@/components/mapa/status"
 
@@ -96,11 +96,11 @@ function PinPopup({ building }: { building: MapaBuilding }) {
             <span
               className={cn(
                 "size-2 shrink-0 rounded-full",
-                STATUS_META[status].dotClass,
+                EQUIPMENT_STATUS_META[status].dotClassName,
               )}
               aria-hidden="true"
             />
-            <span className="flex-1">{STATUS_META[status].label}</span>
+            <span className="flex-1">{EQUIPMENT_STATUS_META[status].label}</span>
             <span className="font-mono text-ink">
               {building.status_counts[status]}
             </span>
@@ -156,7 +156,7 @@ export default function MapaCanvas({ buildings, focus }: MapaCanvasProps) {
           key={b.id}
           position={[b.lat as number, b.lng as number]}
           icon={pinIcon(b.pin_status)}
-          alt={`${b.nome} — ${STATUS_META[b.pin_status].label}`}
+          alt={`${b.nome} — ${EQUIPMENT_STATUS_META[b.pin_status].label}`}
           ref={(marker) => {
             if (marker) markersRef.current.set(b.id, marker)
             else markersRef.current.delete(b.id)

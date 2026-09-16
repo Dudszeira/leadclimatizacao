@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/card"
 import type { DashboardResumo } from "@/lib/types"
 import { getDashboardResumo } from "@/server/dashboard"
-import { BlockError } from "./block-error"
-import { formatBRL, formatInteiro } from "./formatters"
+import { DataError } from "@/components/data-error"
+import { formatBRLInteiro, formatInteiro } from "@/lib/format"
 
 type ItemAtividade = { mod: string; texto: string }
 
@@ -56,7 +56,7 @@ function itensDeAtividade(resumo: DashboardResumo): ItemAtividade[] {
   }
   itens.push({
     mod: "Financeiro → CRM",
-    texto: `${formatBRL(resumo.faturamento_recebido_mes)} recebidos de ${formatBRL(resumo.faturamento_previsto_mes)} previstos no mês — conciliação automática`,
+    texto: `${formatBRLInteiro(resumo.faturamento_recebido_mes)} recebidos de ${formatBRLInteiro(resumo.faturamento_previsto_mes)} previstos no mês — conciliação automática`,
   })
   return itens
 }
@@ -76,7 +76,7 @@ export async function AtividadeSistema() {
       </CardHeader>
       <CardContent>
         {result.error !== null ? (
-          <BlockError message={result.error} />
+          <DataError message={result.error} compact />
         ) : (
           (() => {
             const itens = itensDeAtividade(result.data)

@@ -18,16 +18,6 @@ export const LEGEND_ORDER: readonly EquipmentStatus[] = [
   "inativo",
 ]
 
-export const STATUS_META: Record<
-  EquipmentStatus,
-  { label: string; dotClass: string }
-> = {
-  operacional: { label: "Operacional", dotClass: "bg-clear" },
-  chamado_aberto: { label: "Chamado aberto", dotClass: "bg-amber" },
-  tecnico_em_campo: { label: "Técnico em campo", dotClass: "bg-signal" },
-  inativo: { label: "Inativo", dotClass: "bg-ink-faint" },
-}
-
 export function emptyStatusCounts(): StatusCounts {
   return {
     operacional: 0,

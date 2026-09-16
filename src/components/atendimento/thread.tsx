@@ -6,13 +6,11 @@ import type { ConversationWithMessages, Message } from "@/lib/types"
 import type { ConversationOsRef } from "@/server/conversations"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { initials, OS_PRIORITY_META } from "@/components/chamados/format"
+import { formatMessageTime, formatTelefoneBR, initials } from "@/lib/format"
+import { CONVERSATION_STATUS_META, OS_PRIORITY_META } from "@/lib/status-meta"
 import { AiSummaryMobile, type AiStep } from "@/components/atendimento/ai-panel"
 import {
-  CONVERSATION_STATUS_META,
   conversationName,
-  formatMessageTime,
-  formatTelefoneBR,
   isChamadoAberto,
   messageOsNumero,
 } from "@/components/atendimento/format"

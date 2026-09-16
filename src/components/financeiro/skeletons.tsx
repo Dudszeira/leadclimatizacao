@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { StatCardSkeleton } from "@/components/stat-card-skeleton"
 
 /** Skeleton da linha de KPIs do Financeiro. */
 export function FinanceiroKpisSkeleton() {
@@ -9,14 +9,7 @@ export function FinanceiroKpisSkeleton() {
       aria-hidden="true"
     >
       {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i} size="sm" className="gap-0">
-          <div className="flex items-start justify-between gap-2 px-(--card-spacing)">
-            <Skeleton className="h-3 w-32" />
-            <Skeleton className="size-8 rounded-lg" />
-          </div>
-          <Skeleton className="mx-(--card-spacing) mt-2 h-7 w-28" />
-          <Skeleton className="mx-(--card-spacing) mt-2 h-3 w-36" />
-        </Card>
+        <StatCardSkeleton key={i} />
       ))}
     </div>
   )
@@ -65,14 +58,7 @@ export function ContratosSkeleton({ rows = 6 }: { rows?: number }) {
     <div className="flex flex-col gap-4" aria-hidden="true">
       <div className="grid gap-3 sm:grid-cols-2">
         {Array.from({ length: 2 }).map((_, i) => (
-          <Card key={i} size="sm" className="gap-0">
-            <div className="flex items-start justify-between gap-2 px-(--card-spacing)">
-              <Skeleton className="h-3 w-28" />
-              <Skeleton className="size-8 rounded-lg" />
-            </div>
-            <Skeleton className="mx-(--card-spacing) mt-2 h-7 w-24" />
-            <Skeleton className="mx-(--card-spacing) mt-2 h-3 w-32" />
-          </Card>
+          <StatCardSkeleton key={i} />
         ))}
       </div>
       <div className="overflow-hidden rounded-xl border border-line bg-console">
