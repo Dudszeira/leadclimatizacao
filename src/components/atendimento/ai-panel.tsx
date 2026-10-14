@@ -96,7 +96,7 @@ function AiSteps({ steps }: { steps: AiStep[] }) {
               {step.label}
             </span>
             <span className="sr-only">
-              {step.done ? "— concluído" : "— pendente"}
+              {step.done ? "· concluído" : "· pendente"}
             </span>
           </span>
           <StepDetail step={step} />
@@ -138,7 +138,7 @@ function ConversationActionButtons({
   if (status === "encerrado") {
     return (
       <p className="text-xs leading-relaxed text-ink-faint">
-        Conversa encerrada — sem ações disponíveis.
+        Conversa encerrada. Sem ações disponíveis.
       </p>
     )
   }

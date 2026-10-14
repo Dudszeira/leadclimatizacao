@@ -84,7 +84,7 @@ export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
             Calendário PMOC
           </h2>
           <p className="mt-1 text-sm text-ink-dim">
-            Manutenções preventivas previstas e geradas por plano — Lei
+            Manutenções preventivas previstas e geradas por plano, conforme a Lei
             13.589/2018.
           </p>
         </div>

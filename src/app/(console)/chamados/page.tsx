@@ -386,7 +386,7 @@ async function ChamadosSection({
                 <TableCell className="px-4 py-3">
                   <Link
                     href={`/chamados/${os.id}`}
-                    aria-label={`Abrir chamado ${formatOsNumero(os.numero)} — ${clienteNome}`}
+                    aria-label={`Abrir chamado ${formatOsNumero(os.numero)}, ${clienteNome}`}
                     className="font-mono font-medium text-signal tabular-nums outline-none after:absolute after:inset-0 hover:underline focus-visible:underline"
                   >
                     {formatOsNumero(os.numero)}
@@ -498,7 +498,7 @@ function ChamadoCard({ os }: { os: ServiceOrderListItem }) {
   return (
     <Link
       href={`/chamados/${os.id}`}
-      aria-label={`Abrir chamado ${formatOsNumero(os.numero)} — ${clienteNome}`}
+      aria-label={`Abrir chamado ${formatOsNumero(os.numero)}, ${clienteNome}`}
       className="flex min-h-11 flex-col gap-2 px-4 py-3.5 outline-none hover:bg-console-2/60 focus-visible:bg-console-2"
     >
       <span className="flex items-center justify-between gap-2">

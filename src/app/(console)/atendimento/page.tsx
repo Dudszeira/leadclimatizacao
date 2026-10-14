@@ -271,7 +271,7 @@ function ListPagination({
   const last = Math.min(page.total, first + page.items.length - 1)
   const linkClass = cn(
     buttonVariants({ variant: "ghost", size: "sm" }),
-    "h-8 gap-1 px-2 text-xs max-md:h-10",
+    "h-8 gap-1 px-2 text-xs max-md:h-11",
   )
   return (
     <nav

@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 function buildAddress(building: BuildingWithEquipment): string {
   const rua = [building.logradouro, building.numero].filter(Boolean).join(", ")
   const cidade = `${building.cidade}/${building.uf}`
-  return [rua, building.bairro, cidade].filter(Boolean).join(" — ")
+  return [rua, building.bairro, cidade].filter(Boolean).join(" · ")
 }
 
 export default async function ClienteDetalhePage({ params }: PageParams) {
@@ -346,7 +346,7 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                           <span className="block font-mono text-xs text-ink-faint">
                             {building.lat != null && building.lng != null
                               ? `${building.lat.toFixed(5)}, ${building.lng.toFixed(5)}`
-                              : "sem coordenadas — fora do mapa"}
+                              : "sem coordenadas, fora do mapa"}
                           </span>
                         </span>
                       </p>

@@ -198,9 +198,9 @@ function mb(bytes: number): string {
 /** Valida o arquivo escolhido pelo usuário (antes da compressão). null = ok. */
 export function validatePhotoInput(file: { type: string; size: number }): string | null {
   if (!(PHOTO_ALLOWED_TYPES as readonly string[]).includes(file.type)) {
-    return "Formato não suportado — use foto JPEG, PNG ou WebP."
+    return "Formato não suportado. Use foto JPEG, PNG ou WebP."
   }
-  if (file.size <= 0) return "Arquivo vazio — tire a foto novamente."
+  if (file.size <= 0) return "Arquivo vazio. Tire a foto novamente."
   if (file.size > PHOTO_INPUT_MAX_BYTES) {
     return `Foto muito grande (máx. ${mb(PHOTO_INPUT_MAX_BYTES)}).`
   }
@@ -210,17 +210,17 @@ export function validatePhotoInput(file: { type: string; size: number }): string
 /** Valida o arquivo que vai para o bucket (após compressão) — mesma regra do servidor. */
 export function validatePhotoUpload(file: { type: string; size: number }): string | null {
   if (!(PHOTO_ALLOWED_TYPES as readonly string[]).includes(file.type)) {
-    return "Formato não suportado — use foto JPEG, PNG ou WebP."
+    return "Formato não suportado. Use foto JPEG, PNG ou WebP."
   }
-  if (file.size <= 0) return "Arquivo vazio — tire a foto novamente."
+  if (file.size <= 0) return "Arquivo vazio. Tire a foto novamente."
   if (file.size > PHOTO_MAX_BYTES) return `Foto acima de ${mb(PHOTO_MAX_BYTES)} após compressão.`
   return null
 }
 
 export function validateSignatureUpload(file: { type: string; size: number }): string | null {
-  if (file.type !== SIGNATURE_TYPE) return "Assinatura inválida — deve ser PNG."
-  if (file.size <= 0) return "Assinatura vazia — assine no quadro."
-  if (file.size > SIGNATURE_MAX_BYTES) return "Assinatura acima de 1 MB — limpe e assine de novo."
+  if (file.type !== SIGNATURE_TYPE) return "Assinatura inválida, deve ser PNG."
+  if (file.size <= 0) return "Assinatura vazia. Assine no quadro."
+  if (file.size > SIGNATURE_MAX_BYTES) return "Assinatura acima de 1 MB. Limpe e assine de novo."
   return null
 }
 
@@ -349,7 +349,7 @@ export interface AddressLike {
 
 export function formatEndereco(b: AddressLike): string {
   const rua = [b.logradouro, b.numero].filter(Boolean).join(", ")
-  const local = [b.bairro, `${b.cidade}/${b.uf}`].filter(Boolean).join(" — ")
+  const local = [b.bairro, `${b.cidade}/${b.uf}`].filter(Boolean).join(" · ")
   return [rua, local].filter(Boolean).join(" · ")
 }
 

@@ -4,10 +4,11 @@ import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import { env, isDemoMode } from "@/lib/env"
+import { env, isDemoMode, publicOrigin } from "@/lib/env"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import { authorizeAction } from "@/server/auth"
+import { safeErrorLog } from "@/server/_shared"
 
 /**
  * Gestão da equipe (somente admin). Papel/ativo mudam SEMPRE pela RPC
@@ -51,11 +52,10 @@ const inviteSchema = z.object({
 })
 
 async function appOrigin(): Promise<string> {
-  if (env.NEXT_PUBLIC_SITE_URL) return env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
+  // Produção: só NEXT_PUBLIC_SITE_URL (publicOrigin lança se faltar). Dev: host do request.
+  if (env.NEXT_PUBLIC_SITE_URL || process.env.NODE_ENV === "production") return publicOrigin()
   const h = await headers()
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
-  return `${proto}://${host}`
+  return publicOrigin({ host: h.get("host"), proto: h.get("x-forwarded-proto") })
 }
 
 /** Traduz erros da RPC admin_set_user_access sem vazar detalhes. */
@@ -80,10 +80,33 @@ async function setAccess(
     p_ativo: ativo,
   })
   if (error) {
-    console.error("[actions/equipe] admin_set_user_access:", error)
+    console.error("[actions/equipe] admin_set_user_access:", safeErrorLog(error))
     return accessErrorMessage(error)
   }
   return null
+}
+
+/**
+ * Espelha o "ativo" no Supabase Auth: desativado = banido (não renova sessão
+ * nem faz login; o refresh token deixa de valer), reativado = ban removido.
+ * A Admin API não encerra sessões por id de usuário (signOut exige o JWT do
+ * próprio usuário); o access token ainda vivo expira sozinho e, enquanto isso,
+ * get_my_role() já retorna null para perfil inativo (RLS nega tudo).
+ */
+async function syncAuthBan(userId: string, ativo: boolean): Promise<string | null> {
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      ban_duration: ativo ? "none" : "876000h",
+    })
+    if (!error) return null
+    console.error("[actions/equipe] updateUserById ban:", { code: error.code, message: error.message })
+  } catch (error) {
+    console.error("[actions/equipe] syncAuthBan:", error instanceof Error ? error.message : "erro")
+  }
+  return ativo
+    ? "Acesso reativado no sistema, mas o login continua bloqueado no provedor de autenticação. Tente novamente."
+    : "Acesso desativado no sistema, mas não foi possível bloquear o login no provedor de autenticação. Tente novamente."
 }
 
 /** Convida por e-mail, define o papel e já ativa o acesso. */
@@ -117,7 +140,7 @@ export async function inviteMember(
       data: { full_name: parsed.data.full_name },
     })
     if (error || !data.user) {
-      console.error("[actions/equipe] inviteUserByEmail:", error)
+      console.error("[actions/equipe] inviteUserByEmail:", safeErrorLog(error))
       const exists = error?.code === "email_exists" || error?.status === 422
       return {
         status: "error",
@@ -136,7 +159,7 @@ export async function inviteMember(
       }
     }
   } catch (error) {
-    console.error("[actions/equipe] inviteMember:", error)
+    console.error("[actions/equipe] inviteMember:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível enviar o convite. Tente novamente." }
   }
 
@@ -174,8 +197,13 @@ export async function updateMemberAccess(input: {
   try {
     const accessError = await setAccess(parsed.data.userId, parsed.data.role, parsed.data.ativo)
     if (accessError) return { status: "error", message: accessError }
+    const banError = await syncAuthBan(parsed.data.userId, parsed.data.ativo)
+    if (banError) {
+      revalidatePath("/equipe")
+      return { status: "error", message: banError }
+    }
   } catch (error) {
-    console.error("[actions/equipe] updateMemberAccess:", error)
+    console.error("[actions/equipe] updateMemberAccess:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível atualizar o acesso. Tente novamente." }
   }
 

@@ -140,6 +140,10 @@ export function BillingRunActions({ competencias }: BillingRunActionsProps) {
               </SelectContent>
             </Select>
           </div>
+          <p className="rounded-lg border border-line bg-console-2 px-3 py-2 text-sm text-ink-dim" aria-live="polite">
+            Competência selecionada: <strong className="font-medium text-ink">{label}</strong>.
+            Só contratos ativos e vigentes nesse mês entram; quem já tem fatura de {label} é pulado.
+          </p>
           {lastResult && lastResult.status !== "success" ? (
             <p
               role="status"

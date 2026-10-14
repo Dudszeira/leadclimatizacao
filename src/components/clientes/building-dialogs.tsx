@@ -259,7 +259,7 @@ function BuildingForm({
                 Buscar coordenadas
               </Button>
               <span className="text-xs text-ink-faint">
-                Opcional — consulta o OpenStreetMap pelo endereço; confira antes de salvar.
+                Opcional. Consulta o OpenStreetMap pelo endereço; confira antes de salvar.
               </span>
             </div>
           </fieldset>

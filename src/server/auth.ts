@@ -9,7 +9,7 @@ import { profilesFixture } from "@/lib/fixtures";
 import { homeFor } from "@/lib/nav";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import type { Profile, Result, UserRole } from "@/lib/types";
-import { fail, ok } from "./_shared";
+import { fail, ok, safeErrorLog } from "./_shared";
 
 /**
  * Autenticação e autorização no servidor (Server Components, Server Actions,
@@ -49,7 +49,7 @@ const loadSession = cache(async (): Promise<SessionState> => {
       .eq("id", claims.sub)
       .maybeSingle();
     if (error) {
-      console.error("[auth] loadSession profile:", error);
+      console.error("[auth] loadSession profile:", safeErrorLog(error));
       return { status: "inactive" };
     }
     const profile = data as Profile | null;
@@ -58,7 +58,7 @@ const loadSession = cache(async (): Promise<SessionState> => {
     const email = typeof claims.email === "string" ? claims.email : null;
     return { status: "ok", profile: { ...profile, email } };
   } catch (error) {
-    console.error("[auth] loadSession:", error);
+    console.error("[auth] loadSession:", safeErrorLog(error));
     return { status: "anon" };
   }
 });
@@ -107,7 +107,7 @@ export async function authorizeAction(...roles: UserRole[]): Promise<Result<Sess
   try {
     state = await loadSession();
   } catch (error) {
-    console.error("[auth] authorizeAction:", error);
+    console.error("[auth] authorizeAction:", safeErrorLog(error));
     return fail("Sem permissão");
   }
   if (state.status === "anon") return fail("Sessão expirada — entre novamente.");
@@ -138,13 +138,13 @@ export async function authorizeServiceOrder(osId: string): Promise<Result<Sessio
       .eq("id", id.data)
       .maybeSingle();
     if (error) {
-      console.error("[auth] authorizeServiceOrder:", error);
+      console.error("[auth] authorizeServiceOrder:", safeErrorLog(error));
       return fail("Sem permissão");
     }
     if (!data || data.technician_id !== profile.id) return fail("Sem permissão");
     return auth;
   } catch (error) {
-    console.error("[auth] authorizeServiceOrder:", error);
+    console.error("[auth] authorizeServiceOrder:", safeErrorLog(error));
     return fail("Sem permissão");
   }
 }

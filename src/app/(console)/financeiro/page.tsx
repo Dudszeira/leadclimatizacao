@@ -343,22 +343,22 @@ async function FaturasSection({ filters }: { filters: Filters }) {
             <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
               Cliente / plano
             </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
               Competência
             </TableHead>
             <TableHead className="text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
               Valor
             </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
               Vencimento
             </TableHead>
             <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
               Status
             </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
               Cobrança
             </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
               Nota fiscal
             </TableHead>
             <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
@@ -393,14 +393,17 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                   <span className="mt-0.5 block truncate text-xs text-ink-faint">
                     {tipoMeta.label}
                   </span>
+                  <span className="mt-0.5 block truncate font-mono text-xs text-ink-dim tabular-nums md:hidden">
+                    {formatCompetencia(fatura.competencia)} · vence {formatDateBR(fatura.vencimento)}
+                  </span>
                 </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
+                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
                   {formatCompetencia(fatura.competencia)}
                 </TableCell>
                 <TableCell className="py-3 text-right font-mono font-medium text-ink tabular-nums">
                   {formatBRL(fatura.valor)}
                 </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
+                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
                   {formatDateBR(fatura.vencimento)}
                 </TableCell>
                 <TableCell className="py-3">
@@ -411,7 +414,7 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                     {statusMeta.label}
                   </Badge>
                 </TableCell>
-                <TableCell className="py-3">
+                <TableCell className="py-3 max-md:hidden">
                   {isLock(fatura.asaas_id) ? (
                     <span className="text-ink-faint">Gerando…</span>
                   ) : fatura.metodo ? (
@@ -426,7 +429,7 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                     <span className="text-ink-faint">—</span>
                   )}
                 </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
+                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
                   {fatura.nf_numero ??
                     (fatura.asaas_invoice_id ? (
                       <span className="font-sans text-ink-faint">Em emissão</span>
@@ -528,7 +531,7 @@ async function ContratosSection({ filters }: { filters: Filters }) {
             tone="neutral"
           />
           <StatCard
-            label="MRR — receita recorrente"
+            label="MRR · receita recorrente"
             value={formatBRLInteiro(resumoResult.data.mrr)}
             icon={TrendingUpIcon}
             sub="Soma dos PMOC recorrentes ativos"
@@ -539,8 +542,8 @@ async function ContratosSection({ filters }: { filters: Filters }) {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-ink-dim">
-          Contratos ativos geram as faturas mensais (dia 1, 06:00) — encerre
-          para parar a cobrança.
+          Contratos ativos geram as faturas mensais (dia 1, 06:00). Encerre
+          o contrato para parar a cobrança.
         </p>
         {novoContrato}
       </div>
@@ -557,19 +560,19 @@ async function ContratosSection({ filters }: { filters: Filters }) {
               <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Cliente
               </TableHead>
-              <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Tipo
               </TableHead>
               <TableHead className="text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Valor mensal
               </TableHead>
-              <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Vencimento
               </TableHead>
               <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Status
               </TableHead>
-              <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Vigência
               </TableHead>
               <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
@@ -597,8 +600,11 @@ async function ContratosSection({ filters }: { filters: Filters }) {
                         {contrato.client.cnpj}
                       </span>
                     ) : null}
+                    <span className="mt-0.5 block truncate text-xs text-ink-dim md:hidden">
+                      {tipoMeta.label} · vence dia {contrato.dia_vencimento}
+                    </span>
                   </TableCell>
-                  <TableCell className="py-3">
+                  <TableCell className="py-3 max-md:hidden">
                     <Badge
                       variant="outline"
                       className={cn("font-medium", tipoMeta.badgeClassName)}
@@ -609,7 +615,7 @@ async function ContratosSection({ filters }: { filters: Filters }) {
                   <TableCell className="py-3 text-right font-mono font-medium text-ink tabular-nums">
                     {formatBRL(contrato.valor_mensal)}
                   </TableCell>
-                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
+                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
                     dia {contrato.dia_vencimento}
                   </TableCell>
                   <TableCell className="py-3">
@@ -620,7 +626,7 @@ async function ContratosSection({ filters }: { filters: Filters }) {
                       {statusMeta.label}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
+                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
                     {formatDateBR(contrato.inicio)}
                     {contrato.fim ? ` → ${formatDateBR(contrato.fim)}` : ""}
                   </TableCell>

@@ -43,7 +43,7 @@ export function StatCard({
       size="sm"
       className={cn("console-enter gap-0", className)}
       style={style}
-      aria-label={`${label}: ${value} — ${sub}`}
+      aria-label={`${label}: ${value}, ${sub}`}
     >
       <div className="flex items-start justify-between gap-2 px-(--card-spacing)">
         <span className="text-[0.71rem] leading-snug tracking-[0.05em] text-ink-faint uppercase">

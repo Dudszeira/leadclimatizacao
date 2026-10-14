@@ -51,7 +51,7 @@ export function AtencaoImediata({
       {itens.length === 0 ? (
         <p className="flex items-center gap-2 px-4 py-6 text-sm text-ink-dim">
           <CircleCheckIcon className="size-4 shrink-0 text-clear" aria-hidden="true" />
-          Nenhum plano exige ação agora — manutenções em dia.
+          Nenhum plano exige ação agora. Manutenções em dia.
         </p>
       ) : (
         <ul role="list" className="divide-y divide-line-soft">

@@ -27,6 +27,14 @@ import {
 
 const ROLE_ITEMS: Record<UserRole, string> = ROLE_LABELS
 
+const ROLE_RANK: Record<UserRole, number> = { tecnico: 1, atendente: 2, admin: 3 }
+
+const ROLE_SCOPE: Record<UserRole, string> = {
+  admin: "tudo, inclusive equipe e financeiro",
+  atendente: "clientes, chamados, atendimento e agenda",
+  tecnico: "apenas as OS atribuídas a ele, pelo celular",
+}
+
 type MemberActionsProps = {
   member: { id: string; full_name: string; role: UserRole; ativo: boolean }
   isSelf: boolean
@@ -37,6 +45,8 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
   const [confirmOpen, setConfirmOpen] = React.useState(false)
+  // Rebaixar papel pede confirmação: a pessoa perde telas na hora.
+  const [downgradeTo, setDowngradeTo] = React.useState<UserRole | null>(null)
 
   function apply(role: UserRole, ativo: boolean) {
     startTransition(async () => {
@@ -51,12 +61,16 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
   }
 
   return (
+    <div className="flex flex-col items-end gap-1">
     <div className="flex items-center justify-end gap-2">
       <Select
         items={ROLE_ITEMS}
         value={member.role}
         onValueChange={(value: string | null) => {
-          if (value && value !== member.role) apply(value as UserRole, member.ativo)
+          if (!value || value === member.role) return
+          const next = value as UserRole
+          if (ROLE_RANK[next] < ROLE_RANK[member.role]) setDowngradeTo(next)
+          else apply(next, member.ativo)
         }}
         disabled={pending || isSelf}
       >
@@ -64,7 +78,9 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
           aria-label={`Papel de ${member.full_name}`}
           className="h-9 w-[150px] max-md:h-11"
         >
-          <SelectValue />
+          <SelectValue>
+            {(value: string | null) => (value ? ROLE_ITEMS[value as UserRole] : "Papel")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {Object.entries(ROLE_ITEMS).map(([value, label]) => (
@@ -82,7 +98,7 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
           disabled={pending || isSelf}
           onClick={() => setConfirmOpen(true)}
           aria-label={`Desativar ${member.full_name}`}
-          title={isSelf ? "Você não pode desativar o próprio acesso" : undefined}
+          aria-describedby={isSelf ? `self-${member.id}` : undefined}
         >
           {pending ? (
             <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
@@ -107,6 +123,50 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
           <span className="max-lg:sr-only">Ativar</span>
         </Button>
       )}
+
+    </div>
+      {isSelf && (
+        <p id={`self-${member.id}`} className="text-right text-xs text-ink-faint">
+          Você não pode alterar o próprio papel nem desativar o próprio acesso.
+        </p>
+      )}
+
+      <Dialog open={downgradeTo !== null} onOpenChange={(open) => !open && setDowngradeTo(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Reduzir o acesso de {member.full_name}?
+            </DialogTitle>
+            <DialogDescription>
+              {downgradeTo
+                ? `De ${ROLE_ITEMS[member.role]} para ${ROLE_ITEMS[downgradeTo]}. A pessoa passa a ver ${ROLE_SCOPE[downgradeTo]}. Telas abertas deixam de funcionar no próximo carregamento.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="max-md:h-11"
+              onClick={() => setDowngradeTo(null)}
+              disabled={pending}
+            >
+              Manter {ROLE_ITEMS[member.role]}
+            </Button>
+            <Button
+              variant="destructive"
+              className="max-md:h-11"
+              disabled={pending}
+              onClick={() => {
+                const next = downgradeTo
+                setDowngradeTo(null)
+                if (next) apply(next, member.ativo)
+              }}
+            >
+              Reduzir acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md">

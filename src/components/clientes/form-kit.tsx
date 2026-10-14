@@ -46,17 +46,27 @@ export function Field({
   className?: string
   children: React.ReactNode
 }) {
+  const hintId = hint ? `${id}-dica` : null
+  const errorId = error ? `${id}-erro` : null
+  // A dica fica ligada ao campo sempre (não só quando há erro).
+  let control = children
+  if (hintId && React.isValidElement<{ "aria-describedby"?: string }>(children)) {
+    const current = children.props["aria-describedby"]
+    const ids = new Set([...(current ? current.split(" ") : []), hintId, ...(errorId ? [errorId] : [])])
+    control = React.cloneElement(children, { "aria-describedby": [...ids].join(" ") })
+  }
   return (
     <div className={className ? `grid gap-1.5 ${className}` : "grid gap-1.5"}>
       <Label htmlFor={id}>{label}</Label>
-      {children}
+      {control}
+      {hint ? (
+        <p id={`${id}-dica`} className="text-xs text-ink-faint">
+          {hint}
+        </p>
+      ) : null}
       {error ? (
         <p id={`${id}-erro`} className="text-xs text-danger">
           {error}
-        </p>
-      ) : hint ? (
-        <p id={`${id}-dica`} className="text-xs text-ink-faint">
-          {hint}
         </p>
       ) : null}
     </div>
@@ -131,7 +141,7 @@ export function useCadastroAction() {
         try {
           result = await action()
         } catch {
-          result = { ok: false, message: "Falha de conexão — tente novamente." }
+          result = { ok: false, message: "Falha de conexão. Tente novamente." }
         }
         setFieldErrors(result.fieldErrors ?? {})
         if (result.ok) {

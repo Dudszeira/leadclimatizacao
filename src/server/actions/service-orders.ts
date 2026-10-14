@@ -19,6 +19,7 @@ import {
   equipmentFixture,
   serviceOrdersFixture,
 } from "@/lib/fixtures"
+import { safeErrorLog } from "@/server/_shared"
 import { authorizeAction, authorizeServiceOrder, type SessionProfile } from "@/server/auth"
 import { listEquipment } from "@/server/equipment"
 import {
@@ -38,6 +39,10 @@ import {
 
 /**
  * Server actions da Central de Chamados e da execução em campo.
+ *
+ * Assinatura e conclusão vão pelas RPCs registrar_assinatura / concluir_os
+ * (0009): o banco revalida evidências e o UPDATE direto dessas colunas é
+ * bloqueado para não-admin. A validação aqui antes é só para mensagem amigável.
  *
  * Toda mudança de status é CONDICIONAL ao status atual (.in("status", ...))
  * e confere as linhas afetadas com .select("id"): se a RLS/guard bloquear ou
@@ -79,12 +84,29 @@ function revalidateOs(osId: string) {
 
 type SupabaseServer = Awaited<ReturnType<typeof createSupabase>>
 
+/** URLs assinadas de fotos/assinatura: 10 min. */
+const SIGNED_URL_TTL = 600
+
 /** Traduz o erro do PostgREST (guard do banco = 42501) para pt-BR. */
 function dbError(context: string, err: unknown, fallback: string): OsActionResult {
-  console.error(`[actions/service-orders] ${context}:`, err)
+  console.error(`[actions/service-orders] ${context}:`, safeErrorLog(err))
   const code = (err as { code?: string } | null)?.code
   if (code === "42501") return error("Sem permissão para esta mudança nesta OS.")
   return error(fallback)
+}
+
+/**
+ * Erro das RPCs de evidência: P0001 traz mensagem pt-BR própria do banco
+ * (pendência de foto/assinatura/checklist, sem dado pessoal) e é exibida.
+ */
+function rpcError(context: string, err: unknown, fallback: string): OsActionResult {
+  const e = err as { code?: string; message?: string } | null
+  if (e?.code === "P0001" && typeof e.message === "string" && e.message.length <= 200) {
+    console.error(`[actions/service-orders] ${context}:`, safeErrorLog(err))
+    return error(e.message)
+  }
+  if (e?.code === "P0002") return error(STALE)
+  return dbError(context, err, fallback)
 }
 
 /**
@@ -176,7 +198,7 @@ async function checkLocationConsistency(
       .eq("id", buildingId)
       .maybeSingle()
     if (bErr) {
-      console.error("[actions/service-orders] consistency building:", bErr)
+      console.error("[actions/service-orders] consistency building:", safeErrorLog(bErr))
       return { ok: "error" }
     }
     buildingClient = (b?.client_id as string | undefined) ?? null
@@ -187,7 +209,7 @@ async function checkLocationConsistency(
         .eq("id", equipmentId)
         .maybeSingle()
       if (eErr) {
-        console.error("[actions/service-orders] consistency equipment:", eErr)
+        console.error("[actions/service-orders] consistency equipment:", safeErrorLog(eErr))
         return { ok: "error" }
       }
       equipmentBuilding = (e?.building_id as string | undefined) ?? null
@@ -271,11 +293,11 @@ export async function createServiceOrder(
       })
       .select("id")
     if (err || !data || data.length === 0) {
-      console.error("[actions/service-orders] create:", err)
+      console.error("[actions/service-orders] create:", safeErrorLog(err))
       return { status: "error", message: "Não foi possível abrir o chamado. Tente novamente." }
     }
   } catch (err) {
-    console.error("[actions/service-orders] createServiceOrder:", err)
+    console.error("[actions/service-orders] createServiceOrder:", safeErrorLog(err))
     return { status: "error", message: "Não foi possível abrir o chamado. Tente novamente." }
   }
 
@@ -623,7 +645,7 @@ async function checkStoredObject(
     .from(bucket)
     .list(dir, { search: file, limit: 5 })
   if (err) {
-    console.error("[actions/service-orders] storage list:", err)
+    console.error("[actions/service-orders] storage list:", safeErrorLog(err))
     return "Não foi possível conferir o arquivo enviado. Tente novamente."
   }
   const obj = (data ?? []).find((o) => o.name === file)
@@ -699,7 +721,7 @@ export async function registerServiceOrderPhoto(input: {
 
     const { data: signed } = await supabase.storage
       .from(STORAGE_BUCKETS.fotos)
-      .createSignedUrl(path, 60 * 60)
+      .createSignedUrl(path, SIGNED_URL_TTL)
 
     revalidateOs(osId)
     return {
@@ -762,20 +784,17 @@ export async function saveSignature(input: {
     )
     if (objError) return error(objError)
 
-    const blocked = await guardedUpdate(
-      supabase,
-      "saveSignature",
-      osId,
-      { assinatura_path: path, assinado_por_nome: nome, assinado_em: new Date().toISOString() },
-      ["em_campo"],
-      auth.data,
-      "Não foi possível salvar a assinatura. Tente novamente.",
-    )
-    if (blocked) return blocked
+    const { data: saved, error: rpcErr } = await supabase.rpc("registrar_assinatura", {
+      p_os: osId,
+      p_assinatura_path: path,
+      p_assinado_por_nome: nome,
+    })
+    if (rpcErr) return rpcError("saveSignature", rpcErr, "Não foi possível salvar a assinatura. Tente novamente.")
+    if (!saved) return error(STALE)
 
     const { data: signed } = await supabase.storage
       .from(STORAGE_BUCKETS.assinaturas)
-      .createSignedUrl(path, 60 * 60)
+      .createSignedUrl(path, SIGNED_URL_TTL)
     revalidateOs(osId)
     return { status: "success", message: "Assinatura registrada.", url: signed?.signedUrl ?? null }
   } catch (err) {
@@ -784,9 +803,9 @@ export async function saveSignature(input: {
 }
 
 /**
- * Conclui a OS: em_campo -> concluido. Revalida no servidor checklist
- * obrigatório + foto "depois" + assinatura. concluded_at, PMOC e status do
- * equipamento ficam com o banco (trigger).
+ * Conclui a OS: em_campo -> concluido pela RPC concluir_os, que revalida no
+ * banco checklist obrigatório + foto "depois" (existente no Storage) +
+ * assinatura. concluded_at, PMOC e status do equipamento ficam com o banco.
  */
 export async function concludeServiceOrder(osId: string): Promise<OsActionResult> {
   const auth = await authorizeServiceOrder(osId)
@@ -808,26 +827,26 @@ export async function concludeServiceOrder(osId: string): Promise<OsActionResult
       .eq("etapa", "depois")
     if (cErr) return dbError("conclude count", cErr, "Não foi possível conferir as fotos. Tente novamente.")
 
+    // Pré-checagem só para a mensagem amigável; quem decide é concluir_os
+    // (só conta foto registrada em service_order_photos — fotos_depois legado não vale).
     const readiness = evaluateConclusion({
       status: ctx.status,
       itens: ctx.itens,
       respostas: ctx.respostas,
-      fotosDepois: (count ?? 0) + ctx.fotos_depois.length,
+      fotosDepois: count ?? 0,
       assinaturaPath: ctx.assinatura_path,
       assinadoPorNome: ctx.assinado_por_nome,
     })
     if (!readiness.ready) return error(readiness.pendencias[0])
+    if (!sourceStatusesFor("concluido", auth.data.role).includes(ctx.status)) return error(STALE)
 
-    const blocked = await guardedUpdate(
-      supabase,
-      "conclude",
-      id.data,
-      { status: "concluido" },
-      sourceStatusesFor("concluido", auth.data.role),
-      auth.data,
-      "Não foi possível concluir o chamado. Tente novamente.",
-    )
-    if (blocked) return blocked
+    const { data: done, error: rpcErr } = await supabase.rpc("concluir_os", {
+      p_os: id.data,
+      p_assinatura_path: ctx.assinatura_path,
+      p_assinado_por_nome: ctx.assinado_por_nome,
+    })
+    if (rpcErr) return rpcError("conclude", rpcErr, "Não foi possível concluir o chamado. Tente novamente.")
+    if (!done) return error(STALE)
   } catch (err) {
     return dbError("concludeServiceOrder", err, "Não foi possível concluir o chamado. Tente novamente.")
   }

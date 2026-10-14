@@ -143,7 +143,7 @@ export function EquipmentCombobox({
             </CommandGroup>
             {total > items.length && (
               <p className="border-t border-line-soft px-3 py-2 text-xs text-ink-faint">
-                Mostrando {items.length} de {total} — refine a busca.
+                Mostrando {items.length} de {total}. Refine a busca.
               </p>
             )}
           </CommandList>

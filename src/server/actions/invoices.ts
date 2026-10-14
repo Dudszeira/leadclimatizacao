@@ -22,6 +22,7 @@ import { createClient as createSupabase } from "@/lib/supabase/server"
 import type { PaymentMethod } from "@/lib/types"
 import { getInvoice } from "@/server/invoices"
 import { authorizeAction } from "@/server/auth"
+import { safeErrorLog } from "@/server/_shared"
 
 /**
  * Server actions das faturas. Todas exigem admin (authorizeAction), validam
@@ -80,7 +81,7 @@ async function acquireLock(
   query = isStaleLock(current) ? query.eq(column, current as string) : query.is(column, null)
   const { data, error: dbError } = await extra(query).select("id")
   if (dbError) {
-    console.error(`[actions/invoices] lock ${column}:`, dbError)
+    console.error(`[actions/invoices] lock ${column}:`, safeErrorLog(dbError))
     return { lock: null, dbError: true }
   }
   return { lock: data && data.length > 0 ? lock : null, dbError: false }
@@ -97,7 +98,7 @@ async function releaseLock(
     .update({ [column]: null })
     .eq("id", invoiceId)
     .eq(column, lock)
-  if (dbError) console.error(`[actions/invoices] release ${column}:`, dbError)
+  if (dbError) console.error(`[actions/invoices] release ${column}:`, safeErrorLog(dbError))
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +140,7 @@ export async function generateCharge(
       .eq("id", invoice.contract.client.id)
       .maybeSingle()
     if (clientError || !clientRow) {
-      console.error("[actions/invoices] generateCharge cliente:", clientError)
+      console.error("[actions/invoices] generateCharge cliente:", safeErrorLog(clientError))
       return error("Não foi possível carregar o cliente da fatura. Tente novamente.")
     }
 
@@ -187,7 +188,7 @@ export async function generateCharge(
       .eq("asaas_id", lock)
       .select("id")
     if (saveError || !saved || saved.length === 0) {
-      console.error("[actions/invoices] generateCharge gravar:", saveError ?? "0 linhas")
+      console.error("[actions/invoices] generateCharge gravar:", safeErrorLog(saveError ?? "0 linhas"))
       return error(
         "Cobrança criada no Asaas, mas não foi possível gravar na fatura agora — ela será vinculada automaticamente pelo webhook. Atualize a página em instantes.",
       )
@@ -201,7 +202,7 @@ export async function generateCharge(
         : `Cobrança ${metodoGravado === "pix" ? "Pix" : "por boleto"} gerada no Asaas.`,
     }
   } catch (err) {
-    console.error("[actions/invoices] generateCharge:", err)
+    console.error("[actions/invoices] generateCharge:", safeErrorLog(err))
     return error("Não foi possível gerar a cobrança. Tente novamente.")
   }
 }
@@ -227,14 +228,14 @@ export async function markInvoicePaid(invoiceId: string): Promise<InvoiceActionR
       .in("status", ["pendente", "atrasado"])
       .select("id")
     if (dbError) {
-      console.error("[actions/invoices] markInvoicePaid:", dbError)
+      console.error("[actions/invoices] markInvoicePaid:", safeErrorLog(dbError))
       return error("Não foi possível marcar a fatura como paga. Tente novamente.")
     }
     if (!data || data.length === 0) {
       return error("A fatura não está mais em aberto (ou você não tem permissão) — atualize a página.")
     }
   } catch (err) {
-    console.error("[actions/invoices] markInvoicePaid:", err)
+    console.error("[actions/invoices] markInvoicePaid:", safeErrorLog(err))
     return error("Não foi possível marcar a fatura como paga. Tente novamente.")
   }
 
@@ -283,7 +284,7 @@ export async function issueNfse(invoiceId: string): Promise<InvoiceActionResult>
       .eq("id", invoice.contract.client.id)
       .maybeSingle()
     if (clientError || !clientRow) {
-      console.error("[actions/invoices] issueNfse cliente:", clientError)
+      console.error("[actions/invoices] issueNfse cliente:", safeErrorLog(clientError))
       return error("Não foi possível carregar os dados fiscais do cliente. Tente novamente.")
     }
     const fiscal = fiscalFromClient(clientRow)
@@ -332,7 +333,7 @@ export async function issueNfse(invoiceId: string): Promise<InvoiceActionResult>
       .eq("asaas_invoice_id", lock)
       .select("id")
     if (saveError || !saved || saved.length === 0) {
-      console.error("[actions/invoices] issueNfse gravar:", saveError ?? "0 linhas")
+      console.error("[actions/invoices] issueNfse gravar:", safeErrorLog(saveError ?? "0 linhas"))
       return error(
         "NFS-e agendada no Asaas, mas não foi possível gravar na fatura agora — o webhook vincula a nota automaticamente.",
       )
@@ -344,7 +345,7 @@ export async function issueNfse(invoiceId: string): Promise<InvoiceActionResult>
       message: "NFS-e agendada no Asaas — o número aparece assim que a prefeitura autorizar.",
     }
   } catch (err) {
-    console.error("[actions/invoices] issueNfse:", err)
+    console.error("[actions/invoices] issueNfse:", safeErrorLog(err))
     return error("Não foi possível emitir a NFS-e. Tente novamente.")
   }
 }
@@ -376,7 +377,7 @@ export async function generateMonthlyInvoices(competencia?: string): Promise<Inv
       p_competencia: comp,
     })
     if (rpcError) {
-      console.error("[actions/invoices] generateMonthlyInvoices:", rpcError)
+      console.error("[actions/invoices] generateMonthlyInvoices:", safeErrorLog(rpcError))
       return error("Não foi possível gerar as faturas do mês. Tente novamente.")
     }
     const n = Number(data ?? 0)
@@ -390,7 +391,7 @@ export async function generateMonthlyInvoices(competencia?: string): Promise<Inv
           : `${n} fatura${n > 1 ? "s criadas" : " criada"} para ${label}.`,
     }
   } catch (err) {
-    console.error("[actions/invoices] generateMonthlyInvoices:", err)
+    console.error("[actions/invoices] generateMonthlyInvoices:", safeErrorLog(err))
     return error("Não foi possível gerar as faturas do mês. Tente novamente.")
   }
 }
@@ -410,7 +411,7 @@ export async function markOverdueInvoices(): Promise<InvoiceActionResult> {
     const supabase = await createSupabase()
     const { data, error: rpcError } = await supabase.rpc("mark_overdue_invoices")
     if (rpcError) {
-      console.error("[actions/invoices] markOverdueInvoices:", rpcError)
+      console.error("[actions/invoices] markOverdueInvoices:", safeErrorLog(rpcError))
       return error("Não foi possível atualizar as faturas atrasadas. Tente novamente.")
     }
     const n = Number(data ?? 0)
@@ -424,7 +425,7 @@ export async function markOverdueInvoices(): Promise<InvoiceActionResult> {
           : `${n} fatura${n > 1 ? "s marcadas" : " marcada"} como atrasada${n > 1 ? "s" : ""}.`,
     }
   } catch (err) {
-    console.error("[actions/invoices] markOverdueInvoices:", err)
+    console.error("[actions/invoices] markOverdueInvoices:", safeErrorLog(err))
     return error("Não foi possível atualizar as faturas atrasadas. Tente novamente.")
   }
 }

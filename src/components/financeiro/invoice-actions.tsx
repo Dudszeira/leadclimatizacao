@@ -100,7 +100,7 @@ export function InvoiceActions({
       await navigator.clipboard.writeText(asaasUrl)
       toast.success("Link de pagamento copiado.")
     } catch {
-      toast.error("Não foi possível copiar o link — copie manualmente pelo Asaas.")
+      toast.error("Não foi possível copiar o link. Copie manualmente pelo Asaas.")
     }
   }
 
@@ -113,7 +113,7 @@ export function InvoiceActions({
             size="icon"
             disabled={busy}
             aria-label={`Ações da fatura de ${clienteNome}`}
-            className="relative z-10 size-8 text-ink-dim hover:text-ink max-md:size-10"
+            className="relative z-10 size-8 text-ink-dim hover:text-ink max-md:size-11"
           />
         }
       >

@@ -192,7 +192,7 @@ function PlanForm({
           id="plano-rt"
           value={form.responsavel_tecnico}
           onChange={(e) => set("responsavel_tecnico")(e.target.value)}
-          placeholder="Eng. Nome Sobrenome — CREA-PR 000000/D"
+          placeholder="Eng. Nome Sobrenome, CREA-PR 000000/D"
           className="max-md:h-11"
           {...invalidProps("plano-rt", errors.responsavel_tecnico)}
         />

@@ -80,7 +80,7 @@ export function ContractActions({ contract, clienteNome, clients, hoje }: Contra
                 size="sm"
                 disabled={pending}
                 aria-label={`Encerrar contrato de ${clienteNome}`}
-                className="h-8 px-2 text-ink-dim hover:text-danger max-md:h-10"
+                className="h-8 px-2 text-ink-dim hover:text-danger max-md:h-11"
               />
             }
           >

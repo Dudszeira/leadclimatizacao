@@ -4,17 +4,16 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
-import { env, isDemoMode } from "@/lib/env"
+import { env, isDemoMode, publicOrigin } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import type { AuthFormState } from "./_components/form-bits"
 
 /** Origem pública do app para links enviados por e-mail. */
 async function appOrigin(): Promise<string> {
-  if (env.NEXT_PUBLIC_SITE_URL) return env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
+  // Produção: só NEXT_PUBLIC_SITE_URL (publicOrigin lança se faltar). Dev: host do request.
+  if (env.NEXT_PUBLIC_SITE_URL || process.env.NODE_ENV === "production") return publicOrigin()
   const h = await headers()
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
-  return `${proto}://${host}`
+  return publicOrigin({ host: h.get("host"), proto: h.get("x-forwarded-proto") })
 }
 
 /** Encerra a sessão e volta ao login ("Sair" do menu do usuário). */

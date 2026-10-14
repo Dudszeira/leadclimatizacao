@@ -42,7 +42,7 @@ export function ConversationList({
             <Link
               href={hrefFor(conversation.id)}
               aria-current={selected ? "true" : undefined}
-              aria-label={`Abrir conversa com ${nome} (${telefone}) — status ${statusMeta.label}`}
+              aria-label={`Abrir conversa com ${nome} (${telefone}), status ${statusMeta.label}`}
               className={cn(
                 "flex min-h-11 items-start gap-3 px-3 py-3 transition-colors outline-none focus-visible:bg-console-2",
                 selected

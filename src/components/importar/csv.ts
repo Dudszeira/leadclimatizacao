@@ -35,14 +35,14 @@ export const ENTIDADES: Record<
     label: "Clientes",
     chave: "cnpj (CPF ou CNPJ)",
     colunas: [
-      { nome: "cnpj", obrigatoria: true, descricao: "CNPJ ou CPF (com ou sem máscara)" },
-      { nome: "razao_social", obrigatoria: true, descricao: "Razão social / nome completo" },
-      { nome: "nome_fantasia", obrigatoria: false },
-      { nome: "segmento", obrigatoria: false, descricao: "shopping, hospital, industria…" },
-      { nome: "contato_nome", obrigatoria: false },
-      { nome: "contato_email", obrigatoria: false },
-      { nome: "contato_telefone", obrigatoria: false },
-      { nome: "observacoes", obrigatoria: false },
+      { nome: "cnpj", obrigatoria: true, descricao: "CNPJ da empresa ou CPF da pessoa, com ou sem pontos e traços" },
+      { nome: "razao_social", obrigatoria: true, descricao: "nome da empresa como está no CNPJ (ou nome completo, se for CPF)" },
+      { nome: "nome_fantasia", obrigatoria: false, descricao: "nome pelo qual o cliente é conhecido, ex.: Shopping Estação" },
+      { nome: "segmento", obrigatoria: false, descricao: "tipo de negócio, ex.: shopping, hospital, indústria" },
+      { nome: "contato_nome", obrigatoria: false, descricao: "pessoa com quem a equipe fala no cliente" },
+      { nome: "contato_email", obrigatoria: false, descricao: "e-mail dessa pessoa" },
+      { nome: "contato_telefone", obrigatoria: false, descricao: "telefone com DDD, ex.: (41) 99999-9999" },
+      { nome: "observacoes", obrigatoria: false, descricao: "qualquer anotação livre" },
     ],
     exemplo: [
       ["11.222.333/0001-81", "Condomínio Edifício Exemplo", "Ed. Exemplo", "condominio", "Maria Síndica", "sindico@exemplo.com.br", "(41) 3222-0000", ""],
@@ -52,17 +52,17 @@ export const ENTIDADES: Record<
     label: "Prédios",
     chave: "cliente_cnpj + nome",
     colunas: [
-      { nome: "cliente_cnpj", obrigatoria: true, descricao: "CNPJ/CPF do cliente já cadastrado" },
-      { nome: "nome", obrigatoria: true, descricao: "Nome do prédio/unidade" },
-      { nome: "logradouro", obrigatoria: false },
-      { nome: "numero", obrigatoria: false },
-      { nome: "bairro", obrigatoria: false },
-      { nome: "cidade", obrigatoria: false, descricao: "padrão Curitiba" },
-      { nome: "uf", obrigatoria: false, descricao: "padrão PR" },
-      { nome: "cep", obrigatoria: false, descricao: "00000-000" },
-      { nome: "regiao", obrigatoria: false, descricao: "centro, sul, cic…" },
-      { nome: "lat", obrigatoria: false, descricao: "-25.4284" },
-      { nome: "lng", obrigatoria: false, descricao: "-49.2733" },
+      { nome: "cliente_cnpj", obrigatoria: true, descricao: "CNPJ ou CPF do cliente dono do prédio (o cliente precisa já estar cadastrado)" },
+      { nome: "nome", obrigatoria: true, descricao: "nome do prédio ou unidade, ex.: Torre A" },
+      { nome: "logradouro", obrigatoria: false, descricao: "rua ou avenida" },
+      { nome: "numero", obrigatoria: false, descricao: "número do endereço" },
+      { nome: "bairro", obrigatoria: false, descricao: "bairro" },
+      { nome: "cidade", obrigatoria: false, descricao: "cidade; se ficar vazio, usamos Curitiba" },
+      { nome: "uf", obrigatoria: false, descricao: "sigla do estado; se ficar vazio, usamos PR" },
+      { nome: "cep", obrigatoria: false, descricao: "CEP no formato 00000-000" },
+      { nome: "regiao", obrigatoria: false, descricao: "região da cidade para organizar rotas, ex.: centro, sul, cic" },
+      { nome: "lat", obrigatoria: false, descricao: "latitude para o mapa, ex.: -25.4284 (pode deixar vazio)" },
+      { nome: "lng", obrigatoria: false, descricao: "longitude para o mapa, ex.: -49.2733 (pode deixar vazio)" },
     ],
     exemplo: [
       ["11.222.333/0001-81", "Torre A", "Rua XV de Novembro", "1000", "Centro", "Curitiba", "PR", "80020-310", "centro", "-25.4284", "-49.2733"],
@@ -72,17 +72,17 @@ export const ENTIDADES: Record<
     label: "Equipamentos",
     chave: "numero_serie",
     colunas: [
-      { nome: "numero_serie", obrigatoria: true, descricao: "Número de série do fabricante" },
-      { nome: "cliente_cnpj", obrigatoria: true },
-      { nome: "predio_nome", obrigatoria: true, descricao: "Nome do prédio já cadastrado" },
-      { nome: "tipo", obrigatoria: true, descricao: "split, vrf, chiller, self, janela" },
-      { nome: "codigo_interno", obrigatoria: false, descricao: "padrão: número de série" },
-      { nome: "marca", obrigatoria: false },
-      { nome: "modelo", obrigatoria: false },
-      { nome: "capacidade_btu", obrigatoria: false, descricao: "ex.: 24000" },
-      { nome: "ambiente", obrigatoria: false },
-      { nome: "data_instalacao", obrigatoria: false, descricao: "dd/mm/aaaa" },
-      { nome: "observacoes", obrigatoria: false },
+      { nome: "numero_serie", obrigatoria: true, descricao: "número de série que vem na etiqueta do fabricante" },
+      { nome: "cliente_cnpj", obrigatoria: true, descricao: "CNPJ ou CPF do cliente dono do equipamento" },
+      { nome: "predio_nome", obrigatoria: true, descricao: "nome do prédio exatamente como foi cadastrado" },
+      { nome: "tipo", obrigatoria: true, descricao: "um destes: split, vrf, chiller, self, janela" },
+      { nome: "codigo_interno", obrigatoria: false, descricao: "código da etiqueta interna, ex.: 04-B7; se ficar vazio, usamos o número de série" },
+      { nome: "marca", obrigatoria: false, descricao: "fabricante, ex.: Daikin" },
+      { nome: "modelo", obrigatoria: false, descricao: "modelo do aparelho" },
+      { nome: "capacidade_btu", obrigatoria: false, descricao: "capacidade em BTU, só números, ex.: 24000" },
+      { nome: "ambiente", obrigatoria: false, descricao: "onde fica, ex.: sala de reunião 3" },
+      { nome: "data_instalacao", obrigatoria: false, descricao: "data no formato dd/mm/aaaa" },
+      { nome: "observacoes", obrigatoria: false, descricao: "qualquer anotação livre" },
     ],
     exemplo: [
       ["SN-2024-000123", "11.222.333/0001-81", "Torre A", "split", "04-B7", "Daikin", "Advance 18k", "18000", "Recepção", "15/03/2024", ""],
@@ -174,7 +174,7 @@ const documentoObrigatorio = (campo: string) =>
     .string()
     .trim()
     .min(1, `Informe ${campo}.`)
-    .refine(isValidDocumento, { message: "CPF/CNPJ inválido — confira os dígitos." })
+    .refine(isValidDocumento, { message: "CPF/CNPJ inválido. Confira os dígitos." })
     .transform(onlyDigits)
 
 const clienteImport = clientSchema

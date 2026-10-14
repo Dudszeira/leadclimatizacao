@@ -129,6 +129,11 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
           <Input
             id="lead-email"
             type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={form.email}
             onChange={(e) => set("email")(e.target.value)}
             className="max-md:h-11"
@@ -198,6 +203,34 @@ export function NewLeadButton() {
   )
 }
 
+/** Próxima etapa natural do funil (venda e perdido são finais). */
+function nextStage(stage: LeadStage): LeadStage | null {
+  if (stage === "venda" || stage === "perdido") return null
+  const i = LEAD_STAGES.indexOf(stage)
+  const next = LEAD_STAGES[i + 1]
+  return next && next !== "perdido" ? next : null
+}
+
+/** Botão visível no card: avança o lead para a próxima etapa sem abrir o menu. */
+export function LeadAdvanceButton({ lead }: { lead: Lead }) {
+  const { pending, run } = useCadastroAction()
+  const next = nextStage(lead.estagio)
+  if (!next) return null
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="mt-3 h-9 w-full justify-center max-md:h-11"
+      disabled={pending}
+      aria-busy={pending}
+      onClick={() => run(() => moveLeadStage({ id: lead.id, estagio: next }))}
+    >
+      Avançar para {STAGE_LABELS[next]}
+      <ArrowRightIcon aria-hidden="true" />
+    </Button>
+  )
+}
+
 /** Menu do card: mover de etapa, editar, excluir (admin). */
 export function LeadCardActions({ lead, canDelete }: { lead: Lead; canDelete: boolean }) {
   const [dialog, setDialog] = React.useState<"editar" | "perdido" | "excluir" | null>(null)
@@ -259,7 +292,7 @@ export function LeadCardActions({ lead, canDelete }: { lead: Lead; canDelete: bo
         open={dialog === "perdido"}
         onOpenChange={close}
         title="Marcar como perdido"
-        description={`Registre o motivo da perda de ${lead.empresa ?? lead.nome_contato} — ajuda a entender o funil.`}
+        description={`Registre o motivo da perda de ${lead.empresa ?? lead.nome_contato}. Isso ajuda a entender o funil.`}
         confirmLabel="Marcar como perdido"
         action={() => moveLeadStage({ id: lead.id, estagio: "perdido", motivo_perda: motivo })}
       >

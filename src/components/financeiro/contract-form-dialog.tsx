@@ -135,7 +135,7 @@ export function ContractFormDialog({
             <Button
               variant="ghost"
               size="sm"
-              className={triggerClassName ?? "h-8 px-2 text-ink-dim hover:text-ink max-md:h-10"}
+              className={triggerClassName ?? "h-8 px-2 text-ink-dim hover:text-ink max-md:h-11"}
             />
           ) : (
             <Button className={triggerClassName ?? "h-9 px-3 max-md:h-11 max-md:px-4"} />

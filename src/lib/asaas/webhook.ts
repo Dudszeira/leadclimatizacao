@@ -19,15 +19,37 @@ import { paidAtFromAsaasDate } from "./dates";
  * - Falha de banco → 500 (o Asaas reenvia) e o erro fica em webhook_events.error.
  *   Após 15 falhas seguidas o Asaas pausa a fila: monitore webhook_events.
  * - Fecha por padrão: modo demo ou token ausente → 503; token divergente → 401.
+ * - Pagamento (RECEIVED/CONFIRMED) só marca a fatura como paga depois de
+ *   conferir no Asaas (GET /payments/{id}) status e valor contra a fatura;
+ *   divergência não marca, grava webhook_events.error e responde 200.
+ * - LGPD: webhook_events.payload guarda só o mínimo (ids, evento, status,
+ *   valores, datas, links/número) — nunca nome/CPF/e-mail do pagador.
  */
 
 export const ASAAS_TOKEN_HEADER = "asaas-access-token";
 /** Payloads do Asaas têm poucos KB; 64 KB dá folga e barra abuso. */
 export const MAX_WEBHOOK_BODY_BYTES = 64 * 1024;
 
+/** Cobrança como o Asaas devolve em GET /payments/{id} (só o que conferimos). */
+export interface RemotePayment {
+  id: string;
+  status: string;
+  value: number;
+  billingType?: string | null;
+  paymentDate?: string | null;
+  clientPaymentDate?: string | null;
+  externalReference?: string | null;
+  deleted?: boolean | null;
+}
+
 export interface WebhookConfig {
   demo: boolean;
   expectedToken: string | undefined;
+  /**
+   * Busca a cobrança na API do Asaas (fonte da verdade). Lança em falha de
+   * rede/API → 500 e o Asaas reenvia. Injetado pelo route handler.
+   */
+  fetchPayment: (paymentId: string) => Promise<RemotePayment>;
 }
 
 export interface WebhookResult {
@@ -142,6 +164,41 @@ export class WebhookDbError extends Error {
   }
 }
 
+/** Webhook diz "pago", mas a API do Asaas não confirma (status/valor/fatura). */
+export class PaymentDivergenceError extends Error {
+  constructor(reason: string) {
+    super(`Pagamento não confirmado no Asaas: ${reason}`.slice(0, 500));
+    this.name = "PaymentDivergenceError";
+  }
+}
+
+/** Status do Asaas que significam dinheiro recebido/confirmado. */
+const PAID_STATUSES = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
+
+type InvoiceTarget = { id: string; valor: number; status: string; via: "pid" | "ref" };
+
+/** Confere a cobrança remota contra a fatura local; devolve o motivo da divergência ou null. */
+export function paymentDivergence(
+  remote: RemotePayment | null | undefined,
+  pid: string,
+  invoice: Pick<InvoiceTarget, "id" | "valor">,
+): string | null {
+  if (!remote || typeof remote !== "object") return "cobrança não encontrada na API";
+  if (remote.id !== pid) return "id da cobrança diferente do evento";
+  if (remote.deleted) return "cobrança removida no Asaas";
+  if (!PAID_STATUSES.has(String(remote.status))) return `status no Asaas é ${String(remote.status)}`;
+  const valorRemoto = Number(remote.value);
+  const valorFatura = Number(invoice.valor);
+  if (!Number.isFinite(valorRemoto) || !Number.isFinite(valorFatura)) return "valor inválido";
+  // Juros/multa podem aumentar o valor recebido; a menor é divergência.
+  if (valorRemoto + 0.009 < valorFatura) {
+    return `valor no Asaas (${valorRemoto.toFixed(2)}) menor que o da fatura (${valorFatura.toFixed(2)})`;
+  }
+  const ref = asUuid(remote.externalReference);
+  if (ref && ref !== invoice.id) return "externalReference aponta para outra fatura";
+  return null;
+}
+
 type Cond =
   | { op: "eq"; col: string; val: string }
   | { op: "neq"; col: string; val: string }
@@ -183,8 +240,80 @@ function metodoFrom(billingType: string | null | undefined): "pix" | "boleto" | 
 // Regras por evento
 // ----------------------------------------------------------------------------
 
+/** Fatura alvo do pagamento: por asaas_id; senão por externalReference sem cobrança gravada. */
+async function findInvoiceForPayment(
+  db: Db,
+  event: string,
+  pid: string,
+  ref: string | null,
+): Promise<InvoiceTarget | null> {
+  const { data, error } = await db
+    .from("invoices")
+    .select("id, valor, status")
+    .eq("asaas_id", pid)
+    .neq("status", "cancelado")
+    .maybeSingle();
+  if (error) throw new WebhookDbError(`${event} (buscar fatura)`, error);
+  const row = data as { id: string; valor: number | string; status: string } | null;
+  if (row) return { id: row.id, valor: Number(row.valor), status: row.status, via: "pid" };
+  if (!ref) return null;
+
+  const { data: byRef, error: refError } = await db
+    .from("invoices")
+    .select("id, valor, status")
+    .eq("id", ref)
+    .or(SEM_COBRANCA)
+    .neq("status", "cancelado")
+    .maybeSingle();
+  if (refError) throw new WebhookDbError(`${event} (buscar fatura por referência)`, refError);
+  const r = byRef as { id: string; valor: number | string; status: string } | null;
+  return r ? { id: r.id, valor: Number(r.valor), status: r.status, via: "ref" } : null;
+}
+
+// ----------------------------------------------------------------------------
+// Minimização (LGPD): o que fica gravado em webhook_events.payload
+// ----------------------------------------------------------------------------
+
+const PAYMENT_KEEP = [
+  "id", "status", "billingType", "value", "netValue", "originalValue", "interestValue",
+  "dueDate", "originalDueDate", "paymentDate", "clientPaymentDate", "confirmedDate",
+  "creditDate", "invoiceUrl", "bankSlipUrl", "invoiceNumber", "externalReference", "deleted",
+] as const;
+const INVOICE_KEEP = [
+  "id", "status", "number", "value", "pdfUrl", "xmlUrl", "payment", "externalReference",
+  "effectiveDate", "statusDescription",
+] as const;
+
+function pickScalars(source: unknown, keys: readonly string[]): Record<string, unknown> | null {
+  if (!source || typeof source !== "object") return null;
+  const obj = source as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string") out[k] = v.slice(0, 500);
+    else if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
+/** Só ids, evento, status, valores, datas e links/número — sem dados do pagador. */
+export function minimizeWebhookPayload(event: ParsedWebhookEvent): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: event.id, event: event.event };
+  if (event.dateCreated) out.dateCreated = event.dateCreated;
+  const payment = pickScalars(event.payment, PAYMENT_KEEP);
+  if (payment) out.payment = payment;
+  const invoice = pickScalars(event.invoice, INVOICE_KEEP);
+  if (invoice) out.invoice = invoice;
+  return out;
+}
+
 /** Aplica o evento de cobrança; devolve quantas faturas foram afetadas. */
-async function applyPaymentEvent(db: Db, event: string, payment: ParsedPayment): Promise<number> {
+async function applyPaymentEvent(
+  db: Db,
+  event: string,
+  payment: ParsedPayment,
+  fetchPayment: WebhookConfig["fetchPayment"],
+): Promise<number> {
   const pid = payment.id;
   const byPid: Cond = { op: "eq", col: "asaas_id", val: pid };
   const ref = asUuid(payment.externalReference);
@@ -204,15 +333,25 @@ async function applyPaymentEvent(db: Db, event: string, payment: ParsedPayment):
   switch (event) {
     case "PAYMENT_RECEIVED":
     case "PAYMENT_CONFIRMED": {
-      const metodo = metodoFrom(payment.billingType);
+      const alvo = await findInvoiceForPayment(db, event, pid, ref);
+      if (!alvo) return 0;
+      // Fonte da verdade: a API do Asaas (o corpo do webhook só dispara a conferência).
+      const remote = await fetchPayment(pid);
+      const divergence = paymentDivergence(remote, pid, alvo);
+      if (divergence) throw new PaymentDivergenceError(divergence);
+
+      const metodo = metodoFrom(remote.billingType ?? payment.billingType);
       const patch = {
         status: "pago",
-        paid_at: paidAtFromAsaasDate(payment.paymentDate ?? payment.clientPaymentDate),
+        paid_at: paidAtFromAsaasDate(
+          remote.paymentDate ?? remote.clientPaymentDate ?? payment.paymentDate ?? payment.clientPaymentDate,
+        ),
         ...(metodo ? { metodo } : {}),
       };
       const notCanceled: Cond = { op: "neq", col: "status", val: "cancelado" };
-      const n = await updateInvoices(db, event, patch, [byPid, notCanceled]);
-      return n > 0 ? n : byRef(patch, [notCanceled]);
+      const byId: Cond = { op: "eq", col: "id", val: alvo.id };
+      if (alvo.via === "pid") return updateInvoices(db, event, patch, [byPid, byId, notCanceled]);
+      return byRef(patch, [notCanceled]);
     }
     case "PAYMENT_OVERDUE": {
       const pendente: Cond = { op: "eq", col: "status", val: "pendente" };
@@ -365,7 +504,7 @@ export async function handleAsaasWebhook(
     const { error: insertError } = await db
       .from("webhook_events")
       .upsert(
-        { id: event.id, event: event.event, payload: event },
+        { id: event.id, event: event.event, payload: minimizeWebhookPayload(event) },
         { onConflict: "id", ignoreDuplicates: true },
       );
     if (insertError) throw new WebhookDbError("registrar evento", insertError);
@@ -380,7 +519,7 @@ export async function handleAsaasWebhook(
       return json(200, { received: true, duplicate: true });
     }
   } catch (error) {
-    console.error("[webhooks/asaas] falha ao registrar evento:", error);
+    console.error("[webhooks/asaas] falha ao registrar evento:", error instanceof Error ? error.message : error);
     return json(500, { error: "Falha temporária ao registrar o evento." });
   }
 
@@ -388,18 +527,29 @@ export async function handleAsaasWebhook(
   let affected = 0;
   try {
     if (event.event.startsWith("PAYMENT_") && event.payment) {
-      affected = await applyPaymentEvent(db, event.event, event.payment);
+      affected = await applyPaymentEvent(db, event.event, event.payment, config.fetchPayment);
     } else if (event.event.startsWith("INVOICE_") && event.invoice) {
       affected = await applyInvoiceEvent(db, event.event, event.invoice);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[webhooks/asaas] falha ao processar ${event.event} (${event.id}):`, error);
+    if (error instanceof PaymentDivergenceError) {
+      // Não marca pago nem processado (um reenvio manual reconfere); 200 evita
+      // que o Asaas fique reenviando algo que não vai mudar sozinho.
+      console.error(`[webhooks/asaas] ${event.event} (${event.id}) recusado: ${message}`);
+      const { error: markError } = await db
+        .from("webhook_events")
+        .update({ error: message.slice(0, 500) })
+        .eq("id", event.id);
+      if (markError) console.error("[webhooks/asaas] falha ao gravar erro do evento:", markError.message);
+      return json(200, { received: true, affected: 0, verified: false });
+    }
+    console.error(`[webhooks/asaas] falha ao processar ${event.event} (${event.id}): ${message}`);
     const { error: markError } = await db
       .from("webhook_events")
       .update({ error: message.slice(0, 500) })
       .eq("id", event.id);
-    if (markError) console.error("[webhooks/asaas] falha ao gravar erro do evento:", markError);
+    if (markError) console.error("[webhooks/asaas] falha ao gravar erro do evento:", markError.message);
     return json(500, { error: "Falha temporária ao processar o evento." });
   }
 
@@ -409,7 +559,7 @@ export async function handleAsaasWebhook(
     .update({ processed_at: new Date().toISOString(), error: null })
     .eq("id", event.id);
   if (doneError) {
-    console.error("[webhooks/asaas] falha ao marcar evento processado:", doneError);
+    console.error("[webhooks/asaas] falha ao marcar evento processado:", doneError.message);
     return json(500, { error: "Falha temporária ao concluir o evento." });
   }
 

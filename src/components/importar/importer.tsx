@@ -108,7 +108,7 @@ export function Importer() {
     setResultado(null)
     if (!file) return
     if (file.size > MAX_BYTES) {
-      toast.error("Arquivo acima de 2 MB — divida em partes menores.")
+      toast.error("Arquivo acima de 2 MB. Divida em partes menores.")
       return
     }
     if (!/\.(csv|txt)$/i.test(file.name)) {
@@ -174,12 +174,12 @@ export function Importer() {
         setProgresso((p) => ({ ...p, feito: p.feito + lote.length }))
       }
     } catch {
-      toast.error("Conexão interrompida — reenvie o arquivo (a importação é idempotente).")
+      toast.error("Conexão interrompida. Reenvie o arquivo (a importação é idempotente).")
     } finally {
       acc.erros.sort((a, b) => a.linha - b.linha)
       setResultado(acc)
       setEnviando(false)
-      if (acc.demo) toast.info("Modo demonstração — validado no servidor, nada foi gravado.")
+      if (acc.demo) toast.info("Modo demonstração: validado no servidor, nada foi gravado.")
       else if (acc.inseridos + acc.atualizados > 0) {
         toast.success(`${acc.inseridos} inserido(s), ${acc.atualizados} atualizado(s).`)
         router.refresh()
@@ -195,21 +195,45 @@ export function Importer() {
     <div className="flex flex-col gap-4">
       <section className="rounded-xl border border-line bg-console p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="radiogroup" aria-label="O que importar" className="flex flex-wrap gap-1 rounded-lg bg-console-2 p-1">
+          <div
+            role="radiogroup"
+            aria-label="O que importar"
+            className="flex flex-wrap gap-1 rounded-lg bg-console-2 p-1"
+            onKeyDown={(ev) => {
+              // Setas trocam a opção (padrão de radiogroup); Tab sai do grupo.
+              const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]
+              if (!keys.includes(ev.key) || enviando) return
+              ev.preventDefault()
+              const lista = Object.keys(ENTIDADES) as Entidade[]
+              const atual = lista.indexOf(entidade)
+              const alvo =
+                ev.key === "Home"
+                  ? 0
+                  : ev.key === "End"
+                    ? lista.length - 1
+                    : ev.key === "ArrowRight" || ev.key === "ArrowDown"
+                      ? (atual + 1) % lista.length
+                      : (atual - 1 + lista.length) % lista.length
+              trocarEntidade(lista[alvo])
+              const botoes = ev.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+              botoes[alvo]?.focus()
+            }}
+          >
             {(Object.keys(ENTIDADES) as Entidade[]).map((e, i) => (
               <button
                 key={e}
                 type="button"
                 role="radio"
                 aria-checked={entidade === e}
+                tabIndex={entidade === e ? 0 : -1}
                 disabled={enviando}
                 onClick={() => trocarEntidade(e)}
                 className={cn(
-                  "inline-flex min-h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-colors max-md:min-h-11",
+                  "inline-flex min-h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none max-md:min-h-11",
                   entidade === e ? "bg-signal-dim text-signal" : "text-ink-dim hover:text-ink",
                 )}
               >
-                <span className="font-mono text-xs text-ink-faint">{i + 1}</span>
+                <span className="font-mono text-xs text-ink-faint" aria-hidden="true">{i + 1}</span>
                 {ENTIDADES[e].label}
               </button>
             ))}
@@ -225,21 +249,31 @@ export function Importer() {
         </div>
         <p className="mt-3 text-xs leading-relaxed text-ink-dim">
           Importe na ordem <strong className="text-ink">clientes → prédios → equipamentos</strong>.
-          Chave de atualização: <span className="font-mono text-signal">{def.chave}</span> — se já
+          Chave de atualização: <span className="font-mono text-signal">{def.chave}</span>. Se já
           existir, o registro é atualizado (só as colunas presentes no arquivo); senão, é criado.
           Limite: {MAX_LINHAS.toLocaleString("pt-BR")} linhas e 2 MB por arquivo; separador ; ou ,.
         </p>
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-ink-dim hover:text-ink">Colunas aceitas</summary>
-          <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-ink-dim hover:text-ink md:min-h-0">
+            O que vai em cada coluna
+          </summary>
+          <p className="mt-2 text-ink-dim">
+            A primeira linha do arquivo traz o nome das colunas, escrito exatamente como abaixo.
+            Colunas opcionais podem ficar de fora.
+          </p>
+          <dl className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
             {def.colunas.map((c) => (
-              <li key={c.nome} className="flex gap-2">
-                <span className="font-mono text-ink">{c.nome}</span>
-                {c.obrigatoria && <span className="text-amber">obrigatória</span>}
-                {c.descricao && <span className="text-ink-faint">— {c.descricao}</span>}
-              </li>
+              <div key={c.nome} className="flex flex-col gap-0.5">
+                <dt className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-ink">{c.nome}</span>
+                  <span className={c.obrigatoria ? "text-amber" : "text-ink-faint"}>
+                    {c.obrigatoria ? "obrigatória" : "opcional"}
+                  </span>
+                </dt>
+                {c.descricao && <dd className="text-ink-dim">{c.descricao}</dd>}
+              </div>
             ))}
-          </ul>
+          </dl>
         </details>
       </section>
 
@@ -308,7 +342,7 @@ export function Importer() {
                 Erros encontrados
                 {preview.erros.length > MAX_ERROS_TELA && (
                   <span className="text-xs text-ink-faint">
-                    (mostrando {MAX_ERROS_TELA} de {preview.erros.length} — baixe o relatório)
+                    (mostrando {MAX_ERROS_TELA} de {preview.erros.length}, baixe o relatório)
                   </span>
                 )}
               </h3>

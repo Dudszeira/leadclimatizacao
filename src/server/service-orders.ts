@@ -32,6 +32,7 @@ import {
   paginate,
   sanitizeIlike,
   toPaginated,
+  safeErrorLog,
 } from "./_shared";
 
 export interface ListServiceOrdersParams extends PageParams {
@@ -169,8 +170,8 @@ export async function getServiceOrderByNumero(
 // Evidências (fotos + assinatura) com URL assinada gerada no servidor
 // ---------------------------------------------------------------------------
 
-/** Validade das URLs assinadas exibidas na tela (segundos). */
-const SIGNED_URL_TTL = 60 * 60;
+/** Validade das URLs assinadas de fotos e assinaturas (segundos): 10 min. */
+const SIGNED_URL_TTL = 600;
 
 function legacyPhotos(os: Pick<ServiceOrder, "fotos_antes" | "fotos_depois">, known: Set<string>) {
   const out: Array<Omit<ServiceOrderPhotoView, "url">> = [];
@@ -229,7 +230,7 @@ export async function getServiceOrderEvidence(
           base.map((p) => p.storage_path),
           SIGNED_URL_TTL,
         );
-      if (signError) console.error("[data-layer] getServiceOrderEvidence sign:", signError);
+      if (signError) console.error("[data-layer] getServiceOrderEvidence sign:", safeErrorLog(signError));
       for (const s of signed ?? []) {
         if (s.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl);
       }
@@ -240,7 +241,7 @@ export async function getServiceOrderEvidence(
       const { data: sig, error: sigError } = await supabase.storage
         .from(STORAGE_BUCKETS.assinaturas)
         .createSignedUrl(os.assinatura_path, SIGNED_URL_TTL);
-      if (sigError) console.error("[data-layer] getServiceOrderEvidence assinatura:", sigError);
+      if (sigError) console.error("[data-layer] getServiceOrderEvidence assinatura:", safeErrorLog(sigError));
       assinaturaUrl = sig?.signedUrl ?? null;
     }
 

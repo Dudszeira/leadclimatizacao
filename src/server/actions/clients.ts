@@ -19,6 +19,7 @@ import {
   type FiscalInput,
 } from "@/components/clientes/schemas"
 import { onlyDigits } from "@/components/clientes/validators"
+import { safeErrorLog } from "@/server/_shared"
 
 const INVALID = "Revise os campos destacados antes de salvar."
 
@@ -50,7 +51,7 @@ export async function saveClient(input: ClientInput): Promise<ActionResult> {
         .in("cnpj", [documento, digits])
         .limit(1)
       if (dupError) {
-        console.error("[actions/clients] dup check:", dupError)
+        console.error("[actions/clients] dup check:", safeErrorLog(dupError))
         return { ok: false, message: "Não foi possível salvar o cliente. Tente novamente." }
       }
       if (dup && dup.length > 0 && dup[0].id !== id) {
@@ -65,7 +66,7 @@ export async function saveClient(input: ClientInput): Promise<ActionResult> {
     if (id) {
       const { data, error } = await supabase.from("clients").update(row).eq("id", id).select("id")
       if (error) {
-        console.error("[actions/clients] update:", error)
+        console.error("[actions/clients] update:", safeErrorLog(error))
         return { ok: false, message: "Não foi possível atualizar o cliente. Tente novamente." }
       }
       if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -76,13 +77,13 @@ export async function saveClient(input: ClientInput): Promise<ActionResult> {
 
     const { data, error } = await supabase.from("clients").insert(row).select("id").single()
     if (error) {
-      console.error("[actions/clients] insert:", error)
+      console.error("[actions/clients] insert:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível cadastrar o cliente. Tente novamente." }
     }
     revalidatePath("/clientes")
     return { ok: true, message: "Cliente cadastrado.", id: data.id as string }
   } catch (error) {
-    console.error("[actions/clients] saveClient:", error)
+    console.error("[actions/clients] saveClient:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível salvar o cliente. Tente novamente." }
   }
 }
@@ -105,7 +106,7 @@ export async function setClientAtivo(input: { id: string; ativo: boolean }): Pro
       .eq("id", parsed.data.id)
       .select("id")
     if (error) {
-      console.error("[actions/clients] setClientAtivo:", error)
+      console.error("[actions/clients] setClientAtivo:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível alterar o status. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -117,7 +118,7 @@ export async function setClientAtivo(input: { id: string; ativo: boolean }): Pro
       id: parsed.data.id,
     }
   } catch (error) {
-    console.error("[actions/clients] setClientAtivo:", error)
+    console.error("[actions/clients] setClientAtivo:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível alterar o status. Tente novamente." }
   }
 }
@@ -141,14 +142,14 @@ export async function saveClientFiscal(input: FiscalInput): Promise<ActionResult
       .eq("id", client_id)
       .select("id")
     if (error) {
-      console.error("[actions/clients] saveClientFiscal:", error)
+      console.error("[actions/clients] saveClientFiscal:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível salvar os dados fiscais. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
     revalidatePath(`/clientes/${client_id}`)
     return { ok: true, message: "Dados fiscais atualizados.", id: client_id }
   } catch (error) {
-    console.error("[actions/clients] saveClientFiscal:", error)
+    console.error("[actions/clients] saveClientFiscal:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível salvar os dados fiscais. Tente novamente." }
   }
 }

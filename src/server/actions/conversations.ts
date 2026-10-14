@@ -12,6 +12,7 @@ import {
 } from "@/lib/messaging"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import { authorizeAction } from "@/server/auth"
+import { safeErrorLog } from "@/server/_shared"
 
 /**
  * Server actions do Atendimento, mesmo padrão de actions/service-orders.ts:
@@ -77,7 +78,7 @@ export async function sendConversationMessage(
       .eq("id", parsed.data.conversationId)
       .maybeSingle()
     if (convError || !conversation) {
-      console.error("[actions/conversations] send (busca conversa):", convError)
+      console.error("[actions/conversations] send (busca conversa):", safeErrorLog(convError))
       return {
         status: "error",
         message: "Conversa não encontrada. Recarregue a página e tente novamente.",
@@ -103,7 +104,7 @@ export async function sendConversationMessage(
           metadata: receipt.externalId ? { wa_id: receipt.externalId } : {},
         })
         if (insertError) {
-          console.error("[actions/conversations] send (insert):", insertError)
+          console.error("[actions/conversations] send (insert):", safeErrorLog(insertError))
           return false
         }
         const { error: updateError } = await supabase
@@ -112,7 +113,7 @@ export async function sendConversationMessage(
           .eq("id", conversation.id)
         if (updateError) {
           // Mensagem já persistida: só loga, não falha o envio para o usuário.
-          console.error("[actions/conversations] send (last_message_at):", updateError)
+          console.error("[actions/conversations] send (last_message_at):", safeErrorLog(updateError))
         }
         return true
       },
@@ -127,7 +128,7 @@ export async function sendConversationMessage(
       return { status: "error", message }
     }
   } catch (error) {
-    console.error("[actions/conversations] sendConversationMessage:", error)
+    console.error("[actions/conversations] sendConversationMessage:", safeErrorLog(error))
     return {
       status: "error",
       message: "Não foi possível enviar a mensagem. Tente novamente.",
@@ -167,11 +168,11 @@ export async function transferConversation(
       .update({ status: "transferido" })
       .eq("id", id.data)
     if (error) {
-      console.error("[actions/conversations] transfer:", error)
+      console.error("[actions/conversations] transfer:", safeErrorLog(error))
       return { status: "error", message: "Não foi possível transferir a conversa. Tente novamente." }
     }
   } catch (error) {
-    console.error("[actions/conversations] transferConversation:", error)
+    console.error("[actions/conversations] transferConversation:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível transferir a conversa. Tente novamente." }
   }
 
@@ -204,11 +205,11 @@ export async function closeConversation(
       .update({ status: "encerrado" })
       .eq("id", id.data)
     if (error) {
-      console.error("[actions/conversations] close:", error)
+      console.error("[actions/conversations] close:", safeErrorLog(error))
       return { status: "error", message: "Não foi possível encerrar a conversa. Tente novamente." }
     }
   } catch (error) {
-    console.error("[actions/conversations] closeConversation:", error)
+    console.error("[actions/conversations] closeConversation:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível encerrar a conversa. Tente novamente." }
   }
 

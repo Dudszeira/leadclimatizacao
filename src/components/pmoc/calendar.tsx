@@ -84,7 +84,7 @@ export function PmocCalendar({ mes, hoje, eventos, detalhes }: PmocCalendarProps
           {DIAS_SEMANA.map((dia) => (
             <div
               key={dia}
-              className="px-2 py-2 text-center text-[0.68rem] font-medium tracking-[0.08em] text-ink-faint uppercase"
+              className="px-2 py-2 text-center text-xs font-medium tracking-[0.08em] text-ink-dim uppercase"
             >
               {dia}
             </div>
@@ -117,7 +117,7 @@ export function PmocCalendar({ mes, hoje, eventos, detalhes }: PmocCalendarProps
                   aria-hidden="true"
                   className={cn(
                     "flex size-5 items-center justify-center self-end rounded-full font-mono text-xs tabular-nums",
-                    doMes ? "text-ink-dim" : "text-ink-faint/60",
+                    doMes ? "text-ink-dim" : "text-ink-faint",
                     ehHoje && "bg-signal font-semibold text-primary-foreground"
                   )}
                 >
@@ -137,7 +137,7 @@ export function PmocCalendar({ mes, hoje, eventos, detalhes }: PmocCalendarProps
                   >
                     <PopoverTrigger
                       aria-label={`Ver as ${evs.length} manutenções de ${format(dia, "d 'de' MMMM", { locale: ptBR })}`}
-                      className="rounded px-1.5 py-0.5 text-left text-[0.68rem] leading-4 font-medium text-ink-dim transition-colors outline-none hover:bg-console-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/60"
+                      className="rounded px-1.5 py-0.5 text-left text-xs leading-4 font-medium text-ink-dim transition-colors outline-none hover:bg-console-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/60"
                     >
                       +{ocultos} mais
                     </PopoverTrigger>
@@ -195,7 +195,7 @@ export function PmocCalendar({ mes, hoje, eventos, detalhes }: PmocCalendarProps
                       <button
                         type="button"
                         onClick={() => abrirEvento(ev)}
-                        aria-label={`${meta.label}: ${ev.codigo_interno} — ${ev.predio}. Abrir detalhes`}
+                        aria-label={`${meta.label}: ${ev.codigo_interno} · ${ev.predio}. Abrir detalhes`}
                         className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors outline-none hover:bg-console-2/60 focus-visible:bg-console-2/60"
                       >
                         <span
@@ -248,9 +248,9 @@ function ChipEvento({
     <button
       type="button"
       onClick={() => onSelect(evento)}
-      aria-label={`${meta.label}: ${evento.codigo_interno} — ${evento.predio}. Abrir detalhes`}
+      aria-label={`${meta.label}: ${evento.codigo_interno} · ${evento.predio}. Abrir detalhes`}
       className={cn(
-        "flex w-full min-w-0 items-center gap-1 rounded px-1.5 text-left text-[0.68rem] leading-4 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+        "flex w-full min-w-0 items-center gap-1 rounded px-1.5 text-left text-xs leading-4 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
         detalhado ? "py-1.5" : "py-0.5",
         meta.chip
       )}
@@ -258,7 +258,7 @@ function ChipEvento({
       <span className="shrink-0 font-mono font-medium tracking-tight">
         {evento.codigo_interno}
       </span>
-      <span className="truncate opacity-80">{evento.predio}</span>
+      <span className="truncate">{evento.predio}</span>
     </button>
   )
 }

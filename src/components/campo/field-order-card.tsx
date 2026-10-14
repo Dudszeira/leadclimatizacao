@@ -122,7 +122,7 @@ export function FieldOrderCard({ os, mode, now, showTechnician }: FieldOrderCard
             <AirVentIcon className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
             <span className="min-w-0 truncate">
               <span className="font-mono text-ink">{os.equipment.codigo_interno}</span>
-              {os.equipment.ambiente ? ` — ${os.equipment.ambiente}` : ""}
+              {os.equipment.ambiente ? ` · ${os.equipment.ambiente}` : ""}
             </span>
           </li>
         )}

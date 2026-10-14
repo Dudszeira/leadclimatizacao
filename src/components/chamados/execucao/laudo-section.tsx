@@ -1,11 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { LoaderCircleIcon, SaveIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { saveLaudo } from "@/server/actions/service-orders"
-import { Button } from "@/components/ui/button"
+import {
+  SaveIndicator,
+  draftStorageKey,
+  readStoredDraft,
+  useAutosave,
+  useSectionSync,
+  type SectionSync,
+} from "@/components/chamados/execucao/autosave"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,16 +21,56 @@ type LaudoSectionProps = {
   laudo: string
   observacoes: string
   onSaved: (v: { laudo: string; observacoes: string }) => void
+  sync?: SectionSync
 }
 
 const MAX = 4000
 
 /** Laudo técnico (vai para o cliente) e observações técnicas internas. */
-export function LaudoSection({ osId, editable, laudo, observacoes, onSaved }: LaudoSectionProps) {
+export function LaudoSection({
+  osId,
+  editable,
+  laudo,
+  observacoes,
+  onSaved,
+  sync,
+}: LaudoSectionProps) {
   const [draftLaudo, setDraftLaudo] = React.useState(laudo)
   const [draftObs, setDraftObs] = React.useState(observacoes)
-  const [pending, startTransition] = React.useTransition()
-  const dirty = draftLaudo.trim() !== laudo.trim() || draftObs.trim() !== observacoes.trim()
+  const storageKey = draftStorageKey(osId, "laudo")
+
+  // Rascunho guardado neste aparelho volta para a tela e é regravado pelo autosave.
+  React.useEffect(() => {
+    if (!editable) return
+    const stored = readStoredDraft<{ laudo?: unknown; observacoes?: unknown }>(storageKey)
+    if (!stored || typeof stored !== "object") return
+    if (typeof stored.laudo === "string") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe após montar
+      setDraftLaudo(stored.laudo.slice(0, MAX))
+    }
+    if (typeof stored.observacoes === "string") setDraftObs(stored.observacoes.slice(0, MAX))
+    // só na montagem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const value = { laudo: draftLaudo.trim(), observacoes: draftObs.trim() }
+  const autosave = useAutosave({
+    enabled: editable,
+    storageKey,
+    valueKey: JSON.stringify([value.laudo, value.observacoes]),
+    savedKey: JSON.stringify([laudo.trim(), observacoes.trim()]),
+    persist: () => ({ laudo: draftLaudo, observacoes: draftObs }),
+    save: async () => {
+      const v = value
+      const result = await saveLaudo(osId, v)
+      if (result.status === "success") {
+        onSaved(v)
+        return { ok: true }
+      }
+      return { ok: false, message: result.message }
+    },
+  })
+  useSectionSync("laudo", autosave.dirty, autosave.flush, sync ?? {})
 
   if (!editable && !laudo && !observacoes) {
     return (
@@ -38,20 +83,6 @@ export function LaudoSection({ osId, editable, laudo, observacoes, onSaved }: La
         </CardContent>
       </Card>
     )
-  }
-
-  function handleSave() {
-    startTransition(async () => {
-      const value = { laudo: draftLaudo.trim(), observacoes: draftObs.trim() }
-      const result = await saveLaudo(osId, value)
-      if (result.status === "success") {
-        onSaved(value)
-        if (result.demo) toast.info(result.message)
-        else toast.success(result.message)
-      } else {
-        toast.error(result.message)
-      }
-    })
   }
 
   return (
@@ -70,7 +101,6 @@ export function LaudoSection({ osId, editable, laudo, observacoes, onSaved }: La
                 maxLength={MAX}
                 value={draftLaudo}
                 onChange={(e) => setDraftLaudo(e.target.value)}
-                disabled={pending}
                 placeholder="O que foi encontrado, o que foi feito e o estado final do equipamento."
               />
             </div>
@@ -82,29 +112,14 @@ export function LaudoSection({ osId, editable, laudo, observacoes, onSaved }: La
                 maxLength={MAX}
                 value={draftObs}
                 onChange={(e) => setDraftObs(e.target.value)}
-                disabled={pending}
                 placeholder="Peças a orçar, riscos, recomendações para a próxima visita…"
               />
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-ink-dim" aria-live="polite">
-                {dirty ? "Alterações não salvas." : "Salvo."}
-              </p>
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={!dirty || pending}
-                aria-busy={pending}
-                className="h-11 md:h-9"
-              >
-                {pending ? (
-                  <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <SaveIcon aria-hidden="true" />
-                )}
-                Salvar laudo
-              </Button>
-            </div>
+            <SaveIndicator
+              status={autosave.status}
+              error={autosave.error}
+              onRetry={() => void autosave.flush()}
+            />
           </>
         ) : (
           <>

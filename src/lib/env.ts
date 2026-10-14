@@ -34,11 +34,34 @@ const explicitDemo = env.DEMO_MODE === "true";
 const isProduction = process.env.NODE_ENV === "production";
 /** `next build` roda com NODE_ENV=production; o build sem .env precisa passar. */
 const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+const isServer = typeof window === "undefined";
+/** Deploy de produção na Vercel (preview/development não contam). */
+const isVercelProduction = process.env.VERCEL_ENV === "production";
+
+/**
+ * DEMO_MODE=true desliga login e serve fixtures: nunca pode valer num deploy
+ * de produção nem num ambiente que tem a chave service_role (banco real).
+ * Checado só no servidor (no browser essas variáveis não existem).
+ */
+function demoModeConflict(): string | null {
+  if (!explicitDemo || !isServer) return null;
+  if (isVercelProduction) {
+    return "[env] DEMO_MODE=true é proibido em produção (VERCEL_ENV=production). Remova DEMO_MODE do ambiente de produção.";
+  }
+  if (env.SUPABASE_SERVICE_ROLE_KEY) {
+    return "[env] DEMO_MODE=true não pode ser usado junto com SUPABASE_SERVICE_ROLE_KEY (ambiente com banco real). Remova uma das duas variáveis.";
+  }
+  return null;
+}
+
+const demoConflict = demoModeConflict();
+if (demoConflict) throw new Error(demoConflict);
 
 /**
  * Modo demo: o data layer serve fixtures locais (equivalentes ao seed.sql) e o
  * login não é exigido. Liga quando:
- * - DEMO_MODE=true explícito (inclusive em produção, para apresentações); ou
+ * - DEMO_MODE=true explícito (apresentações; proibido com VERCEL_ENV=production
+ *   ou com SUPABASE_SERVICE_ROLE_KEY definida — ver demoModeConflict); ou
  * - Supabase ausente fora de produção (dev local) ou durante o `next build`.
  *
  * Em produção sem DEMO_MODE=true e sem Supabase o app NÃO cai em demo em
@@ -51,7 +74,11 @@ export const isDemoMode =
 export const isEnvMisconfigured =
   !explicitDemo && supabaseMissing && isProduction && !isBuildPhase;
 
-/** Lança erro claro se a produção subiu sem configuração do Supabase. */
+/** Produção real (não demo, fora do build) exige NEXT_PUBLIC_SITE_URL. */
+const siteUrlMissing =
+  !isDemoMode && isProduction && !isBuildPhase && isServer && !env.NEXT_PUBLIC_SITE_URL;
+
+/** Lança erro claro se a produção subiu sem a configuração obrigatória. */
 export function assertRuntimeEnv(): void {
   if (isEnvMisconfigured) {
     throw new Error(
@@ -60,6 +87,28 @@ export function assertRuntimeEnv(): void {
         "para rodar explicitamente em modo demonstração.",
     );
   }
+  if (siteUrlMissing) {
+    throw new Error(
+      "[env] Produção sem NEXT_PUBLIC_SITE_URL. Defina a URL pública do app (ex.: https://controllead.com.br): " +
+        "links de convite e de recuperação de senha só usam essa variável em produção.",
+    );
+  }
+}
+
+/**
+ * Origem pública do app para links enviados por e-mail (convite, reset).
+ * Produção: SÓ NEXT_PUBLIC_SITE_URL (nunca headers do request — Host /
+ * X-Forwarded-Host são controláveis pelo cliente). Dev: cai para o host da
+ * requisição (`devHost`) ou localhost.
+ */
+export function publicOrigin(devHost?: { host: string | null; proto: string | null }): string {
+  if (env.NEXT_PUBLIC_SITE_URL) return env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "");
+  if (isProduction) {
+    throw new Error("[env] NEXT_PUBLIC_SITE_URL é obrigatória em produção para gerar links públicos.");
+  }
+  const host = devHost?.host ?? "localhost:3000";
+  const proto = devHost?.proto ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }
 
 /** URL pública do app (links de convite e recuperação de senha). */

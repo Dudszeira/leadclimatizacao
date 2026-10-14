@@ -66,7 +66,7 @@ export const clientSchema = z.object({
     .string()
     .trim()
     .refine((v) => v === "" || isValidDocumento(v), {
-      message: "CPF/CNPJ inválido — confira os dígitos.",
+      message: "CPF/CNPJ inválido. Confira os dígitos.",
     })
     .transform((v) => (v === "" ? null : canonicalDocumento(v))),
   segmento: z
@@ -84,7 +84,7 @@ export const clientSchema = z.object({
     .string()
     .trim()
     .refine((v) => v === "" || onlyDigits(v).length >= 10, {
-      message: "Telefone incompleto — use DDD + número.",
+      message: "Telefone incompleto. Use DDD + número.",
     })
     .transform((v) => (v === "" ? null : v)),
   observacoes: optionalText(2000, "Observações"),
@@ -147,7 +147,7 @@ export const buildingFields = z.object({
     cep: z
       .string()
       .trim()
-      .refine((v) => v === "" || isValidCep(v), { message: "CEP inválido — use 00000-000." })
+      .refine((v) => v === "" || isValidCep(v), { message: "CEP inválido. Use 00000-000." })
       .transform((v) => (v === "" ? null : maskCep(v))),
     regiao: z
       .string()
@@ -245,7 +245,7 @@ export const leadSchema = z
       .string()
       .trim()
       .refine((v) => v === "" || onlyDigits(v).length >= 10, {
-        message: "Telefone incompleto — use DDD + número.",
+        message: "Telefone incompleto. Use DDD + número.",
       })
       .transform((v) => (v === "" ? null : v)),
     email: z

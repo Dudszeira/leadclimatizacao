@@ -16,6 +16,7 @@ import {
   pmocPlanSchema,
   type PmocPlanInput,
 } from "@/components/clientes/schemas"
+import { safeErrorLog } from "@/server/_shared"
 
 export interface GerarOsPmocState {
   status: "success" | "error"
@@ -46,7 +47,7 @@ export async function gerarOsPmoc(): Promise<GerarOsPmocState> {
       p_janela_dias: 7,
     })
     if (error) {
-      console.error("[actions/pmoc] generate_pmoc_service_orders:", error)
+      console.error("[actions/pmoc] generate_pmoc_service_orders:", safeErrorLog(error))
       return {
         status: "error",
         message: "Não foi possível gerar as OS agora. Tente novamente.",
@@ -72,7 +73,7 @@ export async function gerarOsPmoc(): Promise<GerarOsPmocState> {
           : `${criadas} OS preventivas geradas com sucesso.`,
     }
   } catch (error) {
-    console.error("[actions/pmoc] gerarOsPmoc:", error)
+    console.error("[actions/pmoc] gerarOsPmoc:", safeErrorLog(error))
     return {
       status: "error",
       message: "Não foi possível gerar as OS agora. Tente novamente.",
@@ -112,7 +113,7 @@ export async function savePmocPlan(input: PmocPlanInput): Promise<ActionResult> 
       .eq("id", row.equipment_id)
       .maybeSingle()
     if (eqError || !equipment) {
-      if (eqError) console.error("[actions/pmoc] savePmocPlan equipment:", eqError)
+      if (eqError) console.error("[actions/pmoc] savePmocPlan equipment:", safeErrorLog(eqError))
       return { ok: false, message: "Equipamento não encontrado.", fieldErrors: { equipment_id: "Equipamento inválido." } }
     }
     if (equipment.status === "inativo") {
@@ -128,7 +129,7 @@ export async function savePmocPlan(input: PmocPlanInput): Promise<ActionResult> 
         .eq("equipment_id", row.equipment_id)
         .maybeSingle()
       if (exError) {
-        console.error("[actions/pmoc] savePmocPlan existente:", exError)
+        console.error("[actions/pmoc] savePmocPlan existente:", safeErrorLog(exError))
         return { ok: false, message: "Não foi possível salvar o plano. Tente novamente." }
       }
       if (existente?.ativo) {
@@ -146,14 +147,14 @@ export async function savePmocPlan(input: PmocPlanInput): Promise<ActionResult> 
         .eq("equipment_id", equipment_id)
         .select("id")
       if (error) {
-        console.error("[actions/pmoc] savePmocPlan update:", error)
+        console.error("[actions/pmoc] savePmocPlan update:", safeErrorLog(error))
         return { ok: false, message: "Não foi possível salvar o plano. Tente novamente." }
       }
       if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
     } else {
       const { error } = await supabase.from("pmoc_plans").insert({ ...row, ativo: true })
       if (error) {
-        console.error("[actions/pmoc] savePmocPlan insert:", error)
+        console.error("[actions/pmoc] savePmocPlan insert:", safeErrorLog(error))
         return { ok: false, message: "Não foi possível criar o plano. Tente novamente." }
       }
     }
@@ -162,7 +163,7 @@ export async function savePmocPlan(input: PmocPlanInput): Promise<ActionResult> 
     if (clientId) revalidatePath(`/clientes/${clientId}`)
     return { ok: true, message: id ? "Plano PMOC atualizado." : "Plano PMOC salvo." }
   } catch (error) {
-    console.error("[actions/pmoc] savePmocPlan:", error)
+    console.error("[actions/pmoc] savePmocPlan:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível salvar o plano. Tente novamente." }
   }
 }
@@ -185,7 +186,7 @@ export async function setPmocPlanAtivo(input: { id: string; ativo: boolean }): P
       .eq("id", parsed.data.id)
       .select("id, equipment:equipment(building:buildings(client_id))")
     if (error) {
-      console.error("[actions/pmoc] setPmocPlanAtivo:", error)
+      console.error("[actions/pmoc] setPmocPlanAtivo:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível alterar o plano. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -201,7 +202,7 @@ export async function setPmocPlanAtivo(input: { id: string; ativo: boolean }): P
         : "Plano encerrado — OS já geradas continuam abertas até serem concluídas ou canceladas.",
     }
   } catch (error) {
-    console.error("[actions/pmoc] setPmocPlanAtivo:", error)
+    console.error("[actions/pmoc] setPmocPlanAtivo:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível alterar o plano. Tente novamente." }
   }
 }

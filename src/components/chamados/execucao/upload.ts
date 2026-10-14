@@ -45,11 +45,11 @@ export async function compressPhoto(file: File): Promise<Blob> {
   try {
     decoded = await decode(file)
   } catch {
-    throw new Error("Não foi possível ler esta imagem — tente outra foto.")
+    throw new Error("Não foi possível ler esta imagem. Tente outra foto.")
   }
   try {
     const { width, height } = fitWithin(decoded.width, decoded.height, PHOTO_MAX_DIMENSION)
-    if (!width || !height) throw new Error("Imagem inválida — tente outra foto.")
+    if (!width || !height) throw new Error("Imagem inválida. Tente outra foto.")
     const canvas = document.createElement("canvas")
     canvas.width = width
     canvas.height = height
@@ -80,7 +80,7 @@ export async function uploadToBucket(
   try {
     supabase = createClient()
   } catch {
-    throw new Error("Armazenamento não configurado — avise o administrador.")
+    throw new Error("Armazenamento não configurado. Avise o administrador.")
   }
   const { error } = await supabase.storage.from(bucket).upload(path, blob, {
     contentType,
@@ -94,6 +94,6 @@ export async function uploadToBucket(
       throw new Error("Sem permissão para enviar arquivos nesta OS.")
     }
     if (String(status) === "413") throw new Error("Arquivo acima do limite permitido.")
-    throw new Error("Falha no envio — verifique a conexão e tente novamente.")
+    throw new Error("Falha no envio. Verifique a conexão e tente novamente.")
   }
 }

@@ -176,7 +176,7 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
                 disabled={pending}
                 aria-invalid={nomeErro ? true : undefined}
                 aria-describedby={nomeErro ? "os-assinante-erro" : undefined}
-                placeholder="Ex.: Mariana Souza — síndica"
+                placeholder="Ex.: Mariana Souza, síndica"
                 className="h-11 md:h-9"
               />
               {nomeErro && (

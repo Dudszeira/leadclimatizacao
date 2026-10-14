@@ -18,6 +18,7 @@ import {
   type LinhaValida,
   type PredioImport,
 } from "@/components/importar/csv"
+import { safeErrorLog } from "@/server/_shared"
 
 /**
  * Importação em lote (carga inicial) — só admin.
@@ -124,7 +125,7 @@ async function gravar(
   for (const part of chunks(inserir, CHUNK_WRITE)) {
     const { error } = await supabase.from(tabela).insert(part.map((p) => p.row))
     if (error) {
-      console.error(`[actions/importar] insert ${tabela}:`, error)
+      console.error(`[actions/importar] insert ${tabela}:`, safeErrorLog(error))
       for (const p of part) erros.push({ linha: p.linha, campo: "lote", mensagem: "Falha ao gravar este lote — reenvie o arquivo." })
     } else inseridos += part.length
   }
@@ -134,7 +135,7 @@ async function gravar(
       .upsert(part.map((p) => p.row), { onConflict: "id", defaultToNull: false })
       .select("id")
     if (error) {
-      console.error(`[actions/importar] upsert ${tabela}:`, error)
+      console.error(`[actions/importar] upsert ${tabela}:`, safeErrorLog(error))
       for (const p of part) erros.push({ linha: p.linha, campo: "lote", mensagem: "Falha ao atualizar este lote — reenvie o arquivo." })
     } else atualizados += data?.length ?? 0
   }
@@ -168,11 +169,14 @@ async function importarPredios(
   const clientes = await clientesPorDocumento(supabase, validas.map((v) => v.dados.cliente_cnpj))
   const clientIds = [...new Set(clientes.values())]
   const predios = new Map<string, string>()
+  // prédio -> cliente (para barrar série que pertence a equipamento de outro cliente)
+  const clienteDoPredio = new Map<string, string>()
   for (const part of chunks(clientIds, CHUNK_LOOKUP)) {
     const { data, error } = await supabase.from("buildings").select("id, client_id, nome").in("client_id", part)
     if (error) throw error
     for (const b of (data ?? []) as Array<{ id: string; client_id: string; nome: string }>) {
       predios.set(`${b.client_id}|${b.nome.trim().toLowerCase()}`, b.id)
+      clienteDoPredio.set(b.id, b.client_id)
     }
   }
 
@@ -204,11 +208,14 @@ async function importarEquipamentos(
   const clientIds = [...new Set(clientes.values())]
 
   const predios = new Map<string, string>()
+  // prédio -> cliente (para barrar série que pertence a equipamento de outro cliente)
+  const clienteDoPredio = new Map<string, string>()
   for (const part of chunks(clientIds, CHUNK_LOOKUP)) {
     const { data, error } = await supabase.from("buildings").select("id, client_id, nome").in("client_id", part)
     if (error) throw error
     for (const b of (data ?? []) as Array<{ id: string; client_id: string; nome: string }>) {
       predios.set(`${b.client_id}|${b.nome.trim().toLowerCase()}`, b.id)
+      clienteDoPredio.set(b.id, b.client_id)
     }
   }
 
@@ -238,6 +245,14 @@ async function importarEquipamentos(
     if (error) throw error
     guardar((data ?? []) as EqRow[])
   }
+  const prediosDesconhecidos = [
+    ...new Set([...porSerie.values()].map((e) => e.building_id).filter((id) => !clienteDoPredio.has(id))),
+  ]
+  for (const part of chunks(prediosDesconhecidos, CHUNK_LOOKUP)) {
+    const { data, error } = await supabase.from("buildings").select("id, client_id").in("id", part)
+    if (error) throw error
+    for (const b of (data ?? []) as Array<{ id: string; client_id: string }>) clienteDoPredio.set(b.id, b.client_id)
+  }
 
   const inserir: Array<{ linha: number; row: Record<string, unknown> }> = []
   const atualizar: Array<{ linha: number; row: Record<string, unknown> }> = []
@@ -254,6 +269,11 @@ async function importarEquipamentos(
       continue
     }
     const existente = porSerie.get(dados.numero_serie.toLowerCase())
+    // upsert por série nunca move equipamento entre clientes (prédio sem leitura = outro dono)
+    if (existente && clienteDoPredio.get(existente.building_id) !== clientId) {
+      erros.push({ linha, campo: "numero_serie", mensagem: "Número de série já cadastrado para outro cliente." })
+      continue
+    }
     const codigo = presentes.has("codigo_interno") || !existente ? dados.codigo_interno : existente.codigo_interno
     const chaveCodigo = `${buildingId}|${codigo.toLowerCase()}`
     const dono = porCodigo.get(chaveCodigo)
@@ -342,7 +362,7 @@ export async function importarLote(input: z.input<typeof loteSchema>): Promise<I
       erros,
     }
   } catch (error) {
-    console.error("[actions/importar] importarLote:", error)
+    console.error("[actions/importar] importarLote:", safeErrorLog(error))
     return {
       ok: false,
       message: "Não foi possível concluir a importação. Nada além do já informado foi gravado — tente novamente.",

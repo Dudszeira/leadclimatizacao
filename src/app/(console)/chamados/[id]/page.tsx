@@ -176,7 +176,7 @@ export default async function ChamadoDetalhePage({ params }: PageParams) {
                   <span className="truncate">{clienteNome}</span>
                 </Link>
                 <span className="mt-0.5 block truncate text-xs text-ink-faint">
-                  {os.building.nome} — {os.building.cidade}/{os.building.uf}
+                  {os.building.nome} · {os.building.cidade}/{os.building.uf}
                 </span>
               </dd>
             </div>
@@ -196,7 +196,7 @@ export default async function ChamadoDetalhePage({ params }: PageParams) {
                     </span>{" "}
                     <span className="text-ink-dim">
                       · {EQUIPMENT_TYPE_LABELS[os.equipment.tipo]}
-                      {os.equipment.ambiente ? ` — ${os.equipment.ambiente}` : ""}
+                      {os.equipment.ambiente ? ` · ${os.equipment.ambiente}` : ""}
                     </span>
                   </span>
                 ) : (
@@ -390,7 +390,7 @@ function TimelineCard({ os }: { os: ServiceOrderWithRelations }) {
         </ol>
         {cancelada && (
           <p className="mt-4 rounded-lg border border-danger/30 bg-danger-dim px-3 py-2 text-sm text-danger">
-            Chamado cancelado — o ciclo foi interrompido.
+            Chamado cancelado. O ciclo foi interrompido.
           </p>
         )}
       </CardContent>

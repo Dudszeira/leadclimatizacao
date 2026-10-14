@@ -35,6 +35,22 @@ async function hojeBrt(): Promise<string> {
   return r.d;
 }
 
+/** Sobe foto "depois" + assinatura (Storage) e registra a foto, como o app faz. */
+async function registrarEvidencias(uid: string, os: string) {
+  await asUser(db, uid, `insert into storage.objects (bucket_id, name) values ('os-fotos', $1)`, [
+    `${os}/depois-1.jpg`,
+  ]);
+  await asUser(
+    db,
+    uid,
+    `insert into public.service_order_photos (service_order_id, storage_path, etapa) values ($1, $2, 'depois')`,
+    [os, `${os}/depois-1.jpg`],
+  );
+  await asUser(db, uid, `insert into storage.objects (bucket_id, name) values ('os-assinaturas', $1)`, [
+    `${os}/assinatura.png`,
+  ]);
+}
+
 beforeAll(async () => {
   db = await createDb();
 
@@ -120,11 +136,47 @@ describe("cadastro e perfis", () => {
     await expect(
       asUser(db, TEC1, `update public.profiles set role = 'admin' where id = $1`, [TEC1]),
     ).rejects.toThrow(/Apenas admin/);
-    await expect(
-      asUser(db, NOVO, `update public.profiles set ativo = true where id = $1`, [NOVO]),
-    ).rejects.toThrow(/Apenas admin/);
+    // inativo nem alcança a linha (policy exige get_my_role() não nulo)
+    const autoAtivar = await asUser(
+      db,
+      NOVO,
+      `update public.profiles set ativo = true where id = $1 returning id`,
+      [NOVO],
+    );
+    expect(autoAtivar).toHaveLength(0);
     // campos comuns continuam editáveis
     await asUser(db, TEC1, `update public.profiles set phone = '(41) 90000-0000' where id = $1`, [TEC1]);
+  });
+
+  it("usuário inativo não atualiza o próprio perfil", async () => {
+    const upd = await asUser(
+      db,
+      NOVO,
+      `update public.profiles set full_name = 'Hacker', phone = '1' where id = $1 returning id`,
+      [NOVO],
+    );
+    expect(upd).toHaveLength(0);
+    const [p] = await asService<{ full_name: string; ativo: boolean }>(
+      db,
+      `select full_name, ativo from public.profiles where id = $1`,
+      [NOVO],
+    );
+    expect(p).toEqual({ full_name: "Fulano", ativo: false });
+  });
+
+  it("usuário ativo só altera nome/telefone/foto do próprio perfil", async () => {
+    await asUser(db, TEC1, `update public.profiles set full_name = 'Técnico Um' where id = $1`, [TEC1]);
+    await expect(
+      asUser(db, TEC1, `update public.profiles set created_at = now() - interval '1 year' where id = $1`, [TEC1]),
+    ).rejects.toThrow(/só pode alterar nome, telefone e foto/);
+    // não alcança o perfil de outra pessoa
+    const outro = await asUser(
+      db,
+      TEC1,
+      `update public.profiles set full_name = 'x' where id = $1 returning id`,
+      [TEC2],
+    );
+    expect(outro).toHaveLength(0);
   });
 });
 
@@ -213,23 +265,109 @@ describe("OS: técnico", () => {
     ).rejects.toThrow(/Transição de status inválida/);
   });
 
-  it("técnico conclui (concluded_at automático) e não reabre OS concluída", async () => {
+  it("técnico não conclui por UPDATE direto nem grava evidências na coluna", async () => {
+    await expect(
+      asUser(db, TEC1, `update public.service_orders set status = 'concluido' where id = $1`, [OS_TEC1]),
+    ).rejects.toThrow(/Transição de status inválida/);
+    await expect(
+      asUser(db, TEC1, `update public.service_orders set fotos_depois = array[$1] where id = $2`, [
+        `${OS_TEC1}/depois/x.jpg`,
+        OS_TEC1,
+      ]),
+    ).rejects.toThrow(/Técnico só pode/);
+    await expect(
+      asUser(db, TEC1, `update public.service_orders set assinatura_path = $1 where id = $2`, [
+        `${OS_TEC1}/assinatura.png`,
+        OS_TEC1,
+      ]),
+    ).rejects.toThrow(/Técnico só pode/);
+    await expect(
+      asUser(
+        db,
+        TEC1,
+        `update public.service_orders set assinado_por_nome = 'Zelador', assinado_em = now() where id = $1`,
+        [OS_TEC1],
+      ),
+    ).rejects.toThrow(/Técnico só pode/);
+    // campos de execução continuam liberados
     await asUser(
       db,
       TEC1,
-      `update public.service_orders
-          set status = 'concluido', laudo = 'Dreno desobstruído',
-              assinado_por_nome = 'Zelador', assinado_em = now(),
-              observacoes_tecnicas = 'ok'
+      `update public.service_orders set laudo = 'Dreno desobstruído', observacoes_tecnicas = 'ok',
+              checklist_respostas = '{"filtro": true}'::jsonb
         where id = $1`,
       [OS_TEC1],
     );
-    const [os] = await asService<{ concluded_at: string | null }>(
-      db,
-      `select concluded_at from public.service_orders where id = $1`,
-      [OS_TEC1],
+  });
+
+  it("os_checklist_pendentes segue a regra da UI (checkbox/número obrigatórios, texto opcional)", async () => {
+    const itens = JSON.stringify([
+      { id: "a", tipo: "checkbox" },
+      { id: "b", tipo: "texto" },
+      { id: "c", tipo: "numero", obrigatorio: false },
+      { id: "d", tipo: "texto", obrigatorio: true },
+    ]);
+    const q = `select public.os_checklist_pendentes($1::jsonb, $2::jsonb) as n`;
+    const [vazio] = await asService<{ n: number }>(db, q, [itens, "{}"]);
+    expect(vazio.n).toBe(2);
+    const [ok] = await asService<{ n: number }>(db, q, [itens, JSON.stringify({ a: false, d: " ok " })]);
+    expect(ok.n).toBe(0);
+    const [ruim] = await asService<{ n: number }>(db, q, [itens, JSON.stringify({ a: "sim", d: "   " })]);
+    expect(ruim.n).toBe(2);
+  });
+
+  it("checklist gigante é recusado", async () => {
+    await expect(
+      asUser(
+        db,
+        TEC1,
+        `update public.service_orders
+            set checklist_respostas = jsonb_build_object('obs', repeat(md5(random()::text), 2000))
+          where id = $1`,
+        [OS_TEC1],
+      ),
+    ).rejects.toThrow(/Checklist inválido ou grande demais/);
+  });
+
+  it("concluir_os sem foto/assinatura falha; com evidência conclui", async () => {
+    await expect(asUser(db, TEC1, `select public.concluir_os($1, null, null)`, [OS_TEC1])).rejects.toThrow(
+      /foto "depois"/,
     );
+    // foto "depois" registrada mas sem objeto no Storage não conta
+    await asUser(
+      db,
+      TEC1,
+      `insert into public.service_order_photos (service_order_id, storage_path, etapa) values ($1, $2, 'depois')`,
+      [OS_TEC1, `${OS_TEC1}/fantasma.jpg`],
+    );
+    await expect(asUser(db, TEC1, `select public.concluir_os($1, null, null)`, [OS_TEC1])).rejects.toThrow(
+      /foto "depois"/,
+    );
+    await registrarEvidencias(TEC1, OS_TEC1);
+    // assinatura de outra OS / inexistente é recusada
+    await expect(
+      asUser(db, TEC1, `select public.concluir_os($1, $2, 'Zelador')`, [OS_TEC1, `${OS_TEC2}/assinatura.png`]),
+    ).rejects.toThrow(/Caminho da assinatura inválido/);
+    await expect(
+      asUser(db, TEC1, `select public.concluir_os($1, $2, 'Zelador')`, [OS_TEC1, `${OS_TEC1}/nao-existe.png`]),
+    ).rejects.toThrow(/não encontrado/);
+    await expect(asUser(db, TEC1, `select public.concluir_os($1, null, null)`, [OS_TEC1])).rejects.toThrow(
+      /assinatura/,
+    );
+    // técnico de outra OS não conclui
+    await expect(
+      asUser(db, TEC2, `select public.concluir_os($1, $2, 'Zelador')`, [OS_TEC1, `${OS_TEC1}/assinatura.png`]),
+    ).rejects.toThrow(/Sem permissão/);
+
+    const [os] = await asUser<{ status: string; concluded_at: string | null; assinado_em: string | null }>(
+      db,
+      TEC1,
+      `select status::text, concluded_at, assinado_em from public.concluir_os($1, $2, 'Zelador')`,
+      [OS_TEC1, `${OS_TEC1}/assinatura.png`],
+    );
+    expect(os.status).toBe("concluido");
     expect(os.concluded_at).not.toBeNull();
+    expect(os.assinado_em).not.toBeNull();
     const [eq] = await asService<{ status: string }>(db, `select status from public.equipment where id = $1`, [EQUIP1]);
     expect(eq.status).toBe("operacional");
 
@@ -239,6 +377,36 @@ describe("OS: técnico", () => {
     await expect(
       asUser(db, TEC1, `update public.service_orders set laudo = 'editado' where id = $1`, [OS_TEC1]),
     ).rejects.toThrow(/técnico não pode alterá-la/);
+  });
+
+  it("atendente não conclui por UPDATE direto nem grava concluded_at retroativo", async () => {
+    await expect(
+      asUser(db, ATEND, `update public.service_orders set concluded_at = now() - interval '30 days' where id = $1`, [
+        OS_TEC1,
+      ]),
+    ).rejects.toThrow(/Apenas admin pode alterar a data de conclusão/);
+    await expect(
+      asUser(db, ATEND, `update public.service_orders set fotos_depois = array['x'] where id = $1`, [OS_TEC2]),
+    ).rejects.toThrow(/Evidências/);
+    await expect(
+      asUser(
+        db,
+        ATEND,
+        `update public.service_orders set status = 'concluido', concluded_at = now() - interval '30 days'
+          where id = $1`,
+        [OS_TEC2],
+      ),
+    ).rejects.toThrow(/fluxo de conclusão|Transição/);
+    // admin pode corrigir a data
+    await asUser(db, ADMIN, `update public.service_orders set concluded_at = now() - interval '1 day' where id = $1`, [
+      OS_TEC1,
+    ]);
+    const [r] = await asService<{ ok: boolean }>(
+      db,
+      `select concluded_at < now() - interval '12 hours' as ok from public.service_orders where id = $1`,
+      [OS_TEC1],
+    );
+    expect(r.ok).toBe(true);
   });
 });
 
@@ -266,7 +434,8 @@ describe("Storage e fotos", () => {
     await asService(db, `insert into storage.objects (bucket_id, name) values ('os-fotos', 'lixo/sem-uuid.jpg')`);
     const vis = await asUser<{ name: string }>(db, TEC2, `select name from storage.objects`);
     expect(vis.map((v) => v.name)).toEqual([`${OS_TEC2}/antes/foto1.jpg`]);
-    expect(await asUser(db, TEC1, `select name from storage.objects`)).toHaveLength(0);
+    const visTec1 = await asUser<{ name: string }>(db, TEC1, `select name from storage.objects`);
+    expect(visTec1.every((v) => v.name.startsWith(`${OS_TEC1}/`))).toBe(true);
     // delete só admin
     const del = await asUser(db, TEC2, `delete from storage.objects returning id`);
     expect(del).toHaveLength(0);
@@ -285,9 +454,64 @@ describe("Storage e fotos", () => {
       `insert into public.service_order_photos (service_order_id, storage_path, legenda) values ($1, $2, 'antes')`,
       [OS_TEC2, `${OS_TEC2}/antes/foto1.jpg`],
     );
-    expect(await asUser(db, TEC1, `select id from public.service_order_photos`)).toHaveLength(0);
+    const fotosTec1 = await asUser<{ service_order_id: string }>(
+      db,
+      TEC1,
+      `select service_order_id from public.service_order_photos`,
+    );
+    expect(fotosTec1.every((f) => f.service_order_id === OS_TEC1)).toBe(true);
     expect(await asUser(db, TEC2, `select id from public.service_order_photos`)).toHaveLength(1);
-    expect(await asUser(db, ATEND, `select id from public.service_order_photos`)).toHaveLength(1);
+    expect(await asUser(db, ATEND, `select id from public.service_order_photos`)).toHaveLength(3);
+  });
+
+  it("técnico não lê, atualiza nem apaga objeto de outra OS", async () => {
+    const alvo = `${OS_TEC2}/antes/foto1.jpg`;
+    expect(
+      await asUser(db, TEC1, `select id from storage.objects where name = $1`, [alvo]),
+    ).toHaveLength(0);
+    expect(
+      await asUser(db, TEC1, `update storage.objects set name = $2 where name = $1 returning id`, [
+        alvo,
+        `${OS_TEC1}/roubada.jpg`,
+      ]),
+    ).toHaveLength(0);
+    expect(
+      await asUser(db, TEC1, `delete from storage.objects where name = $1 returning id`, [alvo]),
+    ).toHaveLength(0);
+    // nem na própria OS o técnico apaga/substitui evidência
+    expect(
+      await asUser(db, TEC1, `delete from storage.objects where name like $1 returning id`, [`${OS_TEC1}/%`]),
+    ).toHaveLength(0);
+    const [n] = await asService<{ n: number }>(db, `select count(*)::int as n from storage.objects where name = $1`, [
+      alvo,
+    ]);
+    expect(n.n).toBe(1);
+  });
+
+  it("registrar_assinatura exige OS em campo do próprio técnico", async () => {
+    // OS_TEC2 está aberta (não em campo)
+    await asUser(db, TEC2, `insert into storage.objects (bucket_id, name) values ('os-assinaturas', $1)`, [
+      `${OS_TEC2}/assinatura.png`,
+    ]);
+    await expect(
+      asUser(db, TEC2, `select public.registrar_assinatura($1, $2, 'Síndico')`, [OS_TEC2, `${OS_TEC2}/assinatura.png`]),
+    ).rejects.toThrow(/precisa estar em campo/);
+    await asUser(db, TEC2, `update public.service_orders set status = 'em_campo' where id = $1`, [OS_TEC2]);
+    await expect(
+      asUser(db, TEC1, `select public.registrar_assinatura($1, $2, 'Síndico')`, [OS_TEC2, `${OS_TEC2}/assinatura.png`]),
+    ).rejects.toThrow(/Sem permissão/);
+    const [r] = await asUser<{ assinado_por_nome: string; assinado_em: string | null }>(
+      db,
+      TEC2,
+      `select assinado_por_nome, assinado_em from public.registrar_assinatura($1, $2, '  Síndico  ')`,
+      [OS_TEC2, `${OS_TEC2}/assinatura.png`],
+    );
+    expect(r.assinado_por_nome).toBe("Síndico");
+    expect(r.assinado_em).not.toBeNull();
+    // concluir sem foto "depois" continua bloqueado mesmo com assinatura registrada
+    await expect(asUser(db, TEC2, `select public.concluir_os($1, null, null)`, [OS_TEC2])).rejects.toThrow(
+      /foto "depois"/,
+    );
   });
 });
 
@@ -328,7 +552,8 @@ describe("PMOC", () => {
       [os.id, TEC1],
     );
     await asUser(db, TEC1, `update public.service_orders set status = 'em_campo' where id = $1`, [os.id]);
-    await asUser(db, TEC1, `update public.service_orders set status = 'concluido' where id = $1`, [os.id]);
+    await registrarEvidencias(TEC1, os.id);
+    await asUser(db, TEC1, `select public.concluir_os($1, $2, 'Zelador')`, [os.id, `${os.id}/assinatura.png`]);
 
     const [depois] = await asService<{ d: string }>(
       db,
@@ -387,6 +612,51 @@ describe("Financeiro", () => {
       [CONTRATO_PMOC],
     );
     expect(rows).toEqual([{ status: "atrasado" }]);
+  });
+
+  it("atendente não faz UPDATE/DELETE em invoices nem contracts (só leitura)", async () => {
+    expect(await asUser(db, ATEND, `select id from public.invoices`)).not.toHaveLength(0);
+    expect(
+      await asUser(db, ATEND, `update public.invoices set status = 'pago' returning id`),
+    ).toHaveLength(0);
+    expect(await asUser(db, ATEND, `delete from public.invoices returning id`)).toHaveLength(0);
+    expect(
+      await asUser(db, ATEND, `update public.contracts set valor_mensal = 1 returning id`),
+    ).toHaveLength(0);
+    expect(await asUser(db, ATEND, `delete from public.contracts returning id`)).toHaveLength(0);
+    await expect(
+      asUser(db, ATEND, `insert into public.invoices (contract_id, competencia, valor, status) values ($1, '2020-01-01', 1, 'pago')`, [
+        CONTRATO_PMOC,
+      ]),
+    ).rejects.toThrow(/row-level security/);
+    const [n] = await asService<{ n: number }>(db, `select count(*)::int as n from public.invoices where status = 'pago'`);
+    expect(n.n).toBe(0);
+  });
+
+  it("técnico não gera faturas nem OS de PMOC", async () => {
+    await expect(asUser(db, TEC1, `select public.generate_monthly_invoices()`)).rejects.toThrow(/Apenas admin/);
+    await expect(asUser(db, TEC1, `select public.generate_pmoc_service_orders(7)`)).rejects.toThrow(/Apenas admin/);
+    await expect(asUser(db, TEC1, `select public.mark_overdue_invoices()`)).rejects.toThrow(/Apenas admin/);
+  });
+
+  it("retenção: eventos processados há mais de 90 dias são apagados", async () => {
+    await asService(
+      db,
+      `insert into public.webhook_events (id, event, processed_at) values
+         ('evt_velho', 'PAYMENT_RECEIVED', now() - interval '91 days'),
+         ('evt_novo', 'PAYMENT_RECEIVED', now() - interval '10 days'),
+         ('evt_pendente', 'PAYMENT_RECEIVED', null)`,
+    );
+    await asService(db, `update public.webhook_events set received_at = now() - interval '200 days' where id = 'evt_pendente'`);
+    const [r] = await asService<{ n: number }>(db, `select public._purge_webhook_events_job() as n`);
+    expect(r.n).toBe(1);
+    const rest = await asService<{ id: string }>(db, `select id from public.webhook_events order by id`);
+    expect(rest.map((x) => x.id)).toEqual(["evt_novo", "evt_pendente"]);
+    const [priv] = await asService<{ ok: boolean }>(
+      db,
+      `select has_function_privilege('authenticated', 'public._purge_webhook_events_job()', 'execute') as ok`,
+    );
+    expect(priv.ok).toBe(false);
   });
 
   it("webhook_events não é acessível por usuários", async () => {

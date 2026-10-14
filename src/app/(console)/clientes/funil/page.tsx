@@ -16,7 +16,11 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { DataError } from "@/components/data-error"
-import { LeadCardActions, NewLeadButton } from "@/components/clientes/lead-dialogs"
+import {
+  LeadAdvanceButton,
+  LeadCardActions,
+  NewLeadButton,
+} from "@/components/clientes/lead-dialogs"
 import { ORIGIN_LABELS, STAGE_LABELS } from "@/components/clientes/lead-labels"
 
 export const metadata: Metadata = {
@@ -59,7 +63,7 @@ export default async function FunilPage() {
             Funil comercial
           </h2>
           <p className="mt-1 text-sm text-ink-dim">
-            Leads por etapa — use o menu de cada card para avançar no funil.
+            Leads por etapa. Use o botão do card para avançar ou o menu para outras etapas.
           </p>
         </div>
         <NewLeadButton />
@@ -68,8 +72,8 @@ export default async function FunilPage() {
       {result.error !== null ? (
         <DataError message={result.error} />
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0">
-          <div className="grid min-w-[64rem] grid-cols-5 gap-3">
+        <div className="-mx-4 snap-x snap-mandatory scroll-px-4 overflow-x-auto overscroll-x-contain px-4 pb-2 md:mx-0 md:snap-none md:px-0">
+          <div className="grid grid-flow-col auto-cols-[85vw] gap-3 sm:auto-cols-[20rem] lg:min-w-[64rem] lg:grid-flow-row lg:auto-cols-auto lg:grid-cols-5">
             {LEAD_STAGES.map((stage) => (
               <StageColumn
                 key={stage}
@@ -98,7 +102,7 @@ function StageColumn({
   return (
     <section
       aria-label={`${STAGE_LABELS[stage]}: ${leads.length} leads`}
-      className="flex flex-col gap-2 rounded-xl border border-line bg-console/60 p-2"
+      className="flex snap-start flex-col gap-2 rounded-xl border border-line bg-console/60 p-2"
     >
       <header className="flex items-center justify-between gap-2 px-1.5 py-1">
         <span className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -159,6 +163,7 @@ function StageColumn({
                   )}
                 </div>
               )}
+              <LeadAdvanceButton lead={lead} />
               {lead.estagio === "perdido" && lead.motivo_perda && (
                 <p className="mt-2 border-t border-line-soft pt-2 text-xs text-danger">
                   {lead.motivo_perda}

@@ -4,6 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 import {
   CheckCheckIcon,
+  ChevronDownIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   FlaskConicalIcon,
@@ -20,12 +21,13 @@ import type {
   ServiceOrderPhotoView,
   UserRole,
 } from "@/lib/types"
-import { formatDateTimeFullBR } from "@/lib/format"
+import { formatDateTimeFullBR, formatOsNumero } from "@/lib/format"
 import {
   concludeServiceOrder,
   startServiceOrder,
 } from "@/server/actions/service-orders"
 import { evaluateConclusion } from "@/components/chamados/execution-rules"
+import type { FlushFn, SectionSync } from "@/components/chamados/execucao/autosave"
 import { ChecklistSection } from "@/components/chamados/execucao/checklist-section"
 import { LaudoSection } from "@/components/chamados/execucao/laudo-section"
 import { PhotosSection } from "@/components/chamados/execucao/photos-section"
@@ -73,6 +75,33 @@ type OsWorkspaceProps = {
   evidenceError: string | null
   /** Linha do tempo renderizada no servidor. */
   timeline: React.ReactNode
+}
+
+/** Campo de digitação focado (o teclado do celular está aberto). */
+function isTypingTarget(el: Element | null): boolean {
+  if (!el) return false
+  if (el instanceof HTMLTextAreaElement) return true
+  if (el instanceof HTMLElement && el.isContentEditable) return true
+  if (el instanceof HTMLInputElement) {
+    return !["button", "checkbox", "radio", "file", "submit", "reset", "range", "color"].includes(el.type)
+  }
+  return false
+}
+
+function useTypingFocus(): boolean {
+  const [typing, setTyping] = React.useState(false)
+  React.useEffect(() => {
+    const update = () => setTyping(isTypingTarget(document.activeElement))
+    // focusout dispara antes de o próximo campo receber o foco
+    const onFocusOut = () => window.setTimeout(update, 0)
+    document.addEventListener("focusin", update)
+    document.addEventListener("focusout", onFocusOut)
+    return () => {
+      document.removeEventListener("focusin", update)
+      document.removeEventListener("focusout", onFocusOut)
+    }
+  }, [])
+  return typing
 }
 
 type Coords = { lat: number | null; lng: number | null }
@@ -126,6 +155,34 @@ export function OsWorkspace({
   const [assinatura, setAssinatura] = React.useState<SignatureState>(os.assinatura)
   const [pending, setPending] = React.useState<"checkin" | "concluir" | null>(null)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
+  const [pendenciasOpen, setPendenciasOpen] = React.useState(false)
+  const typing = useTypingFocus()
+
+  // Seções com algo ainda não confirmado pelo servidor + "salvar agora" de cada uma.
+  const [dirtyMap, setDirtyMap] = React.useState<Record<string, boolean>>({})
+  const flushers = React.useRef(new Map<string, FlushFn>())
+  const onDirtyChange = React.useCallback((key: string, dirty: boolean) => {
+    setDirtyMap((m) => (m[key] === dirty ? m : { ...m, [key]: dirty }))
+  }, [])
+  const registerFlush = React.useCallback((key: string, flush: FlushFn | null) => {
+    if (flush) flushers.current.set(key, flush)
+    else flushers.current.delete(key)
+  }, [])
+  const sync = React.useMemo<SectionSync>(
+    () => ({ onDirtyChange, registerFlush }),
+    [onDirtyChange, registerFlush],
+  )
+  const anyDirty = Object.values(dirtyMap).some(Boolean)
+
+  React.useEffect(() => {
+    if (!anyDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [anyDirty])
 
   const office = role === "admin" || role === "atendente"
   const editable = canExecute && status === "em_campo"
@@ -154,7 +211,7 @@ export function OsWorkspace({
         toast.error(result.message)
       }
     } catch {
-      toast.error("Falha de conexão — tente o check-in novamente.")
+      toast.error("Falha de conexão. Tente o check-in novamente.")
     } finally {
       setPending(null)
     }
@@ -168,6 +225,13 @@ export function OsWorkspace({
     setConfirmOpen(false)
     setPending("concluir")
     try {
+      // Salva o que estiver pendente (checklist, laudo) e só então conclui.
+      const erros = await Promise.all([...flushers.current.values()].map((f) => f()))
+      const erro = erros.find((e): e is string => e !== null)
+      if (erro) {
+        toast.error(`Não deu para concluir: ${erro}`)
+        return
+      }
       const result = await concludeServiceOrder(os.id)
       if (result.status === "success") {
         setStatus("concluido")
@@ -177,7 +241,7 @@ export function OsWorkspace({
         toast.error(result.message)
       }
     } catch {
-      toast.error("Falha de conexão — tente concluir novamente.")
+      toast.error("Falha de conexão. Tente concluir novamente.")
     } finally {
       setPending(null)
     }
@@ -191,7 +255,7 @@ export function OsWorkspace({
         {demo && (
           <p className="flex items-start gap-2 rounded-lg border border-amber/30 bg-amber-dim px-3 py-2 text-sm text-amber">
             <FlaskConicalIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Modo demo — o fluxo funciona, mas nada é salvo (fotos ficam só na memória desta aba).
+            Modo demo: o fluxo funciona, mas nada é salvo (fotos ficam só na memória desta aba).
           </p>
         )}
 
@@ -223,7 +287,7 @@ export function OsWorkspace({
                   </Button>
                   {!technicianId && office && (
                     <p className="text-xs text-ink-faint">
-                      Dica: designe o técnico antes — ele só enxerga OS atribuídas a ele.
+                      Dica: designe o técnico antes, pois ele só enxerga OS atribuídas a ele.
                     </p>
                   )}
                 </>
@@ -252,6 +316,7 @@ export function OsWorkspace({
                 saved={respostas}
                 editable={editable}
                 onSaved={setRespostas}
+                sync={sync}
               />
             )}
             <PhotosSection
@@ -260,6 +325,7 @@ export function OsWorkspace({
               editable={editable}
               photos={photos}
               onAdded={(p) => setPhotos((list) => [...list, p])}
+              sync={sync}
             />
             <LaudoSection
               osId={os.id}
@@ -267,6 +333,7 @@ export function OsWorkspace({
               laudo={laudo.laudo}
               observacoes={laudo.observacoes}
               onSaved={setLaudo}
+              sync={sync}
             />
             <SignatureSection
               osId={os.id}
@@ -279,7 +346,13 @@ export function OsWorkspace({
         )}
 
         {editable && (
-          <div className="sticky bottom-3 z-10">
+          <div
+            className={cn(
+              "sticky bottom-3 z-10",
+              // teclado aberto no celular: a barra sai da frente do campo
+              typing && "max-md:hidden",
+            )}
+          >
             <Card
               size="sm"
               className="border border-line bg-console-2/95 shadow-lg ring-0 backdrop-blur supports-[backdrop-filter]:bg-console-2/85"
@@ -292,17 +365,45 @@ export function OsWorkspace({
                       Tudo pronto para concluir.
                     </p>
                   ) : (
-                    <ul className="flex flex-col gap-1 text-sm text-ink-dim">
-                      {readiness.pendencias.map((p) => (
-                        <li key={p} className="flex items-start gap-2">
-                          <CircleAlertIcon
-                            className="mt-0.5 size-4 shrink-0 text-amber"
-                            aria-hidden="true"
-                          />
-                          {p}
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <button
+                        type="button"
+                        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left text-sm font-medium text-amber focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:hidden"
+                        aria-expanded={pendenciasOpen}
+                        aria-controls="os-pendencias"
+                        onClick={() => setPendenciasOpen((v) => !v)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <CircleAlertIcon className="size-4 shrink-0" aria-hidden="true" />
+                          Faltam {readiness.pendencias.length}{" "}
+                          {readiness.pendencias.length === 1 ? "item" : "itens"}
+                        </span>
+                        <ChevronDownIcon
+                          className={cn(
+                            "size-4 shrink-0 transition-transform motion-reduce:transition-none",
+                            pendenciasOpen && "rotate-180",
+                          )}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <ul
+                        id="os-pendencias"
+                        className={cn(
+                          "flex-col gap-1 text-sm text-ink-dim max-sm:mt-1",
+                          pendenciasOpen ? "flex" : "hidden sm:flex",
+                        )}
+                      >
+                        {readiness.pendencias.map((p) => (
+                          <li key={p} className="flex items-start gap-2">
+                            <CircleAlertIcon
+                              className="mt-0.5 size-4 shrink-0 text-amber"
+                              aria-hidden="true"
+                            />
+                            {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </div>
                 <Button
@@ -317,7 +418,7 @@ export function OsWorkspace({
                   ) : (
                     <CheckCheckIcon aria-hidden="true" />
                   )}
-                  Concluir OS
+                  {pending === "concluir" ? "Salvando e concluindo…" : "Concluir OS"}
                 </Button>
               </CardContent>
             </Card>
@@ -336,8 +437,8 @@ export function OsWorkspace({
             {encerrada ? (
               <p className="text-sm leading-relaxed text-ink-dim">
                 {status === "concluido"
-                  ? "Chamado concluído — nenhuma ação pendente."
-                  : "Chamado cancelado — nenhuma ação disponível."}
+                  ? "Chamado concluído. Nenhuma ação pendente."
+                  : "Chamado cancelado. Nenhuma ação disponível."}
               </p>
             ) : office ? (
               <OrderActions
@@ -392,7 +493,7 @@ export function OsWorkspace({
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Concluir a OS #{os.numero}?</DialogTitle>
+            <DialogTitle>Concluir a OS {formatOsNumero(os.numero)}?</DialogTitle>
             <DialogDescription>
               Depois de concluída, o técnico não consegue mais alterar checklist, fotos ou
               assinatura. A próxima preventiva PMOC é reprogramada automaticamente.

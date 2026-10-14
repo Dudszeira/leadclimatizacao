@@ -17,9 +17,29 @@ export function fail<T>(message: string): Result<T> {
   return { data: null, error: message };
 }
 
-/** Loga o erro cru no servidor e devolve a mensagem amigável em pt-BR. */
+/**
+ * Reduz um erro (PostgREST/Postgres/Error) ao que é seguro logar: code e
+ * message. `details`/`hint` do Postgres trazem valores de linha (ex.:
+ * "Key (cnpj)=(...) already exists") — dado pessoal que não vai para log (LGPD).
+ */
+export function safeErrorLog(error: unknown): { code?: string; message: string } {
+  if (error && typeof error === "object") {
+    const e = error as { code?: unknown; message?: unknown; name?: unknown };
+    const code = typeof e.code === "string" ? e.code : undefined;
+    const raw = typeof e.message === "string" ? e.message : typeof e.name === "string" ? e.name : "erro";
+    return code ? { code, message: scrubValues(raw) } : { message: scrubValues(raw) };
+  }
+  return { message: scrubValues(String(error)) };
+}
+
+/** Remove trechos "Key (col)=(valor)" e afins que alguns drivers põem na message. */
+function scrubValues(message: string): string {
+  return message.replace(/\(([^()]*)\)=\([^)]*\)/g, "($1)=(…)").slice(0, 300);
+}
+
+/** Loga só code + message (sem details/hint) e devolve a mensagem amigável em pt-BR. */
 export function failWith<T>(context: string, error: unknown, message: string): Result<T> {
-  console.error(`[data-layer] ${context}:`, error);
+  console.error(`[data-layer] ${context}:`, safeErrorLog(error));
   return fail(message);
 }
 

@@ -12,7 +12,7 @@ export interface ActionResult {
 }
 
 export const DEMO_MESSAGE =
-  "Modo demonstração — dados validados, mas nada foi gravado. Conecte o banco para salvar."
+  "Modo demonstração: dados validados, mas nada foi gravado. Conecte o banco para salvar."
 
 export const RLS_BLOCK_MESSAGE =
   "Não foi possível salvar: registro não encontrado ou sem permissão para alterá-lo."

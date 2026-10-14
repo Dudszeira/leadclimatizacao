@@ -79,7 +79,17 @@ function req(body: unknown, token: string | null = TOKEN, raw?: string): Request
   });
 }
 
-const config = { demo: false, expectedToken: TOKEN };
+/** Cobrança "verdadeira" na API do Asaas (mock de GET /payments/{id}). */
+const remotePaid = {
+  id: "pay_080225913252",
+  status: "RECEIVED",
+  value: 8900,
+  billingType: "PIX",
+  paymentDate: "2026-10-14",
+  externalReference: INVOICE_ID,
+};
+const fetchPayment = vi.fn(async (id: string) => ({ ...remotePaid, id }));
+const config = { demo: false, expectedToken: TOKEN, fetchPayment };
 
 const paymentReceived = {
   id: "evt_05b708f961d739ea7eba7e4db318f621&368604920",
@@ -105,12 +115,16 @@ function defaultHandler(overrides: Partial<Record<string, Reply>> = {}): Handler
     if (call.table === "webhook_events" && call.op === "update") return overrides.mark ?? {};
     if (call.table === "invoices" && call.op === "update")
       return overrides.invoices ?? { data: [{ id: INVOICE_ID }] };
+    if (call.table === "invoices" && call.op === "select")
+      return overrides.lookup ?? { data: { id: INVOICE_ID, valor: "8900.00", status: "pendente" } };
     return {};
   };
 }
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
+  fetchPayment.mockReset();
+  fetchPayment.mockImplementation(async (id: string) => ({ ...remotePaid, id }));
 });
 
 describe("tokensMatch", () => {
@@ -137,12 +151,12 @@ describe("webhook Asaas — autenticação e falha fechada", () => {
   });
 
   it("modo demo → 503", async () => {
-    const res = await handleAsaasWebhook(req(paymentReceived), { demo: true, expectedToken: TOKEN }, vi.fn());
+    const res = await handleAsaasWebhook(req(paymentReceived), { ...config, demo: true }, vi.fn());
     expect(res.status).toBe(503);
   });
 
   it("token não configurado → 503 (falha fechada)", async () => {
-    const res = await handleAsaasWebhook(req(paymentReceived), { demo: false, expectedToken: undefined }, vi.fn());
+    const res = await handleAsaasWebhook(req(paymentReceived), { ...config, expectedToken: undefined }, vi.fn());
     expect(res.status).toBe(503);
   });
 
@@ -229,19 +243,20 @@ describe("webhook Asaas — regras por evento", () => {
   });
 
   it("PAYMENT_RECEIVED sem asaas_id gravado cai no fallback por externalReference", async () => {
-    let n = 0;
+    let lookups = 0;
     const db = fakeSupabase((call) => {
-      if (call.table === "invoices" && call.op === "update") {
-        n += 1;
-        return { data: n === 1 ? [] : [{ id: INVOICE_ID }] };
+      if (call.table === "invoices" && call.op === "select") {
+        lookups += 1;
+        return { data: lookups === 1 ? null : { id: INVOICE_ID, valor: 8900, status: "pendente" } };
       }
       return defaultHandler()(call);
     });
     const res = await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
     expect(res.body).toMatchObject({ affected: 1 });
-    const fallback = db.calls.filter((c) => c.table === "invoices")[1];
-    expect(fallback.filters).toContainEqual(["eq", "id", INVOICE_ID]);
-    expect(fallback.payload).toMatchObject({ asaas_id: "pay_080225913252", status: "pago" });
+    const updates = db.calls.filter((c) => c.table === "invoices" && c.op === "update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].filters).toContainEqual(["eq", "id", INVOICE_ID]);
+    expect(updates[0].payload).toMatchObject({ asaas_id: "pay_080225913252", status: "pago" });
   });
 
   it("PAYMENT_DELETED libera a fatura em aberto para nova cobrança", async () => {
@@ -330,5 +345,104 @@ describe("webhook Asaas — regras por evento", () => {
     );
     expect(res.status).toBe(200);
     expect(db.calls.some((c) => c.table === "invoices")).toBe(false);
+  });
+});
+
+describe("webhook Asaas — conferência do pagamento na API", () => {
+  it("confere GET /payments/{id} antes de marcar pago", async () => {
+    const db = fakeSupabase(defaultHandler());
+    const res = await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
+    expect(res.status).toBe(200);
+    expect(fetchPayment).toHaveBeenCalledWith("pay_080225913252");
+  });
+
+  it("status no Asaas ainda pendente → não marca pago e grava o erro", async () => {
+    fetchPayment.mockImplementation(async (id: string) => ({ ...remotePaid, id, status: "PENDING" }));
+    const db = fakeSupabase(defaultHandler());
+    const res = await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ affected: 0, verified: false });
+    expect(db.calls.some((c) => c.table === "invoices" && c.op === "update")).toBe(false);
+    const mark = db.calls.find((c) => c.table === "webhook_events" && c.op === "update");
+    expect((mark?.payload as { error: string }).error).toMatch(/status no Asaas é PENDING/);
+    expect(mark?.payload).not.toHaveProperty("processed_at");
+  });
+
+  it("valor no Asaas menor que a fatura → não marca pago", async () => {
+    fetchPayment.mockImplementation(async (id: string) => ({ ...remotePaid, id, value: 10 }));
+    const db = fakeSupabase(defaultHandler());
+    const res = await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
+    expect(res.status).toBe(200);
+    expect(db.calls.some((c) => c.table === "invoices" && c.op === "update")).toBe(false);
+    const mark = db.calls.find((c) => c.table === "webhook_events" && c.op === "update");
+    expect((mark?.payload as { error: string }).error).toMatch(/valor no Asaas/);
+  });
+
+  it("cobrança remota de outra fatura (externalReference) → não marca pago", async () => {
+    fetchPayment.mockImplementation(async (id: string) => ({
+      ...remotePaid,
+      id,
+      externalReference: "11111111-2222-4333-8444-555555555555",
+    }));
+    const db = fakeSupabase(defaultHandler());
+    await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
+    expect(db.calls.some((c) => c.table === "invoices" && c.op === "update")).toBe(false);
+  });
+
+  it("API do Asaas fora do ar → 500 (Asaas reenvia) sem marcar pago", async () => {
+    fetchPayment.mockRejectedValue(new Error("Asaas indisponível"));
+    const db = fakeSupabase(defaultHandler());
+    const res = await handleAsaasWebhook(req(paymentReceived), config, () => db.client as never);
+    expect(res.status).toBe(500);
+    expect(db.calls.some((c) => c.table === "invoices" && c.op === "update")).toBe(false);
+  });
+
+  it("fatura não encontrada → não consulta a API e responde 200", async () => {
+    const db = fakeSupabase(defaultHandler({ lookup: { data: null } }));
+    const res = await handleAsaasWebhook(
+      req({ ...paymentReceived, payment: { ...paymentReceived.payment, externalReference: null } }),
+      config,
+      () => db.client as never,
+    );
+    expect(res.status).toBe(200);
+    expect(fetchPayment).not.toHaveBeenCalled();
+  });
+});
+
+describe("webhook Asaas — minimização do payload (LGPD)", () => {
+  it("não grava nome, CPF/CNPJ nem e-mail do pagador em webhook_events", async () => {
+    const db = fakeSupabase(defaultHandler());
+    await handleAsaasWebhook(
+      req({
+        ...paymentReceived,
+        payment: {
+          ...paymentReceived.payment,
+          customer: "cus_000005219613",
+          customerName: "Fulano de Tal",
+          cpfCnpj: "123.456.789-09",
+          email: "fulano@example.com",
+          description: "Fatura de Fulano de Tal",
+          creditCard: { creditCardNumber: "1234" },
+          invoiceUrl: "https://www.asaas.com/i/abc",
+        },
+      }),
+      config,
+      () => db.client as never,
+    );
+    const upsert = db.calls.find((c) => c.table === "webhook_events" && c.op === "upsert");
+    const payload = (upsert?.payload as { payload: Record<string, unknown> }).payload;
+    const texto = JSON.stringify(payload);
+    expect(texto).not.toMatch(/Fulano|123\.456|fulano@|cus_000005219613|creditCard/);
+    expect(payload).toMatchObject({
+      id: paymentReceived.id,
+      event: "PAYMENT_RECEIVED",
+      payment: {
+        id: "pay_080225913252",
+        status: "RECEIVED",
+        value: 8900,
+        paymentDate: "2026-10-14",
+        invoiceUrl: "https://www.asaas.com/i/abc",
+      },
+    });
   });
 });

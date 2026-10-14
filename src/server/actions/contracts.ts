@@ -7,6 +7,7 @@ import { todayBRT } from "@/lib/asaas/dates"
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import { authorizeAction } from "@/server/auth"
+import { safeErrorLog } from "@/server/_shared"
 
 /**
  * CRUD de contratos (aba Contratos de /financeiro). Só admin. Contrato não é
@@ -114,7 +115,7 @@ export async function saveContract(
         .eq("id", id)
         .select("id")
       if (error) {
-        console.error("[actions/contracts] update:", error)
+        console.error("[actions/contracts] update:", safeErrorLog(error))
         return { status: "error", message: "Não foi possível salvar o contrato. Tente novamente." }
       }
       if (!data || data.length === 0) {
@@ -123,7 +124,7 @@ export async function saveContract(
     } else {
       const { data, error } = await supabase.from("contracts").insert(values).select("id")
       if (error) {
-        console.error("[actions/contracts] insert:", error)
+        console.error("[actions/contracts] insert:", safeErrorLog(error))
         const fk = (error as { code?: string }).code === "23503"
         return {
           status: "error",
@@ -137,7 +138,7 @@ export async function saveContract(
       }
     }
   } catch (error) {
-    console.error("[actions/contracts] saveContract:", error)
+    console.error("[actions/contracts] saveContract:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível salvar o contrato. Tente novamente." }
   }
 
@@ -162,7 +163,7 @@ export async function closeContract(contractId: string): Promise<ContractActionS
       .eq("id", id.data)
       .maybeSingle()
     if (readError) {
-      console.error("[actions/contracts] closeContract read:", readError)
+      console.error("[actions/contracts] closeContract read:", safeErrorLog(readError))
       return { status: "error", message: "Não foi possível encerrar o contrato. Tente novamente." }
     }
     if (!current) return { status: "error", message: "Contrato não encontrado — atualize a página." }
@@ -181,14 +182,14 @@ export async function closeContract(contractId: string): Promise<ContractActionS
       .neq("status", "encerrado")
       .select("id")
     if (error) {
-      console.error("[actions/contracts] closeContract:", error)
+      console.error("[actions/contracts] closeContract:", safeErrorLog(error))
       return { status: "error", message: "Não foi possível encerrar o contrato. Tente novamente." }
     }
     if (!data || data.length === 0) {
       return { status: "error", message: "O contrato já foi encerrado ou você não tem permissão." }
     }
   } catch (error) {
-    console.error("[actions/contracts] closeContract:", error)
+    console.error("[actions/contracts] closeContract:", safeErrorLog(error))
     return { status: "error", message: "Não foi possível encerrar o contrato. Tente novamente." }
   }
 

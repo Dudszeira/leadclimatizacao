@@ -40,7 +40,7 @@ export function ClientStatusButton({ client }: { client: Pick<Client, "id" | "ra
         title={inativar ? "Inativar cliente?" : "Reativar cliente?"}
         description={
           inativar
-            ? `${client.razao_social} sai das listas de clientes ativos. Prédios, equipamentos, contratos e o histórico de OS são mantidos — dá para reativar depois.`
+            ? `${client.razao_social} sai das listas de clientes ativos. Prédios, equipamentos, contratos e o histórico de OS são mantidos. Dá para reativar depois.`
             : `${client.razao_social} volta a aparecer como cliente ativo.`
         }
         confirmLabel={inativar ? "Inativar cliente" : "Reativar cliente"}

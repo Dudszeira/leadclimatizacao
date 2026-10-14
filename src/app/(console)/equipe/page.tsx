@@ -4,7 +4,6 @@ import { ptBR } from "date-fns/locale"
 import { ShieldCheckIcon } from "lucide-react"
 
 import { isDemoMode } from "@/lib/env"
-import { ROLE_LABELS } from "@/lib/nav"
 import { requireRole } from "@/server/auth"
 import { listTeam, type TeamMember } from "@/server/profiles"
 import { Badge } from "@/components/ui/badge"
@@ -142,10 +141,7 @@ export default async function EquipePage() {
                       </div>
                     </TableCell>
                     <TableCell className="max-md:hidden">
-                      <div className="flex flex-col items-start gap-1">
-                        <StatusBadge member={member} />
-                        <span className="text-xs text-ink-faint">{ROLE_LABELS[member.role]}</span>
-                      </div>
+                      <StatusBadge member={member} />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-ink-dim tabular-nums max-lg:hidden">
                       {lastAccess(member.lastSignInAt)}

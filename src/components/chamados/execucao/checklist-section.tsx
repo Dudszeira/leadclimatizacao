@@ -2,8 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
-import { CheckIcon, LoaderCircleIcon, SaveIcon, XIcon } from "lucide-react"
-import { toast } from "sonner"
+import { CheckIcon, XIcon } from "lucide-react"
 
 import type { ChecklistItem, ChecklistRespostas } from "@/lib/types"
 import { saveChecklist } from "@/server/actions/service-orders"
@@ -12,6 +11,14 @@ import {
   isChecklistItemRequired,
   pendingRequiredItems,
 } from "@/components/chamados/execution-rules"
+import {
+  SaveIndicator,
+  draftStorageKey,
+  readStoredDraft,
+  useAutosave,
+  useSectionSync,
+  type SectionSync,
+} from "@/components/chamados/execucao/autosave"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -25,6 +32,7 @@ type ChecklistSectionProps = {
   saved: ChecklistRespostas
   editable: boolean
   onSaved: (respostas: ChecklistRespostas) => void
+  sync?: SectionSync
 }
 
 type Draft = Record<string, string | boolean | null>
@@ -55,15 +63,14 @@ function fromDraft(itens: ChecklistItem[], d: Draft): ChecklistRespostas {
   return r
 }
 
-function sameAnswers(a: ChecklistRespostas, b: ChecklistRespostas): boolean {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
-  for (const k of keys) {
-    const x = a[k] ?? null
-    const y = b[k] ?? null
-    if (typeof x === "number" && typeof y === "number" && Number.isNaN(x) && Number.isNaN(y)) continue
-    if (x !== y) return false
-  }
-  return true
+/** Serialização estável (NaN vira marcador para não se confundir com vazio). */
+function answersKey(itens: ChecklistItem[], r: ChecklistRespostas): string {
+  return JSON.stringify(
+    itens.map((i) => {
+      const v = r[i.id] ?? null
+      return typeof v === "number" && Number.isNaN(v) ? "NaN" : v
+    }),
+  )
 }
 
 /** Checklist do template: conforme/não conforme, medições e texto livre. */
@@ -74,15 +81,69 @@ export function ChecklistSection({
   saved,
   editable,
   onSaved,
+  sync,
 }: ChecklistSectionProps) {
   const [draft, setDraft] = React.useState<Draft>(() => toDraft(itens, saved))
-  const [pending, startTransition] = React.useTransition()
   const [invalid, setInvalid] = React.useState<Set<string>>(new Set())
+  const storageKey = draftStorageKey(osId, "checklist")
+
+  // Rascunho guardado neste aparelho (aba recarregada, sem rede): volta para a tela
+  // e o autosave tenta gravar de novo.
+  React.useEffect(() => {
+    if (!editable) return
+    const stored = readStoredDraft<Draft>(storageKey)
+    if (!stored || typeof stored !== "object") return
+    const restored: Draft = {}
+    for (const item of itens) {
+      const v = stored[item.id]
+      if (item.tipo === "checkbox") restored[item.id] = typeof v === "boolean" ? v : null
+      else restored[item.id] = typeof v === "string" ? v : ""
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe após montar
+    setDraft(restored)
+    // só na montagem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const current = fromDraft(itens, draft)
-  const dirty = !sameAnswers(current, saved)
   const respondidos = itens.filter((i) => isChecklistItemAnswered(i, saved[i.id])).length
   const faltando = pendingRequiredItems(itens, saved).length
+
+  function findInvalid(): Set<string> {
+    return new Set(
+      itens
+        .filter((i) => i.tipo === "numero")
+        .filter((i) => {
+          const v = current[i.id]
+          return typeof v === "number" && !Number.isFinite(v)
+        })
+        .map((i) => i.id),
+    )
+  }
+
+  const autosave = useAutosave({
+    enabled: editable,
+    storageKey,
+    valueKey: answersKey(itens, current),
+    savedKey: answersKey(itens, saved),
+    persist: () => draft,
+    validate: () => {
+      const bad = findInvalid()
+      if (bad.size === 0) return null
+      setInvalid(bad)
+      return "Há medição com valor inválido. Use apenas números."
+    },
+    save: async () => {
+      const value = current
+      const result = await saveChecklist(osId, value)
+      if (result.status === "success") {
+        onSaved(value)
+        return { ok: true }
+      }
+      return { ok: false, message: result.message }
+    },
+  })
+  useSectionSync("checklist", autosave.dirty, autosave.flush, sync ?? {})
 
   function set(id: string, value: string | boolean | null) {
     setDraft((d) => ({ ...d, [id]: value }))
@@ -95,38 +156,11 @@ export function ChecklistSection({
     }
   }
 
-  function handleSave() {
-    const bad = new Set(
-      itens
-        .filter((i) => i.tipo === "numero")
-        .filter((i) => {
-          const v = current[i.id]
-          return typeof v === "number" && !Number.isFinite(v)
-        })
-        .map((i) => i.id),
-    )
-    if (bad.size > 0) {
-      setInvalid(bad)
-      toast.error("Há medições com valor inválido — use apenas números.")
-      return
-    }
-    startTransition(async () => {
-      const result = await saveChecklist(osId, current)
-      if (result.status === "success") {
-        onSaved(current)
-        if (result.demo) toast.info(result.message)
-        else toast.success(result.message)
-      } else {
-        toast.error(result.message)
-      }
-    })
-  }
-
   return (
     <Card size="sm" className="border border-line bg-console ring-0">
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-2 text-ink">
-          <span className="min-w-0 truncate">Checklist — {nome}</span>
+          <span className="min-w-0 truncate">Checklist · {nome}</span>
           <span className="shrink-0 font-mono text-xs font-normal text-ink-faint tabular-nums">
             {respondidos}/{itens.length}
           </span>
@@ -171,8 +205,8 @@ export function ChecklistSection({
                       type="button"
                       variant="outline"
                       aria-pressed={value === true}
-                      disabled={!editable || pending}
-                      onClick={() => set(item.id, value === true ? null : true)}
+                      disabled={!editable}
+                      onClick={() => set(item.id, true)}
                       className={cn(
                         "h-11 justify-center",
                         value === true &&
@@ -186,8 +220,8 @@ export function ChecklistSection({
                       type="button"
                       variant="outline"
                       aria-pressed={value === false}
-                      disabled={!editable || pending}
-                      onClick={() => set(item.id, value === false ? null : false)}
+                      disabled={!editable}
+                      onClick={() => set(item.id, false)}
                       className={cn(
                         "h-11 justify-center",
                         value === false &&
@@ -208,7 +242,7 @@ export function ChecklistSection({
                     placeholder={item.unidade ? `Valor em ${item.unidade}` : "Valor medido"}
                     value={typeof value === "string" ? value : ""}
                     onChange={(e) => set(item.id, e.target.value)}
-                    disabled={!editable || pending}
+                    disabled={!editable}
                     aria-invalid={invalid.has(item.id) || undefined}
                     className="h-11 font-mono tabular-nums md:h-9"
                   />
@@ -221,8 +255,8 @@ export function ChecklistSection({
                     maxLength={2000}
                     value={typeof value === "string" ? value : ""}
                     onChange={(e) => set(item.id, e.target.value)}
-                    disabled={!editable || pending}
-                    placeholder={editable ? "Descreva…" : "—"}
+                    disabled={!editable}
+                    placeholder={editable ? "Descreva…" : "Sem resposta"}
                   />
                 )}
               </li>
@@ -231,28 +265,17 @@ export function ChecklistSection({
         </ul>
 
         {editable && (
-          <div className="flex flex-col gap-2 border-t border-line-soft pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-ink-dim" aria-live="polite">
-              {dirty
-                ? "Alterações não salvas."
-                : faltando > 0
-                  ? `${faltando} ${faltando === 1 ? "item obrigatório pendente" : "itens obrigatórios pendentes"}.`
-                  : "Checklist completo."}
+          <div className="flex flex-col gap-1 border-t border-line-soft pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <SaveIndicator
+              status={autosave.status}
+              error={autosave.error}
+              onRetry={() => void autosave.flush()}
+            />
+            <p className="text-xs text-ink-dim">
+              {faltando > 0
+                ? `${faltando} ${faltando === 1 ? "item obrigatório pendente" : "itens obrigatórios pendentes"}.`
+                : "Checklist completo."}
             </p>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={!dirty || pending}
-              aria-busy={pending}
-              className="h-11 md:h-9"
-            >
-              {pending ? (
-                <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-              ) : (
-                <SaveIcon aria-hidden="true" />
-              )}
-              Salvar checklist
-            </Button>
           </div>
         )}
       </CardContent>

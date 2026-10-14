@@ -22,6 +22,7 @@ import {
   type LeadInput,
 } from "@/components/clientes/schemas"
 import { onlyDigits } from "@/components/clientes/validators"
+import { safeErrorLog } from "@/server/_shared"
 
 const INVALID = "Revise os campos destacados antes de salvar."
 const GENERIC = "Não foi possível salvar. Tente novamente."
@@ -62,14 +63,14 @@ export async function saveBuilding(input: BuildingInput): Promise<ActionResult> 
         .eq("client_id", client_id)
         .select("id")
       if (error) {
-        console.error("[actions/cadastros] saveBuilding update:", error)
+        console.error("[actions/cadastros] saveBuilding update:", safeErrorLog(error))
         return { ok: false, message: GENERIC }
       }
       if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
     } else {
       const { error } = await supabase.from("buildings").insert(row)
       if (error) {
-        console.error("[actions/cadastros] saveBuilding insert:", error)
+        console.error("[actions/cadastros] saveBuilding insert:", safeErrorLog(error))
         return { ok: false, message: GENERIC }
       }
     }
@@ -77,7 +78,7 @@ export async function saveBuilding(input: BuildingInput): Promise<ActionResult> 
     revalidatePath("/mapa")
     return { ok: true, message: id ? "Prédio atualizado." : "Prédio cadastrado." }
   } catch (error) {
-    console.error("[actions/cadastros] saveBuilding:", error)
+    console.error("[actions/cadastros] saveBuilding:", safeErrorLog(error))
     return { ok: false, message: GENERIC }
   }
 }
@@ -102,7 +103,7 @@ export async function deleteBuilding(id: string): Promise<ActionResult> {
       supabase.from("service_orders").select("id", { count: "exact", head: true }).eq("building_id", parsed.data),
     ])
     if (eq.error || os.error) {
-      console.error("[actions/cadastros] deleteBuilding check:", eq.error ?? os.error)
+      console.error("[actions/cadastros] deleteBuilding check:", safeErrorLog(eq.error ?? os.error))
       return { ok: false, message: "Não foi possível excluir o prédio. Tente novamente." }
     }
     if ((eq.count ?? 0) > 0) {
@@ -117,7 +118,7 @@ export async function deleteBuilding(id: string): Promise<ActionResult> {
       .eq("id", parsed.data)
       .select("id, client_id")
     if (error) {
-      console.error("[actions/cadastros] deleteBuilding:", error)
+      console.error("[actions/cadastros] deleteBuilding:", safeErrorLog(error))
       return {
         ok: false,
         message: isFkViolation(error)
@@ -130,7 +131,7 @@ export async function deleteBuilding(id: string): Promise<ActionResult> {
     revalidatePath("/mapa")
     return { ok: true, message: "Prédio excluído." }
   } catch (error) {
-    console.error("[actions/cadastros] deleteBuilding:", error)
+    console.error("[actions/cadastros] deleteBuilding:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível excluir o prédio. Tente novamente." }
   }
 }
@@ -156,7 +157,19 @@ export interface GeocodeResult extends ActionResult {
 }
 
 // Política de uso do Nominatim: no máximo 1 requisição/segundo por aplicação.
+// Além do limite global, cada usuário fica limitado a 1 req/s (map em memória
+// por instância; entradas antigas são podadas para não crescer sem limite).
 let ultimaConsulta = 0
+const ultimaConsultaPorUsuario = new Map<string, number>()
+const JANELA_USUARIO_MS = 1000
+const JANELA_GLOBAL_MS = 1100
+
+function podarConsultasAntigas(agora: number) {
+  if (ultimaConsultaPorUsuario.size < 500) return
+  for (const [uid, t] of ultimaConsultaPorUsuario) {
+    if (agora - t > 60_000) ultimaConsultaPorUsuario.delete(uid)
+  }
+}
 
 /**
  * Busca lat/lng do endereço no Nominatim (OpenStreetMap). Chamada feita só do
@@ -179,9 +192,12 @@ export async function buscarCoordenadas(
   }
 
   const agora = Date.now()
-  if (agora - ultimaConsulta < 1100) {
+  const doUsuario = ultimaConsultaPorUsuario.get(auth.data.id) ?? 0
+  if (agora - doUsuario < JANELA_USUARIO_MS || agora - ultimaConsulta < JANELA_GLOBAL_MS) {
     return { ok: false, message: "Aguarde um instante e tente de novo." }
   }
+  podarConsultasAntigas(agora)
+  ultimaConsultaPorUsuario.set(auth.data.id, agora)
   ultimaConsulta = agora
 
   const params = new URLSearchParams({
@@ -224,7 +240,7 @@ export async function buscarCoordenadas(
       encontrado: hit.display_name?.slice(0, 200),
     }
   } catch (error) {
-    console.error("[actions/cadastros] nominatim:", error)
+    console.error("[actions/cadastros] nominatim:", safeErrorLog(error))
     return { ok: false, message: "Tempo esgotado ao buscar coordenadas — preencha manualmente." }
   }
 }
@@ -251,7 +267,7 @@ export async function saveEquipment(input: EquipmentInput): Promise<ActionResult
       .eq("id", row.building_id)
       .maybeSingle()
     if (bError || !building) {
-      if (bError) console.error("[actions/cadastros] saveEquipment building:", bError)
+      if (bError) console.error("[actions/cadastros] saveEquipment building:", safeErrorLog(bError))
       return { ok: false, message: "Prédio não encontrado.", fieldErrors: { building_id: "Prédio inválido." } }
     }
 
@@ -268,7 +284,7 @@ export async function saveEquipment(input: EquipmentInput): Promise<ActionResult
       error = res.error
     }
     if (error) {
-      console.error("[actions/cadastros] saveEquipment:", error)
+      console.error("[actions/cadastros] saveEquipment:", safeErrorLog(error))
       if (isUniqueViolation(error)) {
         const serie = (error.message ?? "").includes("numero_serie")
         return {
@@ -287,7 +303,7 @@ export async function saveEquipment(input: EquipmentInput): Promise<ActionResult
     revalidatePath("/mapa")
     return { ok: true, message: id ? "Equipamento atualizado." : "Equipamento cadastrado." }
   } catch (error) {
-    console.error("[actions/cadastros] saveEquipment:", error)
+    console.error("[actions/cadastros] saveEquipment:", safeErrorLog(error))
     return { ok: false, message: GENERIC }
   }
 }
@@ -313,7 +329,7 @@ export async function setEquipmentAtivo(input: { id: string; ativo: boolean }): 
       .eq("id", parsed.data.id)
       .select("id, building:buildings(client_id)")
     if (error) {
-      console.error("[actions/cadastros] setEquipmentAtivo:", error)
+      console.error("[actions/cadastros] setEquipmentAtivo:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível alterar o equipamento. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -326,7 +342,7 @@ export async function setEquipmentAtivo(input: { id: string; ativo: boolean }): 
       message: parsed.data.ativo ? "Equipamento reativado." : "Equipamento inativado.",
     }
   } catch (error) {
-    console.error("[actions/cadastros] setEquipmentAtivo:", error)
+    console.error("[actions/cadastros] setEquipmentAtivo:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível alterar o equipamento. Tente novamente." }
   }
 }
@@ -351,14 +367,14 @@ export async function saveLead(input: LeadInput): Promise<ActionResult> {
     if (id) {
       const { data, error } = await supabase.from("leads").update(row).eq("id", id).select("id")
       if (error) {
-        console.error("[actions/cadastros] saveLead update:", error)
+        console.error("[actions/cadastros] saveLead update:", safeErrorLog(error))
         return { ok: false, message: GENERIC }
       }
       if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
     } else {
       const { error } = await supabase.from("leads").insert(row)
       if (error) {
-        console.error("[actions/cadastros] saveLead insert:", error)
+        console.error("[actions/cadastros] saveLead insert:", safeErrorLog(error))
         return { ok: false, message: GENERIC }
       }
     }
@@ -366,7 +382,7 @@ export async function saveLead(input: LeadInput): Promise<ActionResult> {
     revalidatePath("/")
     return { ok: true, message: id ? "Lead atualizado." : "Lead cadastrado." }
   } catch (error) {
-    console.error("[actions/cadastros] saveLead:", error)
+    console.error("[actions/cadastros] saveLead:", safeErrorLog(error))
     return { ok: false, message: GENERIC }
   }
 }
@@ -389,7 +405,7 @@ export async function moveLeadStage(input: z.input<typeof moveLeadSchema>): Prom
       .eq("id", id)
       .select("id")
     if (error) {
-      console.error("[actions/cadastros] moveLeadStage:", error)
+      console.error("[actions/cadastros] moveLeadStage:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível mover o lead. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -397,7 +413,7 @@ export async function moveLeadStage(input: z.input<typeof moveLeadSchema>): Prom
     revalidatePath("/")
     return { ok: true, message: "Lead movido." }
   } catch (error) {
-    console.error("[actions/cadastros] moveLeadStage:", error)
+    console.error("[actions/cadastros] moveLeadStage:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível mover o lead. Tente novamente." }
   }
 }
@@ -414,7 +430,7 @@ export async function deleteLead(id: string): Promise<ActionResult> {
     const supabase = await createSupabase()
     const { data, error } = await supabase.from("leads").delete().eq("id", parsed.data).select("id")
     if (error) {
-      console.error("[actions/cadastros] deleteLead:", error)
+      console.error("[actions/cadastros] deleteLead:", safeErrorLog(error))
       return { ok: false, message: "Não foi possível excluir o lead. Tente novamente." }
     }
     if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
@@ -422,7 +438,7 @@ export async function deleteLead(id: string): Promise<ActionResult> {
     revalidatePath("/")
     return { ok: true, message: "Lead excluído." }
   } catch (error) {
-    console.error("[actions/cadastros] deleteLead:", error)
+    console.error("[actions/cadastros] deleteLead:", safeErrorLog(error))
     return { ok: false, message: "Não foi possível excluir o lead. Tente novamente." }
   }
 }

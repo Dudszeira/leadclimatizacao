@@ -21,6 +21,7 @@ import {
   paginate,
   sanitizeIlike,
   toPaginated,
+  safeErrorLog,
 } from "./_shared";
 
 const CLIENT_EMBED = "client:clients(id,razao_social,nome_fantasia)";
@@ -94,7 +95,7 @@ async function clientIdsMatching(
     .or(`razao_social.ilike.%${safe}%,nome_fantasia.ilike.%${safe}%`)
     .limit(200);
   if (error) {
-    console.error("[data-layer] listConversations (clientes):", error);
+    console.error("[data-layer] listConversations (clientes):", safeErrorLog(error));
     return [];
   }
   return (data ?? []).map((row) => row.id as string);

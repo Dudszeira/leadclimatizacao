@@ -131,7 +131,7 @@ export function Thread({
       {encerrada ? (
         <p className="flex items-center justify-center gap-2 border-t border-line-soft px-4 py-3.5 text-xs text-ink-faint">
           <ArchiveIcon className="size-3.5" aria-hidden="true" />
-          Conversa encerrada — o envio de novas mensagens está desativado.
+          Conversa encerrada. O envio de novas mensagens está desativado.
         </p>
       ) : (
         <MessageComposer
