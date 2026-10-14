@@ -8,10 +8,18 @@ import type {
   Result,
 } from "@/lib/types";
 import { contractsFixture, demoClient, invoicesFixture } from "./_demo";
+import { competenciaBRT } from "@/lib/asaas/dates";
+import {
+  aggregateFaturamento,
+  buildFinanceiroKpis,
+  collectPaged,
+  sumBy,
+  type FaturamentoMesAgg,
+  type FinanceiroKpis,
+} from "@/lib/asaas/kpis";
 import {
   failWith,
   matchesSearch,
-  monthStartDate,
   ok,
   pageRange,
   paginate,
@@ -142,90 +150,69 @@ export async function getInvoice(
 }
 
 // ----------------------------------------------------------------------------
-// KPIs do módulo Financeiro
+// KPIs do módulo Financeiro (agregados — nunca linhas sem limite)
 // ----------------------------------------------------------------------------
 
-/** Agregados dos 4 cards do topo de /financeiro. */
-export interface FinanceiroKpis {
-  /** Soma das faturas não canceladas com competência no mês corrente. */
-  faturamento_previsto_mes: number;
-  /** Valor em atraso ÷ valor faturado não cancelado (12 meses), em % 0-100. */
-  inadimplencia_pct: number | null;
-  /** Soma das faturas com status "atrasado" (janela de 12 meses). */
-  valor_em_atraso: number;
-  /** Faturas com NFS-e emitida (nf_numero) na competência do mês corrente. */
-  notas_emitidas_mes: number;
-  /** Recebido conciliado (pago com método pix/boleto) ÷ previsto do mês, %. */
-  recebido_conciliado_pct: number | null;
-  recebido_pix_mes: number;
-  recebido_boleto_mes: number;
-}
+export type { FinanceiroKpis };
 
-interface KpiInvoiceRow {
-  competencia: string;
-  valor: number;
-  status: InvoiceStatus;
-  metodo: "pix" | "boleto" | null;
-  nf_numero: string | null;
-}
+const KPI_ERROR = "Não foi possível carregar os indicadores financeiros. Tente novamente.";
 
-function buildFinanceiroKpis(rows: KpiInvoiceRow[]): FinanceiroKpis {
-  const mesAtual = monthStartDate(0);
-  let previstoMes = 0;
-  let faturadoJanela = 0;
-  let emAtraso = 0;
-  let notasMes = 0;
-  let recebidoPix = 0;
-  let recebidoBoleto = 0;
-
-  for (const i of rows) {
-    if (i.status !== "cancelado") faturadoJanela += i.valor;
-    if (i.status === "atrasado") emAtraso += i.valor;
-    if (i.competencia !== mesAtual) continue;
-    if (i.status !== "cancelado") previstoMes += i.valor;
-    if (i.nf_numero) notasMes += 1;
-    if (i.status === "pago" && i.metodo === "pix") recebidoPix += i.valor;
-    if (i.status === "pago" && i.metodo === "boleto") recebidoBoleto += i.valor;
-  }
-
-  const recebidoConciliado = recebidoPix + recebidoBoleto;
-  const pct = (numerador: number, denominador: number) =>
-    denominador === 0 ? null : Math.round((numerador / denominador) * 1000) / 10;
-
-  return {
-    faturamento_previsto_mes: previstoMes,
-    inadimplencia_pct: pct(emAtraso, faturadoJanela),
-    valor_em_atraso: emAtraso,
-    notas_emitidas_mes: notasMes,
-    recebido_conciliado_pct: pct(recebidoConciliado, previstoMes),
-    recebido_pix_mes: recebidoPix,
-    recebido_boleto_mes: recebidoBoleto,
-  };
-}
-
-/** KPIs do topo do Financeiro (janela: competências dos últimos 12 meses). */
+/**
+ * KPIs do topo do Financeiro. Supabase: somas por competência da view
+ * vw_dashboard_faturamento (mês atual + 6 anteriores, BRT), count(head) das
+ * NFS-e do mês e soma paginada do recebido Pix/boleto do mês.
+ */
 export async function getFinanceiroKpis(): Promise<Result<FinanceiroKpis>> {
   try {
-    const desde = monthStartDate(11);
+    const mesAtual = competenciaBRT(0);
 
     if (isDemoMode) {
+      const desde = competenciaBRT(6);
+      const janela = invoicesFixture.filter((i) => i.competencia >= desde);
+      const doMes = invoicesFixture.filter((i) => i.competencia === mesAtual);
       return ok(
-        buildFinanceiroKpis(
-          invoicesFixture.filter((i) => i.competencia >= desde),
-        ),
+        buildFinanceiroKpis({
+          meses: aggregateFaturamento(janela),
+          mesAtual,
+          notasEmitidasMes: doMes.filter((i) => i.nf_numero).length,
+          recebidoPixMes: sumBy(doMes, (i) => i.valor, (i) => i.status === "pago" && i.metodo === "pix"),
+          recebidoBoletoMes: sumBy(doMes, (i) => i.valor, (i) => i.status === "pago" && i.metodo === "boleto"),
+        }),
       );
     }
 
     const supabase = await createSupabase();
-    const { data, error } = await supabase
-      .from("invoices")
-      .select("competencia, valor, status, metodo, nf_numero")
-      .gte("competencia", desde);
-    if (error) {
-      return failWith("getFinanceiroKpis", error, "Não foi possível carregar os indicadores financeiros. Tente novamente.");
-    }
-    return ok(buildFinanceiroKpis((data ?? []) as KpiInvoiceRow[]));
+    const [mesesRes, notasRes, recebidos] = await Promise.all([
+      supabase.from("vw_dashboard_faturamento").select("mes, previsto, recebido, pendente, atrasado"),
+      supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("competencia", mesAtual)
+        .not("nf_numero", "is", null),
+      collectPaged<{ valor: number; metodo: string | null }>((from, to) =>
+        supabase
+          .from("invoices")
+          .select("valor, metodo")
+          .eq("competencia", mesAtual)
+          .eq("status", "pago")
+          .in("metodo", ["pix", "boleto"])
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
+    if (mesesRes.error) return failWith("getFinanceiroKpis view", mesesRes.error, KPI_ERROR);
+    if (notasRes.error) return failWith("getFinanceiroKpis notas", notasRes.error, KPI_ERROR);
+
+    return ok(
+      buildFinanceiroKpis({
+        meses: (mesesRes.data ?? []) as FaturamentoMesAgg[],
+        mesAtual,
+        notasEmitidasMes: notasRes.count ?? 0,
+        recebidoPixMes: sumBy(recebidos, (r) => r.valor, (r) => r.metodo === "pix"),
+        recebidoBoletoMes: sumBy(recebidos, (r) => r.valor, (r) => r.metodo === "boleto"),
+      }),
+    );
   } catch (error) {
-    return failWith("getFinanceiroKpis", error, "Não foi possível carregar os indicadores financeiros. Tente novamente.");
+    return failWith("getFinanceiroKpis", error, KPI_ERROR);
   }
 }

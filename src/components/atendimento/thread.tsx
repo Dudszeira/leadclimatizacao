@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { cn } from "cn"
-import { ArchiveIcon, ArrowLeftIcon, BotIcon, UserRoundIcon } from "lucide-react"
+import { ArchiveIcon, ArrowLeftIcon, BotIcon, HistoryIcon, UserRoundIcon } from "lucide-react"
 
 import type { ConversationWithMessages, Message } from "@/lib/types"
 import type { ConversationOsRef } from "@/server/conversations"
@@ -24,13 +24,24 @@ type ThreadProps = {
   aiSteps: AiStep[]
   /** Href de volta para a lista (mobile). */
   backHref: string
+  /** Href que amplia a janela de mensagens; null quando não há anteriores. */
+  olderHref?: string | null
+  /** Motivo do envio estar bloqueado (ex.: WhatsApp não configurado). */
+  sendDisabledReason?: string | null
 }
 
 /**
  * Thread da conversa (coluna central): header com contato, resumo da IA
  * (< xl), bolhas estilo WhatsApp, eventos de sistema e input de resposta.
  */
-export function Thread({ conversation, osRefs, aiSteps, backHref }: ThreadProps) {
+export function Thread({
+  conversation,
+  osRefs,
+  aiSteps,
+  backHref,
+  olderHref = null,
+  sendDisabledReason = null,
+}: ThreadProps) {
   const nome = conversationName(conversation)
   const telefone = formatTelefoneBR(conversation.telefone)
   const statusMeta = CONVERSATION_STATUS_META[conversation.status]
@@ -94,6 +105,16 @@ export function Thread({ conversation, osRefs, aiSteps, backHref }: ThreadProps)
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4"
         aria-label={`Mensagens da conversa com ${nome}`}
       >
+        {olderHref && (
+          <Link
+            href={olderHref}
+            scroll={false}
+            className="flex min-h-9 items-center justify-center gap-1.5 self-center rounded-full border border-line-soft px-3 text-xs text-ink-dim transition-colors outline-none hover:bg-console-2 hover:text-ink focus-visible:border-ring max-md:min-h-11"
+          >
+            <HistoryIcon className="size-3.5" aria-hidden="true" />
+            Carregar mensagens anteriores
+          </Link>
+        )}
         {conversation.messages.map((message) => (
           <MessageItem
             key={message.id}
@@ -113,7 +134,10 @@ export function Thread({ conversation, osRefs, aiSteps, backHref }: ThreadProps)
           Conversa encerrada — o envio de novas mensagens está desativado.
         </p>
       ) : (
-        <MessageComposer conversationId={conversation.id} />
+        <MessageComposer
+          conversationId={conversation.id}
+          disabledReason={sendDisabledReason}
+        />
       )}
     </div>
   )

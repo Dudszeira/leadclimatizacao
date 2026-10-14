@@ -36,6 +36,8 @@ type InvoiceActionsProps = {
   clienteNome: string
   asaasId: string | null
   asaasUrl: string | null
+  /** id da NFS-e no Asaas (ou marcador "pending:" enquanto é emitida). */
+  asaasInvoiceId: string | null
   nfNumero: string | null
 }
 
@@ -50,18 +52,23 @@ export function InvoiceActions({
   clienteNome,
   asaasId,
   asaasUrl,
+  asaasInvoiceId,
   nfNumero,
 }: InvoiceActionsProps) {
   const router = useRouter()
   const [pendingAction, setPendingAction] = React.useState<string | null>(null)
   const [, startTransition] = React.useTransition()
+  // Trava síncrona: impede duplo clique antes do re-render desabilitar o menu.
+  const busyRef = React.useRef(false)
 
   const busy = pendingAction !== null
   const emAberto = status === "pendente" || status === "atrasado"
   const podeGerarCobranca = emAberto && !asaasId
-  const podeEmitirNf = status !== "cancelado" && !nfNumero
+  const podeEmitirNf = status !== "cancelado" && !nfNumero && !asaasInvoiceId
 
   function run(action: string, fn: () => Promise<InvoiceActionResult>) {
+    if (busyRef.current) return
+    busyRef.current = true
     setPendingAction(action)
     startTransition(async () => {
       try {
@@ -69,10 +76,15 @@ export function InvoiceActions({
         if (result.status === "success") {
           toast.success(result.message)
           router.refresh()
+        } else if (result.status === "info") {
+          toast.info(result.message)
         } else {
           toast.error(result.message)
         }
+      } catch {
+        toast.error("Não foi possível concluir a ação. Tente novamente.")
       } finally {
+        busyRef.current = false
         setPendingAction(null)
       }
     })

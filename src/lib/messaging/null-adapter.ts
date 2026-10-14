@@ -3,14 +3,14 @@ import type {
   MessagingAdapter,
   OutgoingMessage,
 } from "./adapter";
+import { MessagingNotConfiguredError } from "./send";
 
 /**
- * Adapter nulo — implementação vigente enquanto o WhatsApp não é conectado.
+ * Adapter nulo: vigente enquanto o WhatsApp não é conectado (fora do go-live).
  *
- * Comportamento: loga a intenção no servidor e resolve com sucesso, sem tocar
- * em rede. Assim, as server actions já usam o fluxo definitivo (validar →
- * adapter.sendMessage → persistir) e, na ativação, basta trocar o adapter na
- * factory (`index.ts`) — nenhuma tela ou action muda.
+ * Comportamento: REJEITA todo envio com MessagingNotConfiguredError, sem tocar
+ * em rede. Assim nenhuma mensagem é gravada como enviada sem ter saído de
+ * fato. Na ativação, basta registrar o provedor real na factory (`index.ts`).
  */
 export function createNullAdapter(): MessagingAdapter {
   const handlers = new Set<IncomingMessageHandler>();
@@ -18,11 +18,11 @@ export function createNullAdapter(): MessagingAdapter {
   return {
     provider: "null",
 
-    async sendMessage(message: OutgoingMessage) {
-      console.info(
-        `[messaging/null] sendMessage → ${message.telefone} (conversa ${message.conversationId}): ${message.texto.slice(0, 80)}`,
+    async sendMessage(message: OutgoingMessage): Promise<never> {
+      console.warn(
+        `[messaging/null] envio bloqueado (sem provedor) para a conversa ${message.conversationId}`,
       );
-      return { externalId: null };
+      throw new MessagingNotConfiguredError();
     },
 
     async markRead(conversationId: string) {

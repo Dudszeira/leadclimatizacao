@@ -29,22 +29,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { EquipmentCombobox } from "@/components/chamados/equipment-combobox"
 import { OS_PRIORITY_META, OS_TYPE_META } from "@/lib/status-meta"
 
 const INITIAL_STATE: NewOsActionState = { status: "idle" }
 
 export type ClienteOption = { id: string; label: string }
 export type PredioOption = { id: string; clientId: string; label: string }
-export type EquipamentoOption = {
-  id: string
-  buildingId: string
-  label: string
-}
-
 type NewOrderDialogProps = {
   clientes: ClienteOption[]
   predios: PredioOption[]
-  equipamentos: EquipamentoOption[]
   triggerLabel?: string
   triggerClassName?: string
 }
@@ -67,7 +61,6 @@ const PRIORIDADE_ITEMS: Record<string, string> = Object.fromEntries(
 export function NewOrderDialog({
   clientes,
   predios,
-  equipamentos,
   triggerLabel = "Novo chamado",
   triggerClassName,
 }: NewOrderDialogProps) {
@@ -82,7 +75,8 @@ export function NewOrderDialog({
     async (prev: NewOsActionState, formData: FormData) => {
       const result = await createServiceOrder(prev, formData)
       if (result.status === "success") {
-        toast.success(result.message)
+        if (result.message?.includes("modo demo")) toast.info(result.message)
+        else toast.success(result.message)
         setOpen(false)
         router.refresh()
       } else if (result.status === "error" && result.message) {
@@ -113,20 +107,6 @@ export function NewOrderDialog({
       ...Object.fromEntries(prediosDoCliente.map((p) => [p.id, p.label])),
     }),
     [prediosDoCliente, clienteId],
-  )
-
-  const equipamentosDoPredio = React.useMemo(
-    () => equipamentos.filter((e) => e.buildingId === predioId),
-    [equipamentos, predioId],
-  )
-  const equipamentoItems = React.useMemo<Record<string, string>>(
-    () => ({
-      "": predioId
-        ? "Sem equipamento específico"
-        : "Escolha o prédio primeiro",
-      ...Object.fromEntries(equipamentosDoPredio.map((e) => [e.id, e.label])),
-    }),
-    [equipamentosDoPredio, predioId],
   )
 
   function handleOpenChange(next: boolean) {
@@ -232,29 +212,20 @@ export function NewOrderDialog({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="os-equipamento">Equipamento (opcional)</Label>
-                <Select
-                  items={equipamentoItems}
+                <EquipmentCombobox
+                  key={predioId}
+                  id="os-equipamento"
+                  buildingId={predioId}
                   value={equipamentoId}
-                  onValueChange={(value: string | null) =>
-                    setEquipamentoId(value ?? "")
-                  }
-                >
-                  <SelectTrigger
-                    id="os-equipamento"
-                    aria-label="Equipamento"
-                    disabled={!predioId}
-                    className="w-full max-md:h-11"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(equipamentoItems).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(id) => setEquipamentoId(id)}
+                  invalid={Boolean(errors.equipment_id)}
+                  describedBy={errors.equipment_id ? "os-equipamento-erro" : undefined}
+                />
+                {errors.equipment_id && (
+                  <p id="os-equipamento-erro" className="text-xs text-danger">
+                    {errors.equipment_id}
+                  </p>
+                )}
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

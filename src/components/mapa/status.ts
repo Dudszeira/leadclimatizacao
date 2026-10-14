@@ -1,11 +1,10 @@
-import type { Building, BuildingMapItem, EquipmentStatus } from "@/lib/types"
+import type { Building, EquipmentStatus, MapPin } from "@/lib/types"
 
 /** Contagem de equipamentos por status dentro de um prédio. */
 export type StatusCounts = Record<EquipmentStatus, number>
 
-/** Pino do mapa: prédio + cliente + contagens e pior status derivado. */
-export interface MapaBuilding extends BuildingMapItem {
-  status_counts: StatusCounts
+/** Pino do mapa: dados enxutos de src/server/map.ts + pior status derivado. */
+export interface MapaBuilding extends MapPin {
   /** Pior status entre os equipamentos do prédio (cor do pino). */
   pin_status: EquipmentStatus
 }

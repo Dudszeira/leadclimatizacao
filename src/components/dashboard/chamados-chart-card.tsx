@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card"
 import { getChamadosPorMes } from "@/server/dashboard"
 import { DataError } from "@/components/data-error"
-import { ChamadosChart } from "./chamados-chart"
+import { ChamadosChartLazy } from "./chamados-chart-lazy"
 
 /** Gráfico "Chamados abertos · últimos 6 meses" (série por tipo de OS). */
 export async function ChamadosChartCard() {
@@ -34,7 +34,7 @@ export async function ChamadosChartCard() {
             </p>
           </div>
         ) : (
-          <ChamadosChart points={result.data} />
+          <ChamadosChartLazy points={result.data} />
         )}
       </CardContent>
     </Card>

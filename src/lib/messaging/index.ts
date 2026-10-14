@@ -8,34 +8,60 @@ export type {
   OutgoingMessage,
   SendReceipt,
 } from "./adapter";
+export {
+  MESSAGING_NOT_CONFIGURED,
+  MessagingNotConfiguredError,
+  deliverAndPersist,
+  type DeliveryOutcome,
+} from "./send";
+
+/**
+ * Provedores com implementação real. Vazio na Fase 1: Atendimento IA e
+ * WhatsApp ficaram fora do go-live. Ao implementar um provedor, registre aqui
+ * (ex.: `evolution: createEvolutionAdapter`).
+ */
+const PROVIDERS: Record<string, () => MessagingAdapter> = {};
+
+/**
+ * Nome do provedor configurado e implementado, ou null quando o envio está
+ * bloqueado (env ausente, "null" ou provedor ainda sem implementação).
+ */
+export function resolveMessagingProvider(
+  value: string | undefined = process.env.MESSAGING_PROVIDER,
+): string | null {
+  const provider = value?.trim();
+  if (!provider || provider === "null") return null;
+  return Object.prototype.hasOwnProperty.call(PROVIDERS, provider) ? provider : null;
+}
+
+/** true somente quando existe um provedor real de envio (WhatsApp) ativo. */
+export function isMessagingConfigured(): boolean {
+  return resolveMessagingProvider() !== null;
+}
 
 let instance: MessagingAdapter | null = null;
 
 /**
  * Factory do adapter de mensageria, escolhido pela env `MESSAGING_PROVIDER`.
  *
- * Valores previstos:
- * - ausente ou "null" → NullAdapter (demo/pré-integração, comportamento atual)
- * - "evolution"       → Evolution API (implementar em evolution-adapter.ts)
- * - "cloud-api"       → WhatsApp Cloud API (implementar em cloud-api-adapter.ts)
- *
- * Enquanto o provedor configurado não tiver implementação, cai no NullAdapter
- * com aviso no log — o sistema nunca quebra por env adiantada.
+ * Sem provedor implementado devolve o NullAdapter, que REJEITA o envio
+ * (MessagingNotConfiguredError): nada é gravado como enviado. Prefira checar
+ * `isMessagingConfigured()` antes, para bloquear cedo e avisar a UI.
  */
 export function getMessagingAdapter(): MessagingAdapter {
   if (instance) return instance;
 
-  const provider = process.env.MESSAGING_PROVIDER ?? "null";
-  switch (provider) {
-    case "null":
-      instance = createNullAdapter();
-      break;
-    default:
-      console.warn(
-        `[messaging] Provedor "${provider}" ainda não implementado — usando o adapter nulo. Veja src/lib/messaging/README.md.`,
-      );
-      instance = createNullAdapter();
-      break;
+  const provider = resolveMessagingProvider();
+  if (provider) {
+    instance = PROVIDERS[provider]();
+    return instance;
   }
+  const raw = process.env.MESSAGING_PROVIDER?.trim();
+  if (raw && raw !== "null") {
+    console.warn(
+      `[messaging] Provedor "${raw}" ainda não implementado; envio bloqueado. Veja src/lib/messaging/README.md.`,
+    );
+  }
+  instance = createNullAdapter();
   return instance;
 }

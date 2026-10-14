@@ -11,7 +11,13 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import type { OsOrigin, OsPriority, OsStatus, OsType } from "@/lib/types"
+import type {
+  OsOrigin,
+  OsPriority,
+  OsStatus,
+  OsType,
+  ServiceOrderListItem,
+} from "@/lib/types"
 import { formatDateTimeBR, formatOsNumero, initials } from "@/lib/format"
 import {
   OS_ORIGIN_META,
@@ -19,8 +25,8 @@ import {
   OS_STATUS_META,
   OS_TYPE_META,
 } from "@/lib/status-meta"
+import { requireRole } from "@/server/auth"
 import { listBuildings } from "@/server/buildings"
-import { listEquipment } from "@/server/equipment"
 import { listServiceOrders } from "@/server/service-orders"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -47,7 +53,6 @@ import {
 import {
   NewOrderDialog,
   type ClienteOption,
-  type EquipamentoOption,
   type PredioOption,
 } from "@/components/chamados/new-order-dialog"
 import { ChamadosTableSkeleton } from "@/components/chamados/skeletons"
@@ -126,6 +131,8 @@ export default async function ChamadosPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  const me = await requireRole("admin", "atendente", "tecnico")
+  const tecnico = me.role === "tecnico"
   const filters = parseFilters(await searchParams)
   const suspenseKey = `${filters.q}|${filters.status}|${filters.tipo}|${filters.prioridade}|${filters.page}`
 
@@ -134,15 +141,19 @@ export default async function ChamadosPage({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-            Central de chamados
+            {tecnico ? "Minhas ordens de serviço" : "Central de chamados"}
           </h2>
           <p className="mt-1 text-sm text-ink-dim">
-            Ordens de serviço do pedido do cliente à conclusão em campo.
+            {tecnico
+              ? "OS atribuídas a você. Para a rota do dia, use a tela Campo."
+              : "Ordens de serviço do pedido do cliente à conclusão em campo."}
           </p>
         </div>
-        <Suspense fallback={null}>
-          <NewOrderDialogLoader />
-        </Suspense>
+        {!tecnico && (
+          <Suspense fallback={null}>
+            <NewOrderDialogLoader />
+          </Suspense>
+        )}
       </header>
       <QuickTabs filters={filters} />
       <ChamadosToolbar
@@ -152,7 +163,11 @@ export default async function ChamadosPage({
         prioridade={filters.prioridade}
       />
       <Suspense key={suspenseKey} fallback={<ChamadosTableSkeleton />}>
-        <ChamadosSection filters={filters} />
+        <ChamadosSection
+          filters={filters}
+          technicianId={tecnico ? me.id : undefined}
+          canCreate={!tecnico}
+        />
       </Suspense>
     </div>
   )
@@ -214,10 +229,8 @@ function QuickTabs({ filters }: { filters: Filters }) {
 // ---------------------------------------------------------------------------
 
 async function NewOrderDialogLoader() {
-  const [buildings, equipment] = await Promise.all([
-    listBuildings(),
-    listEquipment({ pageSize: 100 }),
-  ])
+  // Equipamentos são buscados sob demanda no combobox (busca no servidor).
+  const buildings = await listBuildings()
 
   const predios: PredioOption[] = (buildings.data ?? []).map((b) => ({
     id: b.id,
@@ -235,19 +248,10 @@ async function NewOrderDialogLoader() {
     })
   }
   clientes.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
-  const equipamentos: EquipamentoOption[] = (equipment.data?.items ?? []).map(
-    (e) => ({
-      id: e.id,
-      buildingId: e.building_id,
-      label: `${e.codigo_interno}${e.ambiente ? ` — ${e.ambiente}` : ""}`,
-    }),
-  )
-
   return (
     <NewOrderDialog
       clientes={clientes}
       predios={predios}
-      equipamentos={equipamentos}
     />
   )
 }
@@ -256,8 +260,17 @@ async function NewOrderDialogLoader() {
 // Seção assíncrona: consulta o data layer e renderiza tabela ou estados
 // ---------------------------------------------------------------------------
 
-async function ChamadosSection({ filters }: { filters: Filters }) {
+async function ChamadosSection({
+  filters,
+  technicianId,
+  canCreate,
+}: {
+  filters: Filters
+  technicianId?: string
+  canCreate: boolean
+}) {
   const result = await listServiceOrders({
+    technicianId,
     search: filters.q || undefined,
     status: filters.status !== "todos" ? filters.status : undefined,
     tipo: filters.tipo !== "todos" ? filters.tipo : undefined,
@@ -298,13 +311,19 @@ async function ChamadosSection({ filters }: { filters: Filters }) {
       <EmptyState
         icon={WrenchIcon}
         title="Nenhum chamado registrado"
-        description="Abra a primeira ordem de serviço: preventiva PMOC, corretiva, instalação ou visita de orçamento."
+        description={
+          canCreate
+            ? "Abra a primeira ordem de serviço: preventiva PMOC, corretiva, instalação ou visita de orçamento."
+            : "Nenhuma OS atribuída a você no momento."
+        }
       >
-        <div className="mt-6">
-          <Suspense fallback={null}>
-            <NewOrderDialogLoader />
-          </Suspense>
-        </div>
+        {canCreate && (
+          <div className="mt-6">
+            <Suspense fallback={null}>
+              <NewOrderDialogLoader />
+            </Suspense>
+          </div>
+        )}
       </EmptyState>
     )
   }
@@ -314,7 +333,14 @@ async function ChamadosSection({ filters }: { filters: Filters }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-console">
-      <Table aria-label="Ordens de serviço">
+      <ul aria-label="Ordens de serviço" className="divide-y divide-line-soft md:hidden">
+        {items.map((os) => (
+          <li key={os.id}>
+            <ChamadoCard os={os} />
+          </li>
+        ))}
+      </ul>
+      <Table aria-label="Ordens de serviço" className="max-md:hidden">
         <TableHeader>
           <TableRow className="border-line-soft hover:bg-transparent">
             <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
@@ -457,5 +483,50 @@ async function ChamadosSection({ filters }: { filters: Filters }) {
         nextHref={buildHref({ ...filters, page: page + 1 })}
       />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Card da lista no celular (abaixo de md)
+// ---------------------------------------------------------------------------
+
+function ChamadoCard({ os }: { os: ServiceOrderListItem }) {
+  const tipoMeta = OS_TYPE_META[os.tipo]
+  const prioridadeMeta = OS_PRIORITY_META[os.prioridade]
+  const statusMeta = OS_STATUS_META[os.status]
+  const clienteNome = os.building.client.nome_fantasia ?? os.building.client.razao_social
+  return (
+    <Link
+      href={`/chamados/${os.id}`}
+      aria-label={`Abrir chamado ${formatOsNumero(os.numero)} — ${clienteNome}`}
+      className="flex min-h-11 flex-col gap-2 px-4 py-3.5 outline-none hover:bg-console-2/60 focus-visible:bg-console-2"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <span className="font-mono font-medium text-signal tabular-nums">
+            {formatOsNumero(os.numero)}
+          </span>
+          <span
+            className={cn("size-2 shrink-0 rounded-full", prioridadeMeta.dotClassName)}
+            aria-hidden="true"
+          />
+          <span className="text-xs text-ink-dim">{prioridadeMeta.label}</span>
+        </span>
+        <Badge variant="outline" className={cn("font-medium", statusMeta.badgeClassName)}>
+          {statusMeta.label}
+        </Badge>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-medium text-ink">{clienteNome}</span>
+        <span className="mt-0.5 block truncate text-xs text-ink-faint">{os.building.nome}</span>
+      </span>
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-dim">
+        <Badge variant="outline" className={cn("font-medium", tipoMeta.badgeClassName)}>
+          {tipoMeta.label}
+        </Badge>
+        <span className="font-mono tabular-nums">{formatDateTimeBR(os.scheduled_at)}</span>
+        <span className="truncate">{os.technician?.full_name ?? "A designar"}</span>
+      </span>
+    </Link>
   )
 }

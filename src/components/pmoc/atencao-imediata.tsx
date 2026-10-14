@@ -23,7 +23,14 @@ function prazoDe(dias: number): string {
  * Lista "Atenção imediata": planos atrasados e vencendo (≤7 dias), em ordem
  * de urgência, com a ação de gerar as OS preventivas devidas.
  */
-export function AtencaoImediata({ itens }: { itens: PmocPlanDetail[] }) {
+export function AtencaoImediata({
+  itens,
+  podeGerarOs = true,
+}: {
+  itens: PmocPlanDetail[]
+  /** Só admin dispara a geração manual (a RPC recusa outros papéis). */
+  podeGerarOs?: boolean
+}) {
   return (
     <section
       aria-label="Atenção imediata"
@@ -38,7 +45,7 @@ export function AtencaoImediata({ itens }: { itens: PmocPlanDetail[] }) {
             Planos atrasados ou vencendo em até 7 dias, em ordem de urgência.
           </p>
         </div>
-        {itens.length > 0 && <GerarOsButton />}
+        {itens.length > 0 && podeGerarOs && <GerarOsButton />}
       </header>
 
       {itens.length === 0 ? (

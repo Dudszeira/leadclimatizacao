@@ -1,21 +1,49 @@
 import { isDemoMode } from "@/lib/env";
 import { conversationsFixture, messagesFixture } from "@/lib/fixtures";
 import { createClient as createSupabase } from "@/lib/supabase/server";
+import { z } from "zod";
+
 import type {
   ConversationStatus,
   ConversationWithMessages,
+  Message,
   OsPriority,
+  PageParams,
+  Paginated,
   Result,
 } from "@/lib/types";
 import { demoClient, demoEquipment, serviceOrdersFixture } from "./_demo";
-import { failWith, matchesSearch, ok } from "./_shared";
+import {
+  failWith,
+  matchesSearch,
+  ok,
+  pageRange,
+  paginate,
+  sanitizeIlike,
+  toPaginated,
+} from "./_shared";
 
 const CLIENT_EMBED = "client:clients(id,razao_social,nome_fantasia)";
 
-export interface ListConversationsParams {
+/** Conversas por página na lista do atendimento. */
+export const CONVERSATIONS_PAGE_SIZE = 30;
+/** Mensagens embutidas por conversa na lista (só a prévia). */
+export const LIST_MESSAGES_LIMIT = 1;
+/** Janela padrão de mensagens da conversa aberta e passo do "carregar mais". */
+export const THREAD_MESSAGES_STEP = 50;
+/** Teto de mensagens carregadas numa thread. */
+export const THREAD_MESSAGES_MAX = 500;
+
+export interface ListConversationsParams extends PageParams {
   status?: ConversationStatus;
-  /** Busca por nome do cliente ou telefone (aplicada em memória). */
+  /** Busca por nome do cliente ou telefone. */
   search?: string;
+}
+
+/** Conversa com a janela das últimas mensagens e indicação de mais antigas. */
+export interface ConversationThread extends ConversationWithMessages {
+  /** true quando existem mensagens anteriores às carregadas. */
+  has_older_messages: boolean;
 }
 
 /** true se a conversa bate com o termo (nome do cliente ou telefone). */
@@ -37,79 +65,148 @@ function demoConversationClient(clientId: string | null) {
     : null;
 }
 
-/** Conversas do atendimento (com mensagens), mais recentes primeiro. */
+/** Últimas `limit` mensagens da conversa (demo), em ordem cronológica. */
+function demoMessages(conversationId: string, limit: number): { messages: Message[]; hasOlder: boolean } {
+  const all = messagesFixture
+    .filter((m) => m.conversation_id === conversationId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return { messages: all.slice(-limit), hasOlder: all.length > limit };
+}
+
+function clampMessagesLimit(limit: number | undefined): number {
+  const n = Math.floor(limit ?? THREAD_MESSAGES_STEP);
+  return Math.min(THREAD_MESSAGES_MAX, Math.max(1, Number.isFinite(n) ? n : THREAD_MESSAGES_STEP));
+}
+
+/**
+ * Ids de clientes cujo nome bate com o termo (busca SQL da lista).
+ * Limitado: a busca é para achar uma conversa, não para varrer a base.
+ */
+async function clientIdsMatching(
+  supabase: Awaited<ReturnType<typeof createSupabase>>,
+  term: string,
+): Promise<string[]> {
+  const safe = sanitizeIlike(term);
+  if (!safe) return [];
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id")
+    .or(`razao_social.ilike.%${safe}%,nome_fantasia.ilike.%${safe}%`)
+    .limit(200);
+  if (error) {
+    console.error("[data-layer] listConversations (clientes):", error);
+    return [];
+  }
+  return (data ?? []).map((row) => row.id as string);
+}
+
+/**
+ * Conversas do atendimento, paginadas, mais recentes primeiro. Cada item
+ * traz só a última mensagem (prévia); a thread completa vem de
+ * getConversation, também limitada.
+ */
 export async function listConversations(
   params: ListConversationsParams = {},
-): Promise<Result<ConversationWithMessages[]>> {
+): Promise<Result<Paginated<ConversationWithMessages>>> {
+  const pageParams = { page: params.page, pageSize: params.pageSize ?? CONVERSATIONS_PAGE_SIZE };
   try {
     if (isDemoMode) {
-      let items = conversationsFixture.map((c) => ({
+      let items: ConversationWithMessages[] = conversationsFixture.map((c) => ({
         ...c,
         client: demoConversationClient(c.client_id),
-        messages: messagesFixture
-          .filter((m) => m.conversation_id === c.id)
-          .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+        messages: demoMessages(c.id, LIST_MESSAGES_LIMIT).messages,
       }));
       if (params.status) items = items.filter((c) => c.status === params.status);
-      const termDemo = params.search;
+      const termDemo = params.search?.trim();
       if (termDemo) items = items.filter((c) => conversationMatches(c, termDemo));
       items.sort((a, b) =>
         (b.last_message_at ?? b.created_at).localeCompare(a.last_message_at ?? a.created_at),
       );
-      return ok(items);
+      return ok(paginate(items, pageParams));
     }
 
     const supabase = await createSupabase();
+    const { from, to } = pageRange(pageParams);
     let query = supabase
       .from("conversations")
-      .select(`*, ${CLIENT_EMBED}, messages(*)`)
+      .select(`*, ${CLIENT_EMBED}, messages(*)`, { count: "exact" })
       .order("last_message_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { referencedTable: "messages", ascending: true });
+      .order("created_at", { ascending: false })
+      .order("created_at", { referencedTable: "messages", ascending: false })
+      .limit(LIST_MESSAGES_LIMIT, { referencedTable: "messages" })
+      .range(from, to);
     if (params.status) query = query.eq("status", params.status);
 
-    const { data, error } = await query;
+    const term = params.search?.trim();
+    if (term) {
+      const filters: string[] = [];
+      const digits = term.replace(/\D/g, "");
+      if (digits.length >= 3) filters.push(`telefone.ilike.%${digits}%`);
+      const ids = await clientIdsMatching(supabase, term);
+      if (ids.length > 0) filters.push(`client_id.in.(${ids.join(",")})`);
+      if (filters.length === 0) return ok(toPaginated([], 0, pageParams));
+      query = query.or(filters.join(","));
+    }
+
+    const { data, error, count } = await query;
     if (error) {
       return failWith("listConversations", error, "Não foi possível carregar as conversas. Tente novamente.");
     }
-    let items = (data ?? []) as ConversationWithMessages[];
-    // Volume de conversas é pequeno: busca em memória evita duplicar a lógica
-    // de acento/telefone em SQL nesta fase.
-    const term = params.search;
-    if (term) items = items.filter((c) => conversationMatches(c, term));
-    return ok(items);
+    const items = ((data ?? []) as ConversationWithMessages[]).map((c) => ({
+      ...c,
+      messages: [...(c.messages ?? [])].reverse(),
+    }));
+    return ok(toPaginated(items, count, pageParams));
   } catch (error) {
     return failWith("listConversations", error, "Não foi possível carregar as conversas. Tente novamente.");
   }
 }
 
-/** Conversa por id com cliente e mensagens em ordem cronológica. */
+/**
+ * Conversa por id com cliente e as últimas `messagesLimit` mensagens em ordem
+ * cronológica (default 50, teto 500). `has_older_messages` habilita o
+ * "carregar anteriores" da thread.
+ */
 export async function getConversation(
   id: string,
-): Promise<Result<ConversationWithMessages | null>> {
+  options: { messagesLimit?: number } = {},
+): Promise<Result<ConversationThread | null>> {
+  const limit = clampMessagesLimit(options.messagesLimit);
   try {
     if (isDemoMode) {
       const conversation = conversationsFixture.find((c) => c.id === id);
       if (!conversation) return ok(null);
+      const { messages, hasOlder } = demoMessages(id, limit);
       return ok({
         ...conversation,
         client: demoConversationClient(conversation.client_id),
-        messages: messagesFixture
-          .filter((m) => m.conversation_id === id)
-          .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+        messages,
+        has_older_messages: hasOlder,
       });
     }
 
+    if (!z.uuid().safeParse(id).success) return ok(null);
+
     const supabase = await createSupabase();
+    // Busca limit + 1 para saber se há mensagens mais antigas sem contar tudo.
     const { data, error } = await supabase
       .from("conversations")
       .select(`*, ${CLIENT_EMBED}, messages(*)`)
       .eq("id", id)
-      .order("created_at", { referencedTable: "messages", ascending: true })
+      .order("created_at", { referencedTable: "messages", ascending: false })
+      .limit(limit + 1, { referencedTable: "messages" })
       .maybeSingle();
     if (error) {
       return failWith("getConversation", error, "Não foi possível carregar a conversa. Tente novamente.");
     }
-    return ok((data ?? null) as ConversationWithMessages | null);
+    if (!data) return ok(null);
+    const row = data as ConversationWithMessages;
+    const recent = row.messages ?? [];
+    return ok({
+      ...row,
+      messages: recent.slice(0, limit).reverse(),
+      has_older_messages: recent.length > limit,
+    });
   } catch (error) {
     return failWith("getConversation", error, "Não foi possível carregar a conversa. Tente novamente.");
   }

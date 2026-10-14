@@ -10,7 +10,17 @@ import type {
   Result,
 } from "@/lib/types";
 import { contractsFixture, demoClient, invoicesFixture } from "./_demo";
+import { collectPaged, sumBy, type ContratosResumo } from "@/lib/asaas/kpis";
+import { clientsFixture } from "@/lib/fixtures";
 import { failWith, ok, pageRange, paginate, toPaginated } from "./_shared";
+
+export type { ContratosResumo };
+
+/** Cliente selecionável no formulário de contrato. */
+export interface ContractClientOption {
+  id: string;
+  label: string;
+}
 
 export interface ListContractsParams extends PageParams {
   clientId?: string;
@@ -98,5 +108,79 @@ export async function getContract(
     return ok((data ?? null) as ContractWithRelations | null);
   } catch (error) {
     return failWith("getContract", error, "Não foi possível carregar o contrato. Tente novamente.");
+  }
+}
+
+const RESUMO_ERROR = "Não foi possível carregar o resumo dos contratos. Tente novamente.";
+
+/**
+ * Totais da aba Contratos sem o teto de uma página: count(head) para as
+ * quantidades e soma paginada (collectPaged) para o MRR.
+ */
+export async function getContratosResumo(): Promise<Result<ContratosResumo>> {
+  try {
+    if (isDemoMode) {
+      const ativos = contractsFixture.filter((c) => c.status === "ativo");
+      return ok({
+        total: contractsFixture.length,
+        ativos: ativos.length,
+        mrr: sumBy(ativos, (c) => c.valor_mensal, (c) => c.tipo === "pmoc_recorrente"),
+      });
+    }
+
+    const supabase = await createSupabase();
+    const [totalRes, ativosRes, recorrentes] = await Promise.all([
+      supabase.from("contracts").select("id", { count: "exact", head: true }),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("status", "ativo"),
+      collectPaged<{ valor_mensal: number }>((from, to) =>
+        supabase
+          .from("contracts")
+          .select("valor_mensal")
+          .eq("status", "ativo")
+          .eq("tipo", "pmoc_recorrente")
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
+    if (totalRes.error) return failWith("getContratosResumo total", totalRes.error, RESUMO_ERROR);
+    if (ativosRes.error) return failWith("getContratosResumo ativos", ativosRes.error, RESUMO_ERROR);
+    return ok({
+      total: totalRes.count ?? 0,
+      ativos: ativosRes.count ?? 0,
+      mrr: sumBy(recorrentes, (c) => c.valor_mensal),
+    });
+  } catch (error) {
+    return failWith("getContratosResumo", error, RESUMO_ERROR);
+  }
+}
+
+/** Clientes ativos para o select do formulário de contrato (todas as páginas). */
+export async function listContractClientOptions(): Promise<Result<ContractClientOption[]>> {
+  const label = (c: { razao_social: string; nome_fantasia: string | null }) =>
+    c.nome_fantasia && c.nome_fantasia !== c.razao_social
+      ? `${c.nome_fantasia} — ${c.razao_social}`
+      : c.razao_social;
+  try {
+    if (isDemoMode) {
+      return ok(
+        clientsFixture
+          .filter((c) => c.ativo)
+          .map((c) => ({ id: c.id, label: label(c) }))
+          .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+      );
+    }
+    const supabase = await createSupabase();
+    const rows = await collectPaged<{ id: string; razao_social: string; nome_fantasia: string | null }>(
+      (from, to) =>
+        supabase
+          .from("clients")
+          .select("id, razao_social, nome_fantasia")
+          .eq("ativo", true)
+          .order("razao_social")
+          .range(from, to),
+    );
+    return ok(rows.map((c) => ({ id: c.id, label: label(c) })));
+  } catch (error) {
+    return failWith("listContractClientOptions", error, "Não foi possível carregar os clientes. Tente novamente.");
   }
 }

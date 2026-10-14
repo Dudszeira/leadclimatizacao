@@ -1,16 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
-import { LoaderCircleIcon, PencilLineIcon, PlusIcon } from "lucide-react"
-import { toast } from "sonner"
+import { PencilLineIcon, PlusIcon } from "lucide-react"
 
 import type { Client } from "@/lib/types"
-import {
-  saveClient,
-  type ClientActionState,
-  type ClientFieldErrors,
-} from "@/server/actions/clients"
+import { maskPhone } from "@/lib/format"
+import { SEGMENTO_LABELS } from "@/lib/status-meta"
+import { saveClient } from "@/server/actions/clients"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,41 +18,45 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { isValidCnpj, maskCnpj, maskPhone, onlyDigits } from "@/lib/format"
-
-const INITIAL_STATE: ClientActionState = { status: "idle" }
+import { Textarea } from "@/components/ui/textarea"
+import { Field, SelectField, SubmitButton, invalidProps, useCadastroAction } from "./form-kit"
+import { clientSchema, fieldErrorsFrom, type ClientInput } from "./schemas"
+import { maskDocumento } from "./validators"
 
 type ClientFormDialogProps = {
   /** Cliente existente = modo edição; ausente = cadastro. */
   client?: Pick<
     Client,
-    "id" | "razao_social" | "cnpj" | "contato_nome" | "contato_email" | "contato_telefone"
+    | "id"
+    | "razao_social"
+    | "nome_fantasia"
+    | "cnpj"
+    | "segmento"
+    | "contato_nome"
+    | "contato_email"
+    | "contato_telefone"
+    | "observacoes"
   >
   triggerLabel?: string
   triggerVariant?: "default" | "outline"
   triggerClassName?: string
 }
 
-function validateOnClient(formData: FormData): ClientFieldErrors {
-  const errors: ClientFieldErrors = {}
-  const razao = String(formData.get("razao_social") ?? "").trim()
-  if (razao.length < 3) {
-    errors.razao_social = "Informe a razão social (mínimo 3 caracteres)."
+const SEM_SEGMENTO = "_nenhum"
+const SEGMENTO_ITEMS: Record<string, string> = { [SEM_SEGMENTO]: "Sem segmento", ...SEGMENTO_LABELS }
+
+function initialState(client?: ClientFormDialogProps["client"]): Required<ClientInput> {
+  return {
+    id: client?.id ?? "",
+    razao_social: client?.razao_social ?? "",
+    nome_fantasia: client?.nome_fantasia ?? "",
+    documento: client?.cnpj ? maskDocumento(client.cnpj) : "",
+    segmento: client?.segmento ?? "",
+    contato_nome: client?.contato_nome ?? "",
+    contato_email: client?.contato_email ?? "",
+    contato_telefone: client?.contato_telefone ? maskPhone(client.contato_telefone) : "",
+    observacoes: client?.observacoes ?? "",
   }
-  const cnpj = String(formData.get("cnpj") ?? "").trim()
-  if (cnpj && !isValidCnpj(cnpj)) {
-    errors.cnpj = "CNPJ inválido — confira os dígitos."
-  }
-  const email = String(formData.get("contato_email") ?? "").trim()
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.contato_email = "E-mail inválido."
-  }
-  const telefone = String(formData.get("contato_telefone") ?? "").trim()
-  if (telefone && onlyDigits(telefone).length < 10) {
-    errors.contato_telefone = "Telefone incompleto — use DDD + número."
-  }
-  return errors
 }
 
 export function ClientFormDialog({
@@ -65,44 +65,31 @@ export function ClientFormDialog({
   triggerVariant,
   triggerClassName,
 }: ClientFormDialogProps) {
-  const router = useRouter()
   const isEdit = Boolean(client)
   const [open, setOpen] = React.useState(false)
-  const [cnpj, setCnpj] = React.useState("")
-  const [telefone, setTelefone] = React.useState("")
-  const [clientErrors, setClientErrors] = React.useState<ClientFieldErrors>({})
-  const [state, formAction, pending] = React.useActionState(
-    async (prev: ClientActionState, formData: FormData) => {
-      const result = await saveClient(prev, formData)
-      if (result.status === "success") {
-        toast.success(result.message)
-        setOpen(false)
-        router.refresh()
-      } else if (result.status === "error" && result.message) {
-        toast.error(result.message)
-      }
-      return result
-    },
-    INITIAL_STATE,
-  )
+  const [form, setForm] = React.useState(() => initialState(client))
+  const { pending, run, fieldErrors: errors, setFieldErrors } = useCadastroAction()
 
-  const errors: ClientFieldErrors = { ...state.fieldErrors, ...clientErrors }
+  const set = (key: keyof ClientInput) => (value: string) =>
+    setForm((f) => ({ ...f, [key]: value }))
 
   function handleOpenChange(next: boolean) {
+    if (pending) return
     setOpen(next)
     if (next) {
-      setCnpj(client?.cnpj ? maskCnpj(client.cnpj) : "")
-      setTelefone(client?.contato_telefone ? maskPhone(client.contato_telefone) : "")
-      setClientErrors({})
+      setForm(initialState(client))
+      setFieldErrors({})
     }
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    const found = validateOnClient(new FormData(event.currentTarget))
-    setClientErrors(found)
-    if (Object.keys(found).length > 0) {
-      event.preventDefault()
+    event.preventDefault()
+    const check = clientSchema.safeParse(form)
+    if (!check.success) {
+      setFieldErrors(fieldErrorsFrom(check.error))
+      return
     }
+    run(() => saveClient(form), () => setOpen(false))
   }
 
   const label = triggerLabel ?? (isEdit ? "Editar" : "Novo cliente")
@@ -117,136 +104,117 @@ export function ClientFormDialog({
           />
         }
       >
-        {isEdit ? (
-          <PencilLineIcon aria-hidden="true" />
-        ) : (
-          <PlusIcon aria-hidden="true" />
-        )}
+        {isEdit ? <PencilLineIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
         {label}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Editar cliente" : "Cadastrar cliente"}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? "Editar cliente" : "Cadastrar cliente"}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Atualize os dados cadastrais e o contato principal."
-              : "Dados cadastrais da empresa e contato principal."}
+              : "Dados cadastrais da empresa (ou pessoa física) e contato principal."}
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} onSubmit={handleSubmit} noValidate>
-          {isEdit && <input type="hidden" name="id" value={client?.id} />}
-          <div className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="cliente-razao-social">Razão social</Label>
+        <form onSubmit={handleSubmit} noValidate className="grid gap-4">
+          <Field id="cliente-razao-social" label="Razão social" error={errors.razao_social}>
+            <Input
+              id="cliente-razao-social"
+              value={form.razao_social}
+              onChange={(e) => set("razao_social")(e.target.value)}
+              placeholder="Ex.: Condomínio Edifício Torres do Batel"
+              autoComplete="organization"
+              required
+              className="max-md:h-11"
+              {...invalidProps("cliente-razao-social", errors.razao_social)}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="cliente-fantasia" label="Nome fantasia" error={errors.nome_fantasia}>
               <Input
-                id="cliente-razao-social"
-                name="razao_social"
-                defaultValue={client?.razao_social ?? ""}
-                placeholder="Ex.: Condomínio Edifício Torres do Batel"
-                autoComplete="organization"
-                required
-                aria-invalid={errors.razao_social ? true : undefined}
-                aria-describedby={
-                  errors.razao_social ? "cliente-razao-social-erro" : undefined
-                }
+                id="cliente-fantasia"
+                value={form.nome_fantasia}
+                onChange={(e) => set("nome_fantasia")(e.target.value)}
                 className="max-md:h-11"
+                {...invalidProps("cliente-fantasia", errors.nome_fantasia)}
               />
-              {errors.razao_social && (
-                <p
-                  id="cliente-razao-social-erro"
-                  className="text-xs text-danger"
-                >
-                  {errors.razao_social}
-                </p>
-              )}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="cliente-cnpj">CNPJ</Label>
-                <Input
-                  id="cliente-cnpj"
-                  name="cnpj"
-                  value={cnpj}
-                  onChange={(e) => setCnpj(maskCnpj(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  aria-invalid={errors.cnpj ? true : undefined}
-                  aria-describedby={errors.cnpj ? "cliente-cnpj-erro" : undefined}
-                  className="font-mono max-md:h-11"
-                />
-                {errors.cnpj && (
-                  <p id="cliente-cnpj-erro" className="text-xs text-danger">
-                    {errors.cnpj}
-                  </p>
-                )}
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cliente-contato">Contato</Label>
-                <Input
-                  id="cliente-contato"
-                  name="contato_nome"
-                  defaultValue={client?.contato_nome ?? ""}
-                  placeholder="Nome do responsável"
-                  autoComplete="name"
-                  aria-invalid={errors.contato_nome ? true : undefined}
-                  className="max-md:h-11"
-                />
-                {errors.contato_nome && (
-                  <p className="text-xs text-danger">{errors.contato_nome}</p>
-                )}
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="cliente-email">E-mail</Label>
-                <Input
-                  id="cliente-email"
-                  name="contato_email"
-                  type="email"
-                  defaultValue={client?.contato_email ?? ""}
-                  placeholder="contato@empresa.com.br"
-                  autoComplete="email"
-                  aria-invalid={errors.contato_email ? true : undefined}
-                  aria-describedby={
-                    errors.contato_email ? "cliente-email-erro" : undefined
-                  }
-                  className="max-md:h-11"
-                />
-                {errors.contato_email && (
-                  <p id="cliente-email-erro" className="text-xs text-danger">
-                    {errors.contato_email}
-                  </p>
-                )}
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cliente-telefone">Telefone</Label>
-                <Input
-                  id="cliente-telefone"
-                  name="contato_telefone"
-                  type="tel"
-                  value={telefone}
-                  onChange={(e) => setTelefone(maskPhone(e.target.value))}
-                  placeholder="(41) 99999-9999"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  aria-invalid={errors.contato_telefone ? true : undefined}
-                  aria-describedby={
-                    errors.contato_telefone ? "cliente-telefone-erro" : undefined
-                  }
-                  className="font-mono max-md:h-11"
-                />
-                {errors.contato_telefone && (
-                  <p id="cliente-telefone-erro" className="text-xs text-danger">
-                    {errors.contato_telefone}
-                  </p>
-                )}
-              </div>
-            </div>
+            </Field>
+            <Field id="cliente-documento" label="CNPJ ou CPF" error={errors.documento}>
+              <Input
+                id="cliente-documento"
+                value={form.documento}
+                onChange={(e) => set("documento")(maskDocumento(e.target.value))}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono max-md:h-11"
+                {...invalidProps("cliente-documento", errors.documento)}
+              />
+            </Field>
           </div>
-          <DialogFooter className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="cliente-segmento" label="Segmento" error={errors.segmento}>
+              <SelectField
+                id="cliente-segmento"
+                value={form.segmento || SEM_SEGMENTO}
+                onChange={(v) => set("segmento")(v === SEM_SEGMENTO ? "" : v)}
+                items={
+                  form.segmento && !(form.segmento in SEGMENTO_ITEMS)
+                    ? { ...SEGMENTO_ITEMS, [form.segmento]: form.segmento }
+                    : SEGMENTO_ITEMS
+                }
+                error={errors.segmento}
+              />
+            </Field>
+            <Field id="cliente-contato" label="Contato" error={errors.contato_nome}>
+              <Input
+                id="cliente-contato"
+                value={form.contato_nome}
+                onChange={(e) => set("contato_nome")(e.target.value)}
+                placeholder="Nome do responsável"
+                autoComplete="name"
+                className="max-md:h-11"
+                {...invalidProps("cliente-contato", errors.contato_nome)}
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="cliente-email" label="E-mail" error={errors.contato_email}>
+              <Input
+                id="cliente-email"
+                type="email"
+                value={form.contato_email}
+                onChange={(e) => set("contato_email")(e.target.value)}
+                placeholder="contato@empresa.com.br"
+                autoComplete="email"
+                className="max-md:h-11"
+                {...invalidProps("cliente-email", errors.contato_email)}
+              />
+            </Field>
+            <Field id="cliente-telefone" label="Telefone" error={errors.contato_telefone}>
+              <Input
+                id="cliente-telefone"
+                type="tel"
+                value={form.contato_telefone}
+                onChange={(e) => set("contato_telefone")(maskPhone(e.target.value))}
+                placeholder="(41) 99999-9999"
+                inputMode="tel"
+                autoComplete="tel"
+                className="font-mono max-md:h-11"
+                {...invalidProps("cliente-telefone", errors.contato_telefone)}
+              />
+            </Field>
+          </div>
+          <Field id="cliente-obs" label="Observações" error={errors.observacoes}>
+            <Textarea
+              id="cliente-obs"
+              value={form.observacoes}
+              onChange={(e) => set("observacoes")(e.target.value)}
+              rows={3}
+              {...invalidProps("cliente-obs", errors.observacoes)}
+            />
+          </Field>
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -256,26 +224,9 @@ export function ClientFormDialog({
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={pending}
-              aria-busy={pending}
-              className="max-md:h-11"
-            >
-              {pending ? (
-                <>
-                  <LoaderCircleIcon
-                    className="animate-spin"
-                    aria-hidden="true"
-                  />
-                  Salvando…
-                </>
-              ) : isEdit ? (
-                "Salvar alterações"
-              ) : (
-                "Cadastrar cliente"
-              )}
-            </Button>
+            <SubmitButton pending={pending}>
+              {isEdit ? "Salvar alterações" : "Cadastrar cliente"}
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

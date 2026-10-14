@@ -32,6 +32,16 @@ export type AsaasWebhookEventName =
   | "PAYMENT_RECEIVED"
   | "PAYMENT_CONFIRMED"
   | "PAYMENT_OVERDUE"
+  | "PAYMENT_DELETED"
+  | "PAYMENT_RESTORED"
+  | "PAYMENT_REFUNDED"
+  | "PAYMENT_RECEIVED_IN_CASH_UNDONE"
+  | "PAYMENT_CHARGEBACK_REQUESTED"
+  | "PAYMENT_CHARGEBACK_DISPUTE"
+  | "PAYMENT_AWAITING_CHARGEBACK_REVERSAL"
+  | "INVOICE_AUTHORIZED"
+  | "INVOICE_ERROR"
+  | "INVOICE_CANCELED"
   | (string & {});
 
 // ----------------------------------------------------------------------------
@@ -124,6 +134,8 @@ export interface AsaasInvoice {
   pdfUrl: string | null;
   xmlUrl: string | null;
   externalReference: string | null;
+  /** Motivo do status (ex.: rejeição da prefeitura). */
+  statusDescription?: string | null;
 }
 
 export interface AsaasInvoicePayload {
@@ -133,6 +145,10 @@ export interface AsaasInvoicePayload {
   customer?: string;
   serviceDescription: string;
   observations?: string;
+  /** Código do serviço na prefeitura (clients.codigo_servico_municipal). */
+  municipalServiceCode?: string;
+  /** Descrição do serviço municipal (obrigatória junto com o código). */
+  municipalServiceName?: string;
   value: number;
   deductions?: number;
   /** "YYYY-MM-DD" — data de emissão. */
@@ -160,9 +176,11 @@ export interface AsaasErrorBody {
   errors?: Array<{ code: string; description: string }>;
 }
 
-/** Payload dos webhooks de cobrança. */
+/** Payload dos webhooks (cobrança ou nota fiscal) — validado por zod em webhook.ts. */
 export interface AsaasWebhookEvent {
-  id?: string;
+  id: string;
   event: AsaasWebhookEventName;
-  payment?: AsaasPayment;
+  dateCreated?: string;
+  payment?: Partial<AsaasPayment> & { id: string };
+  invoice?: Partial<AsaasInvoice> & { id: string };
 }

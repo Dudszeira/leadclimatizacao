@@ -506,3 +506,108 @@ export interface PageParams {
   /** Default 20. */
   pageSize?: number;
 }
+
+// ----------------------------------------------------------------------------
+// Onda 2D — cadastros (0007_cadastros.sql). Declaration merging: as colunas
+// novas entram opcionais nas interfaces originais.
+// ----------------------------------------------------------------------------
+
+export interface Equipment {
+  /** 0007 — número de série do fabricante (chave natural da importação). */
+  numero_serie?: string | null;
+}
+
+export interface PmocPlan {
+  /** 0007 — responsável técnico do plano (nome / registro CREA). */
+  responsavel_tecnico?: string | null;
+}
+
+/** Plano PMOC com equipamento/prédio/cliente e a OS em aberto (tela de planos). */
+export interface PmocPlanListItem extends PmocPlan {
+  equipment: Pick<Equipment, "id" | "codigo_interno" | "tipo" | "marca" | "modelo" | "status">;
+  building: Pick<Building, "id" | "nome">;
+  client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  /** OS do plano em aberto/agendada/em campo, se houver. */
+  os_aberta: { id: string; numero: number; status: OsStatus } | null;
+  /** Dias até proxima_data (negativo = atrasado). */
+  dias_para_vencer: number;
+  situacao: PmocSituacao;
+}
+
+// ----------------------------------------------------------------------------
+// Execução da OS em campo (Onda 2C)
+// ----------------------------------------------------------------------------
+
+/** Item de checklist com obrigatoriedade explícita (opcional no JSONB). */
+export interface ChecklistItemComRegra extends ChecklistItem {
+  /** Default: checkbox/número obrigatórios, texto opcional. */
+  obrigatorio?: boolean;
+}
+
+/** Foto da OS pronta para exibição (URL assinada gerada no servidor). */
+export interface ServiceOrderPhotoView {
+  /** id da linha em service_order_photos, ou "legado:<path>" (fotos_antes/fotos_depois). */
+  id: string;
+  storage_path: string;
+  etapa: "antes" | "depois";
+  legenda: string | null;
+  created_at: string | null;
+  /** null quando não há arquivo acessível (modo demo / legado sem objeto). */
+  url: string | null;
+}
+
+/** Evidências da OS (fotos + assinatura) com URLs assinadas de curta duração. */
+export interface ServiceOrderEvidence {
+  photos: ServiceOrderPhotoView[];
+  assinaturaUrl: string | null;
+}
+
+/** Card do app de campo: OS + endereço completo do prédio. */
+export interface FieldOrderItem extends ServiceOrder {
+  building: Pick<
+    Building,
+    "id" | "nome" | "logradouro" | "numero" | "bairro" | "cidade" | "uf" | "lat" | "lng"
+  > & {
+    client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  };
+  equipment: Pick<Equipment, "id" | "codigo_interno" | "tipo" | "ambiente"> | null;
+  technician: Pick<Profile, "id" | "full_name"> | null;
+}
+
+/** Opção do combobox de equipamento (busca no servidor). */
+export interface EquipmentOption {
+  id: string;
+  building_id: string;
+  label: string;
+}
+
+// ----------------------------------------------------------------------------
+// Mapa de equipamentos (src/server/map.ts): pino enxuto por prédio
+// ----------------------------------------------------------------------------
+
+/** Contagem de equipamentos do prédio por status. */
+export type EquipmentStatusCounts = Record<EquipmentStatus, number>;
+
+/** Pino do mapa: só o necessário para desenhar, buscar e abrir o cliente. */
+export interface MapPin {
+  id: string;
+  nome: string;
+  lat: number;
+  lng: number;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  cidade: string;
+  uf: string;
+  client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  equipment_total: number;
+  status_counts: EquipmentStatusCounts;
+}
+
+/** Recorte geográfico opcional do mapa (graus decimais). */
+export interface MapBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}

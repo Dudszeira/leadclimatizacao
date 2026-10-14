@@ -4,16 +4,23 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { isDemoMode } from "@/lib/env"
-import { getMessagingAdapter } from "@/lib/messaging"
+import {
+  MESSAGING_NOT_CONFIGURED,
+  deliverAndPersist,
+  getMessagingAdapter,
+  isMessagingConfigured,
+} from "@/lib/messaging"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import { authorizeAction } from "@/server/auth"
 
 /**
- * Server actions do Atendimento IA — mesmo padrão de actions/service-orders.ts:
- * validação zod no servidor, modo demo devolve mensagem amigável (toast na UI)
- * e com Supabase real persiste + revalidatePath. O envio de mensagem passa
- * SEMPRE pelo MessagingAdapter (src/lib/messaging) — hoje o adapter nulo, na
- * ativação o provedor de WhatsApp, sem mudar nada aqui além da factory.
+ * Server actions do Atendimento, mesmo padrão de actions/service-orders.ts:
+ * authorizeAction + validação zod no servidor, modo demo devolve mensagem
+ * amigável (toast na UI) e com Supabase real persiste + revalidatePath.
+ *
+ * Envio: WhatsApp fora do go-live. Sem provedor configurado o envio é
+ * BLOQUEADO antes de qualquer consulta e nada é gravado como enviado. Com
+ * provedor, passa por deliverAndPersist (provedor primeiro, banco depois).
  */
 
 export interface ConversationActionResult {
@@ -22,7 +29,7 @@ export interface ConversationActionResult {
 }
 
 const DEMO_MESSAGE =
-  "Modo demonstração — o envio real de mensagens será habilitado quando o WhatsApp for conectado."
+  "Modo demonstração: o envio real de mensagens será habilitado quando o WhatsApp for conectado."
 
 const conversationIdSchema = z.uuid()
 
@@ -58,54 +65,66 @@ export async function sendConversationMessage(
       message: issue?.message ?? "Dados inválidos — recarregue a página e tente novamente.",
     }
   }
+  // Bloqueio do go-live: sem provedor real, nada é enviado nem gravado.
+  if (!isMessagingConfigured()) return { status: "error", message: MESSAGING_NOT_CONFIGURED }
   if (isDemoMode) return { status: "error", message: DEMO_MESSAGE }
 
   try {
     const supabase = await createSupabase()
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
-      .select("id,telefone")
+      .select("id,telefone,status")
       .eq("id", parsed.data.conversationId)
       .maybeSingle()
     if (convError || !conversation) {
       console.error("[actions/conversations] send (busca conversa):", convError)
       return {
         status: "error",
-        message: "Conversa não encontrada — recarregue a página e tente novamente.",
+        message: "Conversa não encontrada. Recarregue a página e tente novamente.",
       }
     }
-
-    // Envio pelo provedor (hoje: adapter nulo, que só loga e resolve).
-    const adapter = getMessagingAdapter()
-    const receipt = await adapter.sendMessage({
-      conversationId: conversation.id,
-      telefone: conversation.telefone,
-      texto: parsed.data.texto,
-    })
-
-    const now = new Date().toISOString()
-    const { error: insertError } = await supabase.from("messages").insert({
-      conversation_id: conversation.id,
-      direcao: "out",
-      autor: "humano",
-      texto: parsed.data.texto,
-      metadata: receipt.externalId ? { wa_id: receipt.externalId } : {},
-    })
-    if (insertError) {
-      console.error("[actions/conversations] send (insert):", insertError)
-      return {
-        status: "error",
-        message: "Não foi possível enviar a mensagem. Tente novamente.",
-      }
+    if (conversation.status === "encerrado") {
+      return { status: "error", message: "Conversa encerrada: o envio está desativado." }
     }
 
-    const { error: updateError } = await supabase
-      .from("conversations")
-      .update({ last_message_at: now })
-      .eq("id", conversation.id)
-    if (updateError) {
-      // Mensagem já persistida: só loga, não falha o envio para o usuário.
-      console.error("[actions/conversations] send (last_message_at):", updateError)
+    const outcome = await deliverAndPersist(
+      getMessagingAdapter(),
+      {
+        conversationId: conversation.id,
+        telefone: conversation.telefone,
+        texto: parsed.data.texto,
+      },
+      async (receipt) => {
+        const { error: insertError } = await supabase.from("messages").insert({
+          conversation_id: conversation.id,
+          direcao: "out",
+          autor: "humano",
+          texto: parsed.data.texto,
+          metadata: receipt.externalId ? { wa_id: receipt.externalId } : {},
+        })
+        if (insertError) {
+          console.error("[actions/conversations] send (insert):", insertError)
+          return false
+        }
+        const { error: updateError } = await supabase
+          .from("conversations")
+          .update({ last_message_at: new Date().toISOString() })
+          .eq("id", conversation.id)
+        if (updateError) {
+          // Mensagem já persistida: só loga, não falha o envio para o usuário.
+          console.error("[actions/conversations] send (last_message_at):", updateError)
+        }
+        return true
+      },
+    )
+    if (!outcome.ok) {
+      const message =
+        outcome.reason === "not_configured"
+          ? MESSAGING_NOT_CONFIGURED
+          : outcome.reason === "provider_error"
+            ? "O WhatsApp recusou o envio. Tente novamente em instantes."
+            : "A mensagem saiu pelo WhatsApp, mas não foi registrada no histórico. Avise o administrador."
+      return { status: "error", message }
     }
   } catch (error) {
     console.error("[actions/conversations] sendConversationMessage:", error)

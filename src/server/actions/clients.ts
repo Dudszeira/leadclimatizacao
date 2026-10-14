@@ -5,141 +5,150 @@ import { z } from "zod"
 
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
-import { isValidCnpj, maskCnpj, onlyDigits } from "@/lib/format"
 import { authorizeAction } from "@/server/auth"
+import {
+  DEMO_MESSAGE,
+  RLS_BLOCK_MESSAGE,
+  type ActionResult,
+} from "@/components/clientes/action-result"
+import {
+  clientSchema,
+  fieldErrorsFrom,
+  fiscalSchema,
+  type ClientInput,
+  type FiscalInput,
+} from "@/components/clientes/schemas"
+import { onlyDigits } from "@/components/clientes/validators"
 
-export interface ClientFieldErrors {
-  razao_social?: string
-  cnpj?: string
-  contato_nome?: string
-  contato_email?: string
-  contato_telefone?: string
-}
-
-export interface ClientActionState {
-  status: "idle" | "success" | "error"
-  message?: string
-  fieldErrors?: ClientFieldErrors
-}
-
-const clientSchema = z.object({
-  id: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) => (v ? v : undefined)),
-  razao_social: z
-    .string({ error: "Informe a razão social." })
-    .trim()
-    .min(3, "Informe a razão social (mínimo 3 caracteres)."),
-  cnpj: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || isValidCnpj(v), {
-      message: "CNPJ inválido — confira os dígitos.",
-    }),
-  contato_nome: z.string().trim().max(120, "Nome do contato muito longo."),
-  contato_email: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || z.email().safeParse(v).success, {
-      message: "E-mail inválido.",
-    }),
-  contato_telefone: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || onlyDigits(v).length >= 10, {
-      message: "Telefone incompleto — use DDD + número.",
-    }),
-})
+const INVALID = "Revise os campos destacados antes de salvar."
 
 /**
- * Cria ou atualiza um cliente (Dialog de cadastro/edição).
- * Valida com zod no servidor; em modo demo não grava nada e devolve
- * mensagem amigável para a UI exibir via toast.
+ * Cria ou atualiza um cliente. Zod no servidor; CPF/CNPJ gravado mascarado
+ * (forma canônica) e checado contra duplicidade antes do insert para dar uma
+ * mensagem melhor que a violação de unique.
  */
-export async function saveClient(
-  _prevState: ClientActionState,
-  formData: FormData,
-): Promise<ClientActionState> {
+export async function saveClient(input: ClientInput): Promise<ActionResult> {
   const auth = await authorizeAction("admin", "atendente")
-  if (auth.error !== null) return { status: "error", message: auth.error }
-  const raw = {
-    id: String(formData.get("id") ?? ""),
-    razao_social: String(formData.get("razao_social") ?? ""),
-    cnpj: String(formData.get("cnpj") ?? ""),
-    contato_nome: String(formData.get("contato_nome") ?? ""),
-    contato_email: String(formData.get("contato_email") ?? ""),
-    contato_telefone: String(formData.get("contato_telefone") ?? ""),
-  }
+  if (auth.error !== null) return { ok: false, message: auth.error }
 
-  const parsed = clientSchema.safeParse(raw)
+  const parsed = clientSchema.safeParse(input)
   if (!parsed.success) {
-    const fieldErrors: ClientFieldErrors = {}
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0] as keyof ClientFieldErrors | undefined
-      if (field && !fieldErrors[field]) fieldErrors[field] = issue.message
-    }
-    return {
-      status: "error",
-      message: "Revise os campos destacados antes de salvar.",
-      fieldErrors,
-    }
+    return { ok: false, message: INVALID, fieldErrors: fieldErrorsFrom(parsed.error) }
   }
+  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE }
 
-  if (isDemoMode) {
-    return {
-      status: "error",
-      message:
-        "Modo demonstração — o cadastro será habilitado quando o banco do cliente for conectado.",
-    }
-  }
-
-  const { id, razao_social, cnpj, contato_nome, contato_email, contato_telefone } =
-    parsed.data
-  const row = {
-    razao_social,
-    cnpj: cnpj ? maskCnpj(cnpj) : null,
-    contato_nome: contato_nome || null,
-    contato_email: contato_email || null,
-    contato_telefone: contato_telefone || null,
-  }
+  const { id, documento, ...rest } = parsed.data
+  const row = { ...rest, cnpj: documento }
 
   try {
     const supabase = await createSupabase()
+    if (documento) {
+      const digits = onlyDigits(documento)
+      const { data: dup, error: dupError } = await supabase
+        .from("clients")
+        .select("id")
+        .in("cnpj", [documento, digits])
+        .limit(1)
+      if (dupError) {
+        console.error("[actions/clients] dup check:", dupError)
+        return { ok: false, message: "Não foi possível salvar o cliente. Tente novamente." }
+      }
+      if (dup && dup.length > 0 && dup[0].id !== id) {
+        return {
+          ok: false,
+          message: "Já existe um cliente com este CPF/CNPJ.",
+          fieldErrors: { documento: "CPF/CNPJ já cadastrado." },
+        }
+      }
+    }
+
     if (id) {
-      const { error } = await supabase.from("clients").update(row).eq("id", id)
+      const { data, error } = await supabase.from("clients").update(row).eq("id", id).select("id")
       if (error) {
         console.error("[actions/clients] update:", error)
-        return {
-          status: "error",
-          message: "Não foi possível atualizar o cliente. Tente novamente.",
-        }
+        return { ok: false, message: "Não foi possível atualizar o cliente. Tente novamente." }
       }
-    } else {
-      const { error } = await supabase.from("clients").insert(row)
-      if (error) {
-        console.error("[actions/clients] insert:", error)
-        return {
-          status: "error",
-          message: "Não foi possível cadastrar o cliente. Tente novamente.",
-        }
-      }
+      if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
+      revalidatePath("/clientes")
+      revalidatePath(`/clientes/${id}`)
+      return { ok: true, message: "Cliente atualizado.", id }
     }
+
+    const { data, error } = await supabase.from("clients").insert(row).select("id").single()
+    if (error) {
+      console.error("[actions/clients] insert:", error)
+      return { ok: false, message: "Não foi possível cadastrar o cliente. Tente novamente." }
+    }
+    revalidatePath("/clientes")
+    return { ok: true, message: "Cliente cadastrado.", id: data.id as string }
   } catch (error) {
     console.error("[actions/clients] saveClient:", error)
-    return {
-      status: "error",
-      message: "Não foi possível salvar o cliente. Tente novamente.",
-    }
+    return { ok: false, message: "Não foi possível salvar o cliente. Tente novamente." }
   }
+}
 
-  revalidatePath("/clientes")
-  if (id) revalidatePath(`/clientes/${id}`)
-  return {
-    status: "success",
-    message: id
-      ? "Cliente atualizado com sucesso."
-      : "Cliente cadastrado com sucesso.",
+const ativoSchema = z.object({ id: z.uuid(), ativo: z.boolean() })
+
+/** Inativa/reativa (nunca apaga: o cliente tem histórico de OS e faturas). */
+export async function setClientAtivo(input: { id: string; ativo: boolean }): Promise<ActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { ok: false, message: auth.error }
+  const parsed = ativoSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, message: "Cliente inválido." }
+  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE }
+
+  try {
+    const supabase = await createSupabase()
+    const { data, error } = await supabase
+      .from("clients")
+      .update({ ativo: parsed.data.ativo })
+      .eq("id", parsed.data.id)
+      .select("id")
+    if (error) {
+      console.error("[actions/clients] setClientAtivo:", error)
+      return { ok: false, message: "Não foi possível alterar o status. Tente novamente." }
+    }
+    if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
+    revalidatePath("/clientes")
+    revalidatePath(`/clientes/${parsed.data.id}`)
+    return {
+      ok: true,
+      message: parsed.data.ativo ? "Cliente reativado." : "Cliente inativado.",
+      id: parsed.data.id,
+    }
+  } catch (error) {
+    console.error("[actions/clients] setClientAtivo:", error)
+    return { ok: false, message: "Não foi possível alterar o status. Tente novamente." }
+  }
+}
+
+/** Dados fiscais da NFS-e (código do serviço municipal, ISS). */
+export async function saveClientFiscal(input: FiscalInput): Promise<ActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { ok: false, message: auth.error }
+  const parsed = fiscalSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: INVALID, fieldErrors: fieldErrorsFrom(parsed.error) }
+  }
+  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE }
+
+  const { client_id, ...row } = parsed.data
+  try {
+    const supabase = await createSupabase()
+    const { data, error } = await supabase
+      .from("clients")
+      .update(row)
+      .eq("id", client_id)
+      .select("id")
+    if (error) {
+      console.error("[actions/clients] saveClientFiscal:", error)
+      return { ok: false, message: "Não foi possível salvar os dados fiscais. Tente novamente." }
+    }
+    if (!data || data.length === 0) return { ok: false, message: RLS_BLOCK_MESSAGE }
+    revalidatePath(`/clientes/${client_id}`)
+    return { ok: true, message: "Dados fiscais atualizados.", id: client_id }
+  } catch (error) {
+    console.error("[actions/clients] saveClientFiscal:", error)
+    return { ok: false, message: "Não foi possível salvar os dados fiscais. Tente novamente." }
   }
 }

@@ -29,9 +29,15 @@ import {
   INVOICE_STATUS_META,
   PAYMENT_METHOD_META,
 } from "@/lib/status-meta"
-import { listContracts } from "@/server/contracts"
+import { competenciaBRT, todayBRT } from "@/lib/asaas/dates"
+import { isLock } from "@/lib/asaas/lock"
+import { requireRole } from "@/server/auth"
+import {
+  getContratosResumo,
+  listContractClientOptions,
+  listContracts,
+} from "@/server/contracts"
 import { getFinanceiroKpis, listInvoices } from "@/server/invoices"
-import { monthStartDate } from "@/server/_shared"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import {
@@ -51,6 +57,9 @@ import {
   type StatusParam,
 } from "@/components/financeiro/faturas-toolbar"
 import { InvoiceActions } from "@/components/financeiro/invoice-actions"
+import { BillingRunActions } from "@/components/financeiro/billing-run-actions"
+import { ContractActions } from "@/components/financeiro/contract-actions"
+import { ContractFormDialog } from "@/components/financeiro/contract-form-dialog"
 import {
   ContratosSkeleton,
   FaturasTableSkeleton,
@@ -112,10 +121,10 @@ function buildHref({ aba, q, status, competencia, page }: Filters): string {
   return qs ? `/financeiro?${qs}` : "/financeiro"
 }
 
-/** Últimos 6 meses de competência para o filtro (mais recente primeiro). */
-function competenciaOptions(): CompetenciaOption[] {
-  return Array.from({ length: 6 }, (_, i) => {
-    const value = monthStartDate(i)
+/** Últimos N meses de competência em BRT (mais recente primeiro). */
+function competenciaOptions(length = 6): CompetenciaOption[] {
+  return Array.from({ length }, (_, i) => {
+    const value = competenciaBRT(i)
     return { value, label: formatCompetenciaLonga(value) }
   })
 }
@@ -125,19 +134,23 @@ export default async function FinanceiroPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireRole("admin")
   const filters = parseFilters(await searchParams)
   const faturasKey = `${filters.q}|${filters.status}|${filters.competencia}|${filters.page}`
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <header>
-        <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-          Financeiro &amp; fiscal
-        </h2>
-        <p className="mt-1 text-sm text-ink-dim">
-          Faturas dos contratos, cobranças via Asaas (Pix/boleto) e NFS-e em um
-          só painel.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg font-bold tracking-tight text-ink">
+            Financeiro &amp; fiscal
+          </h2>
+          <p className="mt-1 text-sm text-ink-dim">
+            Faturas dos contratos, cobranças via Asaas (Pix/boleto) e NFS-e em
+            um só painel.
+          </p>
+        </div>
+        <BillingRunActions competencias={competenciaOptions(3)} />
       </header>
 
       <Suspense fallback={<FinanceiroKpisSkeleton />}>
@@ -159,8 +172,8 @@ export default async function FinanceiroPage({
           </Suspense>
         </>
       ) : (
-        <Suspense fallback={<ContratosSkeleton />}>
-          <ContratosSection />
+        <Suspense key={`contratos|${filters.page}`} fallback={<ContratosSkeleton />}>
+          <ContratosSection filters={filters} />
         </Suspense>
       )}
     </div>
@@ -396,7 +409,9 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="py-3">
-                  {fatura.metodo ? (
+                  {isLock(fatura.asaas_id) ? (
+                    <span className="text-ink-faint">Gerando…</span>
+                  ) : fatura.metodo ? (
                     <span className="flex items-center gap-1.5 text-ink-dim">
                       <MetodoIcon
                         className="size-3.5 shrink-0 text-ink-faint"
@@ -409,7 +424,12 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                   )}
                 </TableCell>
                 <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
-                  {fatura.nf_numero ?? <span className="text-ink-faint">—</span>}
+                  {fatura.nf_numero ??
+                    (fatura.asaas_invoice_id ? (
+                      <span className="font-sans text-ink-faint">Em emissão</span>
+                    ) : (
+                      <span className="text-ink-faint">—</span>
+                    ))}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-right">
                   <InvoiceActions
@@ -418,6 +438,7 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                     clienteNome={clienteNome}
                     asaasId={fatura.asaas_id}
                     asaasUrl={fatura.asaas_url}
+                    asaasInvoiceId={fatura.asaas_invoice_id ?? null}
                     nfNumero={fatura.nf_numero}
                   />
                 </TableCell>
@@ -446,47 +467,73 @@ async function FaturasSection({ filters }: { filters: Filters }) {
 // Aba Contratos: resumo (ativos, MRR) + tabela
 // ---------------------------------------------------------------------------
 
-async function ContratosSection() {
-  const result = await listContracts({ pageSize: 100 })
+const CONTRATOS_PAGE_SIZE = 20
 
-  if (result.error !== null) {
-    return <DataError message={result.error} />
+async function ContratosSection({ filters }: { filters: Filters }) {
+  const [listResult, resumoResult, clientsResult] = await Promise.all([
+    listContracts({ page: filters.page, pageSize: CONTRATOS_PAGE_SIZE }),
+    getContratosResumo(),
+    listContractClientOptions(),
+  ])
+
+  if (listResult.error !== null) {
+    return <DataError message={listResult.error} />
   }
+  const clients = clientsResult.data ?? []
+  const hoje = todayBRT()
+  const novoContrato = <ContractFormDialog clients={clients} hoje={hoje} />
 
-  const contratos = result.data.items
-  if (contratos.length === 0) {
+  const { items: contratos, total, page, pageCount } = listResult.data
+  if (total === 0) {
     return (
       <EmptyState
         icon={RepeatIcon}
         title="Nenhum contrato cadastrado"
         description="Cadastre os contratos PMOC recorrentes, corretivas avulsas e instalações para gerar as faturas mensais automaticamente."
-      />
+      >
+        <div className="mt-6">{novoContrato}</div>
+      </EmptyState>
     )
   }
 
-  const ativos = contratos.filter((c) => c.status === "ativo")
-  const mrr = ativos
-    .filter((c) => c.tipo === "pmoc_recorrente")
-    .reduce((sum, c) => sum + c.valor_mensal, 0)
+  const from = (page - 1) * CONTRATOS_PAGE_SIZE + 1
+  const to = Math.min(page * CONTRATOS_PAGE_SIZE, total)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <StatCard
-          label="Contratos ativos"
-          value={String(ativos.length)}
-          icon={RepeatIcon}
-          sub={`${contratos.length} contratos no total`}
-          tone="neutral"
-        />
-        <StatCard
-          label="MRR — receita recorrente"
-          value={formatBRLInteiro(mrr)}
-          icon={TrendingUpIcon}
-          sub="Soma dos PMOC recorrentes ativos"
-          tone="clear"
-        />
+      {resumoResult.error !== null ? (
+        <DataError message={resumoResult.error} compact className="min-h-28" />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatCard
+            label="Contratos ativos"
+            value={String(resumoResult.data.ativos)}
+            icon={RepeatIcon}
+            sub={`${resumoResult.data.total} contratos no total`}
+            tone="neutral"
+          />
+          <StatCard
+            label="MRR — receita recorrente"
+            value={formatBRLInteiro(resumoResult.data.mrr)}
+            icon={TrendingUpIcon}
+            sub="Soma dos PMOC recorrentes ativos"
+            tone="clear"
+          />
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-ink-dim">
+          Contratos ativos geram as faturas mensais (dia 1, 06:00) — encerre
+          para parar a cobrança.
+        </p>
+        {novoContrato}
       </div>
+      {clientsResult.error !== null ? (
+        <p role="status" className="text-xs text-danger">
+          {clientsResult.error}
+        </p>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-console">
         <Table aria-label="Contratos por cliente">
@@ -507,8 +554,11 @@ async function ContratosSection() {
               <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
                 Status
               </TableHead>
-              <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Desde
+              <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+                Vigência
+              </TableHead>
+              <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
+                <span className="sr-only">Ações</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -555,14 +605,35 @@ async function ContratosSection() {
                       {statusMeta.label}
                     </Badge>
                   </TableCell>
-                  <TableCell className="px-4 py-3 font-mono text-ink-dim tabular-nums">
+                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums">
                     {formatDateBR(contrato.inicio)}
+                    {contrato.fim ? ` → ${formatDateBR(contrato.fim)}` : ""}
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right">
+                    <ContractActions
+                      contract={contrato}
+                      clienteNome={clienteNome}
+                      clients={clients}
+                      hoje={hoje}
+                    />
                   </TableCell>
                 </TableRow>
               )
             })}
           </TableBody>
         </Table>
+        <TablePagination
+          ariaLabel="Paginação de contratos"
+          from={from}
+          to={to}
+          total={total}
+          page={page}
+          pageCount={pageCount}
+          singular="contrato"
+          plural="contratos"
+          prevHref={buildHref({ ...filters, page: page - 1 })}
+          nextHref={buildHref({ ...filters, page: page + 1 })}
+        />
       </div>
     </div>
   )

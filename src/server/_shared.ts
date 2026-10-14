@@ -1,4 +1,6 @@
 import type { PageParams, Paginated, Result } from "@/lib/types";
+// Import relativo (não "@/"): este módulo também roda nos testes vitest sem alias.
+import { daysFromTodayBRT, monthStartBRT } from "../lib/format";
 
 /**
  * Infra interna do data layer (ver README.md nesta pasta):
@@ -84,22 +86,32 @@ export function sanitizeIlike(term: string): string {
   return term.trim().replace(/[,()%_]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** "YYYY-MM" ou "YYYY-MM-DD" do primeiro dia do mês corrente - monthsBack. */
-export function monthStartDate(monthsBack = 0): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  d.setMonth(d.getMonth() - monthsBack);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}-01`;
+// ----------------------------------------------------------------------------
+// Datas no fuso de Curitiba (America/Sao_Paulo)
+// Implementação em src/lib/format.ts (pura, também usada no cliente); aqui
+// ficam os nomes estáveis do data layer. Nunca use toISOString().slice(0, 10)
+// para "hoje": em UTC o dia vira às 21h de Curitiba.
+// ----------------------------------------------------------------------------
+
+export {
+  APP_TIME_ZONE,
+  addDaysToDateKey,
+  dateKeyBRT,
+  startOfDayBRTISO,
+  todayBRT,
+} from "../lib/format";
+
+/** "YYYY-MM-01" do mês corrente em Curitiba menos `monthsBack` meses. */
+export function monthStartDate(monthsBack = 0, now: Date = new Date()): string {
+  return monthStartBRT(monthsBack, now);
 }
 
-/** Diferença em dias entre uma data "YYYY-MM-DD" e hoje (positivo = futuro). */
-export function daysFromToday(isoDate: string): number {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const target = new Date(y, m - 1, d);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+/** Diferença em dias entre "YYYY-MM-DD" e hoje em Curitiba (positivo = futuro). */
+export function daysFromToday(isoDate: string, now: Date = new Date()): number {
+  return daysFromTodayBRT(isoDate, now);
+}
+
+/** Instante ISO de N dias atrás (janelas móveis: "últimos 30 dias"). */
+export function isoDaysAgo(days: number, now: Date = new Date()): string {
+  return new Date(now.getTime() - days * 86_400_000).toISOString();
 }

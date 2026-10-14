@@ -1,11 +1,10 @@
 import type { CSSProperties } from "react"
 import Link from "next/link"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
 import { ArrowRightIcon, InboxIcon } from "lucide-react"
 import { cn } from "cn"
 
 import { Badge } from "@/components/ui/badge"
+import { formatAgendaCurtaBR } from "@/lib/format"
 import {
   Card,
   CardAction,
@@ -79,7 +78,7 @@ export async function ChamadosRecentes() {
                     <p className="mt-0.5 truncate text-xs text-ink-faint">
                       {nomeDoCliente(os)} · {os.building.nome}
                       {os.scheduled_at
-                        ? ` · ${format(new Date(os.scheduled_at), "EEE dd/MM · HH'h'", { locale: ptBR })}`
+                        ? ` · ${formatAgendaCurtaBR(os.scheduled_at)}`
                         : ""}
                     </p>
                   </div>
