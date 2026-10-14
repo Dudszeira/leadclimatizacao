@@ -1,7 +1,9 @@
 /**
  * Tipos TypeScript do domínio Control Lead.
- * Fonte da verdade: supabase/migrations/0001_schema.sql (tabelas/enums)
- * e 0003_functions.sql (views e dashboard_resumo()).
+ * Fonte da verdade: supabase/migrations/0001_schema.sql (tabelas/enums),
+ * 0003_functions.sql (views e dashboard_resumo()) e 0004..0006 (colunas novas).
+ * Colunas adicionadas em 0004..0006 estão opcionais (`?`) até as fixtures
+ * do modo demo serem atualizadas; no banco elas sempre existem.
  *
  * Convenções:
  * - Colunas `date` viram string "YYYY-MM-DD".
@@ -83,6 +85,12 @@ export interface Client {
   contato_telefone: string | null;
   observacoes: string | null;
   ativo: boolean;
+  /** 0006 — código do serviço na prefeitura (NFS-e). */
+  codigo_servico_municipal?: string | null;
+  /** 0006 — alíquota de ISS em % (default 5). */
+  aliquota_iss?: number;
+  /** 0006 — ISS retido pelo tomador (default false). */
+  reter_iss?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -191,6 +199,13 @@ export interface ServiceOrder {
   fotos_depois: string[];
   laudo: string | null;
   assinatura_path: string | null;
+  /** 0004 — nome de quem assinou no local. */
+  assinado_por_nome?: string | null;
+  /** 0004 — momento da assinatura. */
+  assinado_em?: string | null;
+  /** 0004 — observações técnicas livres do executor. */
+  observacoes_tecnicas?: string | null;
+  /** Preenchido pelo banco ao mudar status para "concluido". */
   concluded_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -243,11 +258,41 @@ export interface Invoice {
   vencimento: string | null;
   asaas_id: string | null;
   asaas_url: string | null;
+  /** 0006 — id da NFS-e no Asaas (único quando preenchido). */
+  asaas_invoice_id?: string | null;
   nf_numero: string | null;
   paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** 0004 — public.service_order_photos (evidência no bucket os-fotos). */
+export interface ServiceOrderPhoto {
+  id: string;
+  service_order_id: string;
+  /** "<service_order_id>/<arquivo>" no bucket os-fotos. */
+  storage_path: string;
+  legenda: string | null;
+  etapa: "antes" | "depois" | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** 0006 — public.webhook_events (só service_role). id = id do evento Asaas. */
+export interface WebhookEvent {
+  id: string;
+  event: string;
+  payload: Record<string, unknown>;
+  received_at: string;
+  processed_at: string | null;
+  error: string | null;
+}
+
+/** Buckets privados do Storage (0004). Caminho: "<service_order_id>/<arquivo>". */
+export const STORAGE_BUCKETS = {
+  fotos: "os-fotos",
+  assinaturas: "os-assinaturas",
+} as const;
 
 // ----------------------------------------------------------------------------
 // Tipos compostos (getters com relações e itens de lista das telas)
