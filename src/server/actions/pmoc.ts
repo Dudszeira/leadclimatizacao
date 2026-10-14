@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
+import { authorizeAction } from "@/server/auth"
 
 export interface GerarOsPmocState {
   status: "success" | "error"
@@ -17,6 +18,8 @@ export interface GerarOsPmocState {
  * ligada ao plano. Em modo demo não grava nada e devolve mensagem para toast.
  */
 export async function gerarOsPmoc(): Promise<GerarOsPmocState> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   if (isDemoMode) {
     return {
       status: "error",

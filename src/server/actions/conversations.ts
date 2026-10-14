@@ -6,6 +6,7 @@ import { z } from "zod"
 import { isDemoMode } from "@/lib/env"
 import { getMessagingAdapter } from "@/lib/messaging"
 import { createClient as createSupabase } from "@/lib/supabase/server"
+import { authorizeAction } from "@/server/auth"
 
 /**
  * Server actions do Atendimento IA — mesmo padrão de actions/service-orders.ts:
@@ -47,6 +48,8 @@ export async function sendConversationMessage(
   conversationId: string,
   texto: string,
 ): Promise<ConversationActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const parsed = sendSchema.safeParse({ conversationId, texto })
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
@@ -124,6 +127,8 @@ export async function sendConversationMessage(
 export async function transferConversation(
   conversationId: string,
 ): Promise<ConversationActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = conversationIdSchema.safeParse(conversationId)
   if (!id.success) {
     return { status: "error", message: "Dados inválidos — recarregue a página e tente novamente." }
@@ -159,6 +164,8 @@ export async function transferConversation(
 export async function closeConversation(
   conversationId: string,
 ): Promise<ConversationActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = conversationIdSchema.safeParse(conversationId)
   if (!id.success) {
     return { status: "error", message: "Dados inválidos — recarregue a página e tente novamente." }

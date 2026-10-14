@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
+import { authorizeAction, authorizeServiceOrder } from "@/server/auth"
 
 /**
  * Server actions da Central de Chamados — mesmo padrão de actions/clients.ts:
@@ -73,6 +74,8 @@ export async function createServiceOrder(
   _prevState: NewOsActionState,
   formData: FormData,
 ): Promise<NewOsActionState> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const raw = {
     client_id: String(formData.get("client_id") ?? ""),
     building_id: String(formData.get("building_id") ?? ""),
@@ -147,6 +150,8 @@ export async function assignTechnician(
   osId: string,
   technicianId: string,
 ): Promise<OsActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = osIdSchema.safeParse(osId)
   const tech = osIdSchema.safeParse(technicianId)
   if (!id.success || !tech.success) {
@@ -186,6 +191,8 @@ export async function scheduleServiceOrder(
   osId: string,
   scheduledAt: string,
 ): Promise<OsActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const parsed = scheduleSchema.safeParse({ osId, scheduledAt })
   if (!parsed.success) {
     return { status: "error", message: "Selecione uma data válida para o agendamento." }
@@ -225,6 +232,8 @@ export async function startServiceOrder(
   osId: string,
   coords: { lat: number | null; lng: number | null },
 ): Promise<OsActionResult> {
+  const auth = await authorizeServiceOrder(osId)
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const parsed = startSchema.safeParse({ osId, lat: coords.lat, lng: coords.lng })
   if (!parsed.success) {
     return { status: "error", message: "Dados inválidos — recarregue a página e tente novamente." }
@@ -257,6 +266,8 @@ export async function startServiceOrder(
 
 /** Conclui a OS: status "concluido" + concluded_at agora. */
 export async function concludeServiceOrder(osId: string): Promise<OsActionResult> {
+  const auth = await authorizeServiceOrder(osId)
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = osIdSchema.safeParse(osId)
   if (!id.success) {
     return { status: "error", message: "Dados inválidos — recarregue a página e tente novamente." }
@@ -284,6 +295,8 @@ export async function concludeServiceOrder(osId: string): Promise<OsActionResult
 
 /** Cancela a OS (confirmada via Dialog na UI). */
 export async function cancelServiceOrder(osId: string): Promise<OsActionResult> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = osIdSchema.safeParse(osId)
   if (!id.success) {
     return { status: "error", message: "Dados inválidos — recarregue a página e tente novamente." }

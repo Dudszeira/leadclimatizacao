@@ -6,6 +6,7 @@ import { z } from "zod"
 import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import { isValidCnpj, maskCnpj, onlyDigits } from "@/lib/format"
+import { authorizeAction } from "@/server/auth"
 
 export interface ClientFieldErrors {
   razao_social?: string
@@ -61,6 +62,8 @@ export async function saveClient(
   _prevState: ClientActionState,
   formData: FormData,
 ): Promise<ClientActionState> {
+  const auth = await authorizeAction("admin", "atendente")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const raw = {
     id: String(formData.get("id") ?? ""),
     razao_social: String(formData.get("razao_social") ?? ""),

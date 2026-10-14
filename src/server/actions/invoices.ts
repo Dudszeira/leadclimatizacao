@@ -12,6 +12,7 @@ import { isDemoMode } from "@/lib/env"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import type { PaymentMethod } from "@/lib/types"
 import { getInvoice } from "@/server/invoices"
+import { authorizeAction } from "@/server/auth"
 
 /**
  * Server actions das faturas — mesmo padrão de actions/service-orders.ts:
@@ -50,6 +51,8 @@ export async function generateCharge(
   invoiceId: string,
   metodo: PaymentMethod,
 ): Promise<InvoiceActionResult> {
+  const auth = await authorizeAction("admin")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = invoiceIdSchema.safeParse(invoiceId)
   const met = metodoSchema.safeParse(metodo)
   if (!id.success || !met.success) return invalid()
@@ -130,6 +133,8 @@ export async function generateCharge(
 export async function markInvoicePaid(
   invoiceId: string,
 ): Promise<InvoiceActionResult> {
+  const auth = await authorizeAction("admin")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = invoiceIdSchema.safeParse(invoiceId)
   if (!id.success) return invalid()
   if (isDemoMode) return demoResult()
@@ -162,6 +167,8 @@ export async function markInvoicePaid(
 export async function issueNfse(
   invoiceId: string,
 ): Promise<InvoiceActionResult> {
+  const auth = await authorizeAction("admin")
+  if (auth.error !== null) return { status: "error", message: auth.error }
   const id = invoiceIdSchema.safeParse(invoiceId)
   if (!id.success) return invalid()
   if (isDemoMode) return demoResult()
