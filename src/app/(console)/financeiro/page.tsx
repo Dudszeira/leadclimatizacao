@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { cn } from "cn"
 import {
   BarcodeIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   FileWarningIcon,
   QrCodeIcon,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/status-meta"
 import { competenciaBRT, todayBRT } from "@/lib/asaas/dates"
 import { isLock } from "@/lib/asaas/lock"
+import { httpsUrl } from "@/lib/safe-url"
 import { requireRole } from "@/server/auth"
 import {
   getContratosResumo,
@@ -368,6 +370,7 @@ async function FaturasSection({ filters }: { filters: Filters }) {
           {items.map((fatura) => {
             const statusMeta = INVOICE_STATUS_META[fatura.status]
             const tipoMeta = CONTRACT_TYPE_META[fatura.contract.tipo]
+            const nfUrl = httpsUrl(fatura.nf_url)
             const clienteNome =
               fatura.contract.client.nome_fantasia ??
               fatura.contract.client.razao_social
@@ -430,6 +433,18 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                     ) : (
                       <span className="text-ink-faint">—</span>
                     ))}
+                  {nfUrl ? (
+                    <a
+                      href={nfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-0.5 flex w-fit items-center gap-1 font-sans text-xs text-primary underline-offset-4 hover:underline"
+                    >
+                      Ver NFS-e
+                      <ExternalLinkIcon className="size-3" aria-hidden="true" />
+                      <span className="sr-only">(abre em nova aba)</span>
+                    </a>
+                  ) : null}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-right">
                   <InvoiceActions

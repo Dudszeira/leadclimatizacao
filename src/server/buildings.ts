@@ -1,11 +1,9 @@
 import { isDemoMode } from "@/lib/env";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import type {
-  BuildingMapItem,
   BuildingWithClient,
   BuildingWithEquipment,
   Client,
-  Equipment,
   Result,
 } from "@/lib/types";
 import {
@@ -60,51 +58,6 @@ export async function listBuildings(
     return ok((data ?? []) as BuildingWithClient[]);
   } catch (error) {
     return failWith("listBuildings", error, "Não foi possível carregar os prédios. Tente novamente.");
-  }
-}
-
-/** Pinos do mapa: prédios com lat/lng, cliente e contagem de equipamentos. */
-export async function listBuildingsForMap(): Promise<Result<BuildingMapItem[]>> {
-  try {
-    if (isDemoMode) {
-      const items = buildingsFixture
-        .filter((b) => b.lat !== null && b.lng !== null)
-        .map((b) => {
-          const equipment = equipmentFixture.filter((e) => e.building_id === b.id);
-          return {
-            ...demoBuildingWithClient(b.id),
-            equipment_total: equipment.length,
-            equipment_com_chamado: equipment.filter(
-              (e) => e.status === "chamado_aberto" || e.status === "tecnico_em_campo",
-            ).length,
-          };
-        });
-      return ok(items);
-    }
-
-    const supabase = await createSupabase();
-    const { data, error } = await supabase
-      .from("buildings")
-      .select(`*, ${CLIENT_EMBED}, equipment(id,status)`)
-      .not("lat", "is", null)
-      .not("lng", "is", null);
-    if (error) {
-      return failWith("listBuildingsForMap", error, "Não foi possível carregar o mapa de prédios. Tente novamente.");
-    }
-    const rows = (data ?? []) as Array<
-      BuildingWithClient & { equipment: Array<Pick<Equipment, "id" | "status">> }
-    >;
-    return ok(
-      rows.map(({ equipment, ...building }) => ({
-        ...building,
-        equipment_total: equipment.length,
-        equipment_com_chamado: equipment.filter(
-          (e) => e.status === "chamado_aberto" || e.status === "tecnico_em_campo",
-        ).length,
-      })),
-    );
-  } catch (error) {
-    return failWith("listBuildingsForMap", error, "Não foi possível carregar o mapa de prédios. Tente novamente.");
   }
 }
 

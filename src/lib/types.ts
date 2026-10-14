@@ -261,6 +261,8 @@ export interface Invoice {
   /** 0006 — id da NFS-e no Asaas (único quando preenchido). */
   asaas_invoice_id?: string | null;
   nf_numero: string | null;
+  /** 0008 — link (https) do PDF da NFS-e autorizada. */
+  nf_url?: string | null;
   paid_at: string | null;
   created_at: string;
   updated_at: string;
@@ -300,12 +302,6 @@ export const STORAGE_BUCKETS = {
 
 export interface BuildingWithClient extends Building {
   client: Pick<Client, "id" | "razao_social" | "nome_fantasia" | "segmento">;
-}
-
-/** Pino do mapa: prédio + cliente + contagem de equipamentos por status. */
-export interface BuildingMapItem extends BuildingWithClient {
-  equipment_total: number;
-  equipment_com_chamado: number;
 }
 
 export interface BuildingWithEquipment extends Building {

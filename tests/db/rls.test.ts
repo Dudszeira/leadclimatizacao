@@ -397,7 +397,7 @@ describe("Financeiro", () => {
 });
 
 describe("migrations + seed", () => {
-  it("seed aplica limpo sobre 0001..0006 e ativa a equipe", async () => {
+  it("seed aplica limpo sobre todas as migrations e ativa a equipe", async () => {
     const seeded = await createDb({ seed: true });
     try {
       const rows = await seeded.query<{ n: number }>(
@@ -411,6 +411,23 @@ describe("migrations + seed", () => {
     } finally {
       await seeded.close();
     }
+  });
+
+  it("0008: invoices.nf_url existe e só aceita https", async () => {
+    const files = migrationFiles().map((f) => f.split("/").pop());
+    expect(files).toContain("0007_cadastros.sql");
+    expect(files).toContain("0008_nfse_link.sql");
+    const cols = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'invoices'
+          and column_name in ('nf_numero', 'nf_url')`,
+    );
+    expect(cols.rows.map((r) => r.column_name).sort()).toEqual(["nf_numero", "nf_url"]);
+    const [chk] = await asService<{ n: number }>(
+      db,
+      `select count(*)::int as n from pg_constraint where conname = 'invoices_nf_url_https'`,
+    );
+    expect(chk.n).toBe(1);
   });
 
   it("blocos de pg_cron são ignorados onde a extensão não existe", async () => {

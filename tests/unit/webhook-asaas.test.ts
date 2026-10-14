@@ -287,7 +287,11 @@ describe("webhook Asaas — regras por evento", () => {
     );
     expect(res.status).toBe(200);
     const inv = db.calls.find((c) => c.table === "invoices");
-    expect(inv?.payload).toEqual({ asaas_invoice_id: "inv_000000000232", nf_numero: "4321" });
+    expect(inv?.payload).toEqual({
+      asaas_invoice_id: "inv_000000000232",
+      nf_numero: "4321",
+      nf_url: "https://www.asaas.com/nfse/x.pdf",
+    });
     expect(inv?.filters).toContainEqual(["eq", "asaas_invoice_id", "inv_000000000232"]);
   });
 
@@ -314,7 +318,7 @@ describe("webhook Asaas — regras por evento", () => {
       () => db.client as never,
     );
     const inv = db.calls.find((c) => c.table === "invoices");
-    expect(inv?.payload).toEqual({ asaas_invoice_id: null, nf_numero: null });
+    expect(inv?.payload).toEqual({ asaas_invoice_id: null, nf_numero: null, nf_url: null });
   });
 
   it("evento desconhecido é registrado e respondido com 200", async () => {

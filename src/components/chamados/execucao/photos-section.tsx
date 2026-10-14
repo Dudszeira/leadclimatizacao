@@ -8,6 +8,7 @@ import { STORAGE_BUCKETS, type ServiceOrderPhotoView } from "@/lib/types"
 import { fileBasename } from "@/lib/format"
 import { registerServiceOrderPhoto } from "@/server/actions/service-orders"
 import {
+  LEGENDA_MAX,
   buildPhotoPath,
   validatePhotoInput,
   validatePhotoUpload,
@@ -15,6 +16,7 @@ import {
 } from "@/components/chamados/execution-rules"
 import { compressPhoto, uploadToBucket } from "@/components/chamados/execucao/upload"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 type PhotosSectionProps = {
   osId: string
@@ -32,6 +34,8 @@ const ETAPAS: Array<{ etapa: FotoEtapa; titulo: string; dica: string }> = [
 /** Fotos antes/depois: compressão no aparelho + upload direto ao Storage. */
 export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosSectionProps) {
   const [busy, setBusy] = React.useState<{ etapa: FotoEtapa; label: string } | null>(null)
+  // Legenda opcional aplicada às fotos do próximo envio da etapa (validada no servidor).
+  const [legendas, setLegendas] = React.useState<Record<FotoEtapa, string>>({ antes: "", depois: "" })
   const objectUrls = React.useRef<string[]>([])
 
   React.useEffect(() => {
@@ -42,6 +46,7 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosS
   async function handleFiles(etapa: FotoEtapa, files: FileList | null) {
     if (!files || files.length === 0) return
     const list = Array.from(files)
+    const legenda = legendas[etapa].trim().slice(0, LEGENDA_MAX)
     let enviados = 0
     for (const [i, file] of list.entries()) {
       const prefix = list.length > 1 ? `${i + 1}/${list.length} · ` : ""
@@ -64,6 +69,7 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosS
           osId,
           path,
           etapa,
+          legenda: legenda || undefined,
           mime: "image/jpeg",
           size: blob.size,
         })
@@ -76,7 +82,7 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosS
             id: `demo:${path}`,
             storage_path: path,
             etapa,
-            legenda: null,
+            legenda: legenda || null,
             created_at: new Date().toISOString(),
             url,
           })
@@ -90,6 +96,7 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosS
     }
     setBusy(null)
     if (enviados > 0) {
+      setLegendas((prev) => ({ ...prev, [etapa]: "" }))
       const msg = `${enviados} foto${enviados > 1 ? "s" : ""} "${etapa}" adicionada${enviados > 1 ? "s" : ""}`
       if (demo) toast.info(`${msg} (modo demo, não salvo)`)
       else toast.success(`${msg}.`)
@@ -118,6 +125,25 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded }: PhotosS
                 </h3>
                 <span className="text-xs text-ink-faint">{dica}</span>
               </div>
+              {editable && (
+                <div className="mt-2">
+                  <label htmlFor={`${inputId}-legenda`} className="sr-only">
+                    Legenda das próximas fotos {titulo.toLowerCase()} (opcional)
+                  </label>
+                  <Input
+                    id={`${inputId}-legenda`}
+                    value={legendas[etapa]}
+                    maxLength={LEGENDA_MAX}
+                    disabled={busy !== null}
+                    placeholder="Legenda (opcional), ex.: dreno obstruído"
+                    onChange={(e) => {
+                      const value = e.currentTarget.value
+                      setLegendas((prev) => ({ ...prev, [etapa]: value }))
+                    }}
+                    className="h-9 max-md:h-11"
+                  />
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {items.map((photo) => (
                   <PhotoTile key={photo.id} photo={photo} />
@@ -197,6 +223,11 @@ function PhotoTile({ photo }: { photo: ServiceOrderPhotoView }) {
         decoding="async"
         className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
       />
+      {photo.legenda && (
+        <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1 text-[11px] text-white">
+          {photo.legenda}
+        </span>
+      )}
     </a>
   )
 }

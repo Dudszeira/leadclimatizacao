@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { httpsUrl } from "../safe-url";
 import { paidAtFromAsaasDate } from "./dates";
 
 /**
@@ -282,7 +283,12 @@ async function applyInvoiceEvent(db: Db, event: string, nota: ParsedInvoice): Pr
   switch (event) {
     case "INVOICE_AUTHORIZED": {
       const numero = nota.number == null || nota.number === "" ? null : String(nota.number);
-      const patch = { asaas_invoice_id: iid, ...(numero ? { nf_numero: numero } : {}) };
+      const link = httpsUrl(nota.pdfUrl);
+      const patch = {
+        asaas_invoice_id: iid,
+        ...(numero ? { nf_numero: numero } : {}),
+        ...(link ? { nf_url: link } : {}),
+      };
       return updateNota(patch, patch);
     }
     case "INVOICE_ERROR":
@@ -291,8 +297,8 @@ async function applyInvoiceEvent(db: Db, event: string, nota: ParsedInvoice): Pr
       return updateNota({ asaas_invoice_id: null }, { asaas_invoice_id: null });
     case "INVOICE_CANCELED":
       return updateNota(
-        { asaas_invoice_id: null, nf_numero: null },
-        { asaas_invoice_id: null, nf_numero: null },
+        { asaas_invoice_id: null, nf_numero: null, nf_url: null },
+        { asaas_invoice_id: null, nf_numero: null, nf_url: null },
       );
     default:
       return 0;

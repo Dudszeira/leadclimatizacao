@@ -17,6 +17,7 @@ import {
 import { isDemoMode } from "@/lib/env"
 import { contractsFixture, invoicesFixture } from "@/lib/fixtures"
 import { formatCompetenciaLonga } from "@/lib/format"
+import { httpsUrl } from "@/lib/safe-url"
 import { createClient as createSupabase } from "@/lib/supabase/server"
 import type { PaymentMethod } from "@/lib/types"
 import { getInvoice } from "@/server/invoices"
@@ -319,11 +320,13 @@ export async function issueNfse(invoiceId: string): Promise<InvoiceActionResult>
       nota = created.data
     }
 
+    const nfUrl = httpsUrl(nota.pdfUrl)
     const { data: saved, error: saveError } = await supabase
       .from("invoices")
       .update({
         asaas_invoice_id: nota.id,
         ...(nota.number ? { nf_numero: String(nota.number) } : {}),
+        ...(nfUrl ? { nf_url: nfUrl } : {}),
       })
       .eq("id", id.data)
       .eq("asaas_invoice_id", lock)

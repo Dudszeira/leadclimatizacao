@@ -61,8 +61,9 @@ function parseMes(sp: Record<string, string | string[] | undefined>): string {
 type FiltroPlanos = "ativos" | "todos"
 
 export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
-  // Todos os papéis leem; só o escritório edita planos (técnico: leitura).
-  const profile = await requireRole()
+  // Só o escritório: a RLS de pmoc_plans (0002) não dá leitura ao técnico —
+  // ele vê as preventivas geradas em "Minhas OS".
+  const profile = await requireRole("admin", "atendente")
   const sp = await searchParams
   const mes = parseMes(sp)
   const filtroPlanos: FiltroPlanos = sp.planos === "todos" ? "todos" : "ativos"

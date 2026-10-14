@@ -1,6 +1,7 @@
 import {
   BotIcon,
   CalendarCheckIcon,
+  FileUpIcon,
   LayoutDashboardIcon,
   MapPinnedIcon,
   ShieldCheckIcon,
@@ -36,13 +37,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ALL,
     titleFor: { tecnico: "Minhas OS" },
   },
-  // Rota criada em outra onda (app do técnico em campo).
   { title: "Campo", href: "/campo", icon: SmartphoneIcon, roles: ["tecnico", "admin"] },
-  { title: "Calendário PMOC", href: "/pmoc", icon: CalendarCheckIcon, roles: ALL },
+  { title: "Calendário PMOC", href: "/pmoc", icon: CalendarCheckIcon, roles: OFFICE },
   { title: "Mapa de Equipamentos", href: "/mapa", icon: MapPinnedIcon, roles: OFFICE },
   { title: "Atendimento IA", href: "/atendimento", icon: BotIcon, roles: OFFICE },
   { title: "Financeiro", href: "/financeiro", icon: WalletIcon, roles: ["admin"] },
   { title: "Equipe", href: "/equipe", icon: ShieldCheckIcon, roles: ["admin"] },
+  { title: "Importar", href: "/importar", icon: FileUpIcon, roles: ["admin"] },
 ]
 
 export const ROLE_LABELS: Record<UserRole, string> = {
