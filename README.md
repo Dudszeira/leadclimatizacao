@@ -49,10 +49,10 @@ Ordem recomendada. Cada passo diz onde fazer e como conferir.
 1. Criar o projeto na região São Paulo.
 2. Database > Extensions: habilitar **pg_cron** e **pg_net**. As migrations agendam os
    jobs só se o pg_cron estiver disponível; sem ele nada é agendado.
-3. Aplicar as migrations 0001 a 0006:
+3. Aplicar as migrations 0001 a 0009 (nunca o seed):
    ```bash
    supabase link --project-ref <ref>
-   supabase db push
+   supabase db push --include-seed=false
    ```
    - 0001 schema, 0002 RLS, 0003 funções e views do dashboard
    - 0004 segurança: `hoje_brt()`, cadastro nasce técnico inativo, guardas de papel,
@@ -62,7 +62,12 @@ Ordem recomendada. Cada passo diz onde fazer e como conferir.
      job `control-lead-pmoc-diario` (06:00 BRT)
    - 0006 financeiro: faturas mensais (dia 1, 06:00 BRT), faturas atrasadas (diário,
      06:05 BRT), idempotência do webhook
-4. Conferir: `select jobname, schedule from cron.job;` deve listar os três jobs
+   - 0007 cadastros: número de série do equipamento, RT do plano PMOC, índices da
+     importação CSV
+   - 0008 NFS-e: número e link do PDF da nota na fatura
+   - 0009 hardening: técnico só altera colunas permitidas da OS, evidências e
+     conclusão só por RPC, job de retenção dos eventos do webhook
+4. Conferir: `select jobname, schedule from cron.job;` deve listar os quatro jobs
    `control-lead-*`; Storage deve mostrar os dois buckets privados.
 5. **`seed.sql` NUNCA em produção.** Ele cria usuários com senha fixa em `auth.users`.
    Use só em ambiente local ou staging descartável.
@@ -126,7 +131,7 @@ npm run build
 
 Checklist final:
 
-- [ ] Migrations 0001 a 0006 aplicadas, pg_cron e pg_net habilitados, jobs em `cron.job`
+- [ ] Migrations 0001 a 0009 aplicadas, pg_cron e pg_net habilitados, jobs em `cron.job`
 - [ ] Buckets `os-fotos` e `os-assinaturas` criados pela 0004 (privados)
 - [ ] Signup público desligado; templates de convite e recovery apontando para
       `/auth/callback` com `next=/auth/nova-senha`
