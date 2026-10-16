@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { mapAsaasError } from "./errors";
 import type { AsaasErrorBody } from "./types";
 
 /**
@@ -7,8 +8,8 @@ import type { AsaasErrorBody } from "./types";
  * - Base URL decidida por env.ASAAS_ENV (sandbox por padrão, até a conta real
  *   da Lead Climatização ser aprovada).
  * - Autenticação pelo header `access_token` (env.ASAAS_API_KEY).
- * - Erros da API viram AsaasError com mensagem pt-BR acionável; o corpo cru
- *   é logado no servidor SEM a chave (nunca logamos headers).
+ * - Erros da API viram AsaasError com mensagem PRÓPRIA (errors.ts); a descrição
+ *   crua do Asaas só vai para o log do servidor, SEM a chave (nunca logamos headers).
  */
 
 const BASE_URLS: Record<"sandbox" | "production", string> = {
@@ -30,22 +31,6 @@ export class AsaasError extends Error {
     this.name = "AsaasError";
     this.status = status;
   }
-}
-
-function friendlyMessage(status: number, body: AsaasErrorBody | null): string {
-  const detail = body?.errors?.[0]?.description;
-  if (detail) return `Asaas: ${detail}`;
-  if (status === 401 || status === 403) {
-    return "Asaas recusou a autenticação — confira a chave ASAAS_API_KEY do ambiente.";
-  }
-  if (status === 404) return "Recurso não encontrado no Asaas.";
-  if (status === 429) {
-    return "O Asaas limitou as requisições no momento. Aguarde alguns segundos e tente novamente.";
-  }
-  if (status >= 500) {
-    return "O Asaas está instável no momento. Tente novamente em instantes.";
-  }
-  return "O Asaas não aceitou a requisição. Revise os dados e tente novamente.";
 }
 
 export interface AsaasFetchOptions {
@@ -89,14 +74,12 @@ export async function asaasFetch<T>(
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     });
   } catch (error) {
     // Loga só a causa da falha de rede — nunca headers/chave.
     console.error(`[asaas] falha de rede em ${options.method ?? "GET"} ${path}:`, error);
-    throw new AsaasError(
-      "Não foi possível falar com o Asaas — verifique a conexão e tente novamente.",
-      0,
-    );
+    throw new AsaasError(mapAsaasError(0), 0);
   }
 
   if (!response.ok) {
@@ -110,7 +93,7 @@ export async function asaasFetch<T>(
       `[asaas] ${options.method ?? "GET"} ${path} → HTTP ${response.status}`,
       body?.errors ?? "(sem corpo de erro)",
     );
-    throw new AsaasError(friendlyMessage(response.status, body), response.status);
+    throw new AsaasError(mapAsaasError(response.status, body?.errors), response.status);
   }
 
   return (await response.json()) as T;

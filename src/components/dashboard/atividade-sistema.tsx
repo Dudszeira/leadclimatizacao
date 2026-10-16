@@ -21,7 +21,7 @@ function itensDeAtividade(resumo: DashboardResumo): ItemAtividade[] {
   if (resumo.os_em_campo > 0) {
     itens.push({
       mod: "Chamados → Mapa",
-      texto: `${formatInteiro(resumo.os_em_campo)} técnico(s) em campo agora — pins do mapa atualizados em tempo real`,
+      texto: `${formatInteiro(resumo.os_em_campo)} técnico(s) em campo agora · pins do mapa atualizados em tempo real`,
     })
   }
   if (resumo.os_abertas > 0) {
@@ -33,13 +33,13 @@ function itensDeAtividade(resumo: DashboardResumo): ItemAtividade[] {
   if (resumo.pmoc_atrasados > 0) {
     itens.push({
       mod: "PMOC → Chamados",
-      texto: `${formatInteiro(resumo.pmoc_atrasados)} plano(s) PMOC atrasado(s) — regularização pendente (Lei 13.589/2018)`,
+      texto: `${formatInteiro(resumo.pmoc_atrasados)} plano(s) PMOC atrasado(s) · regularização pendente (Lei 13.589/2018)`,
     })
   }
   if (resumo.pmoc_vencendo_7d > 0) {
     itens.push({
       mod: "PMOC → Agenda",
-      texto: `${formatInteiro(resumo.pmoc_vencendo_7d)} plano(s) PMOC vencendo em até 7 dias — geração automática de OS na fila`,
+      texto: `${formatInteiro(resumo.pmoc_vencendo_7d)} plano(s) PMOC vencendo em até 7 dias · geração automática de OS na fila`,
     })
   }
   if (resumo.leads_mes > 0) {
@@ -56,7 +56,7 @@ function itensDeAtividade(resumo: DashboardResumo): ItemAtividade[] {
   }
   itens.push({
     mod: "Financeiro → CRM",
-    texto: `${formatBRLInteiro(resumo.faturamento_recebido_mes)} recebidos de ${formatBRLInteiro(resumo.faturamento_previsto_mes)} previstos no mês — conciliação automática`,
+    texto: `${formatBRLInteiro(resumo.faturamento_recebido_mes)} recebidos de ${formatBRLInteiro(resumo.faturamento_previsto_mes)} previstos no mês · conciliação automática`,
   })
   return itens
 }

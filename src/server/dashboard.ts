@@ -23,7 +23,16 @@ import {
   pmocPlansFixture,
   serviceOrdersFixture,
 } from "./_demo";
-import { failWith, monthStartDate, ok } from "./_shared";
+import { avgFirstResponseMinutes, type FirstResponseInput } from "./dashboard-metrics";
+import {
+  addDaysToDateKey,
+  dateKeyBRT,
+  failWith,
+  isoDaysAgo,
+  monthStartDate,
+  ok,
+  todayBRT,
+} from "./_shared";
 
 export { getPmocContadores, listPmocSituacao } from "./pmoc";
 
@@ -36,14 +45,14 @@ export async function getDashboardResumo(): Promise<Result<DashboardResumo>> {
   try {
     if (isDemoMode) {
       const mes = monthStartDate(0);
-      const hoje = new Date().toISOString().slice(0, 10);
-      const em7d = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      const hoje = todayBRT();
+      const em7d = addDaysToDateKey(hoje, 7);
       return ok({
         os_abertas: serviceOrdersFixture.filter((o) => o.status === "aberto").length,
         os_agendadas: serviceOrdersFixture.filter((o) => o.status === "agendado").length,
         os_em_campo: serviceOrdersFixture.filter((o) => o.status === "em_campo").length,
         os_concluidas_mes: serviceOrdersFixture.filter(
-          (o) => o.status === "concluido" && (o.concluded_at ?? "") >= mes,
+          (o) => o.status === "concluido" && o.concluded_at !== null && dateKeyBRT(o.concluded_at) >= mes,
         ).length,
         equip_com_chamado: equipmentFixture.filter(
           (e) => e.status === "chamado_aberto" || e.status === "tecnico_em_campo",
@@ -52,7 +61,7 @@ export async function getDashboardResumo(): Promise<Result<DashboardResumo>> {
         pmoc_vencendo_7d: pmocPlansFixture.filter(
           (p) => p.ativo && p.proxima_data >= hoje && p.proxima_data <= em7d,
         ).length,
-        leads_mes: leadsFixture.filter((l) => l.created_at >= mes).length,
+        leads_mes: leadsFixture.filter((l) => dateKeyBRT(l.created_at) >= mes).length,
         faturamento_previsto_mes: invoicesFixture
           .filter((i) => i.competencia === mes && i.status !== "cancelado")
           .reduce((sum, i) => sum + i.valor, 0),
@@ -77,39 +86,17 @@ export async function getDashboardResumo(): Promise<Result<DashboardResumo>> {
 // KPIs do topo
 // ----------------------------------------------------------------------------
 
-interface FirstResponseInput {
-  conversation_id: string;
-  direcao: "in" | "out";
-  created_at: string;
-}
-
-/** Média (min) entre a 1ª mensagem do cliente e a 1ª resposta da conversa. */
-function avgFirstResponseMinutes(messages: FirstResponseInput[]): number | null {
-  const byConversation = new Map<string, FirstResponseInput[]>();
-  for (const m of messages) {
-    const list = byConversation.get(m.conversation_id) ?? [];
-    list.push(m);
-    byConversation.set(m.conversation_id, list);
-  }
-  const deltas: number[] = [];
-  for (const list of byConversation.values()) {
-    list.sort((a, b) => a.created_at.localeCompare(b.created_at));
-    const firstIn = list.find((m) => m.direcao === "in");
-    if (!firstIn) continue;
-    const firstOut = list.find(
-      (m) => m.direcao === "out" && m.created_at >= firstIn.created_at,
-    );
-    if (!firstOut) continue;
-    deltas.push(
-      (new Date(firstOut.created_at).getTime() - new Date(firstIn.created_at).getTime()) / 60_000,
-    );
-  }
-  if (deltas.length === 0) return null;
-  return Math.round((deltas.reduce((a, b) => a + b, 0) / deltas.length) * 10) / 10;
-}
+/** Janela do KPI de 1ª resposta (dias corridos até agora). */
+export const FIRST_RESPONSE_WINDOW_DAYS = 30;
+/** Teto de mensagens lidas para o KPI (as mais recentes da janela). */
+const FIRST_RESPONSE_MAX_MESSAGES = 5000;
 
 export async function getDashboardKpis(): Promise<Result<DashboardKpis>> {
   try {
+    // Só conversas iniciadas na janela: a 1ª mensagem delas está garantida
+    // dentro do recorte e o KPI reflete a operação recente.
+    const desde = isoDaysAgo(FIRST_RESPONSE_WINDOW_DAYS);
+
     if (isDemoMode) {
       const clientesComContrato = demoClientIdsComContratoAtivo();
       const buildingIdsSobContrato = new Set(
@@ -136,7 +123,12 @@ export async function getDashboardKpis(): Promise<Result<DashboardKpis>> {
         equipamentos_sob_contrato: equipamentosSobContrato,
         chamados_abertos: chamadosAbertos,
         triagem_ia_pct: triagemIaPct,
-        tempo_primeira_resposta_min: avgFirstResponseMinutes(messagesFixture),
+        tempo_primeira_resposta_min: avgFirstResponseMinutes(
+          messagesFixture.filter((m) => {
+            const conversa = conversationsFixture.find((c) => c.id === m.conversation_id);
+            return (conversa?.created_at ?? "") >= desde;
+          }),
+        ),
       });
     }
 
@@ -159,11 +151,14 @@ export async function getDashboardKpis(): Promise<Result<DashboardKpis>> {
         .from("conversations")
         .select("id", { count: "exact", head: true })
         .eq("status", "transferido"),
+      // Janela recente (30 dias), mais novas primeiro, com teto de linhas.
       supabase
         .from("messages")
-        .select("conversation_id, direcao, created_at")
-        .order("created_at", { ascending: true })
-        .limit(2000),
+        .select("conversation_id, direcao, created_at, conversation:conversations!inner(created_at)")
+        .gte("conversation.created_at", desde)
+        .gte("created_at", desde)
+        .order("created_at", { ascending: false })
+        .limit(FIRST_RESPONSE_MAX_MESSAGES),
     ]);
 
     const firstError =
@@ -182,7 +177,7 @@ export async function getDashboardKpis(): Promise<Result<DashboardKpis>> {
           ? null
           : Math.round(((totalConversas - transferidas) / totalConversas) * 1000) / 10,
       tempo_primeira_resposta_min: avgFirstResponseMinutes(
-        (msgRes.data ?? []) as FirstResponseInput[],
+        (msgRes.data ?? []) as unknown as FirstResponseInput[],
       ),
     });
   } catch (error) {
@@ -212,7 +207,7 @@ export async function getChamadosPorMes(
 
     if (isDemoMode) {
       for (const os of serviceOrdersFixture) {
-        const point = points.get(os.created_at.slice(0, 7));
+        const point = points.get(dateKeyBRT(os.created_at).slice(0, 7));
         if (!point) continue;
         point.total += 1;
         point.por_tipo[os.tipo] += 1;
@@ -276,7 +271,7 @@ export async function getFunilDoMes(): Promise<Result<FunilDoMes>> {
   try {
     if (isDemoMode) {
       const mes = monthStartDate(0);
-      const doMes = leadsFixture.filter((l) => l.created_at >= mes);
+      const doMes = leadsFixture.filter((l) => dateKeyBRT(l.created_at) >= mes);
       const porEstagio: FunilMesRow[] = [];
       for (const lead of doMes) {
         let row = porEstagio.find((r) => r.estagio === lead.estagio);

@@ -1,4 +1,6 @@
 import type { PageParams, Paginated, Result } from "@/lib/types";
+// Import relativo (não "@/"): este módulo também roda nos testes vitest sem alias.
+import { daysFromTodayBRT, monthStartBRT } from "../lib/format";
 
 /**
  * Infra interna do data layer (ver README.md nesta pasta):
@@ -15,9 +17,29 @@ export function fail<T>(message: string): Result<T> {
   return { data: null, error: message };
 }
 
-/** Loga o erro cru no servidor e devolve a mensagem amigável em pt-BR. */
+/**
+ * Reduz um erro (PostgREST/Postgres/Error) ao que é seguro logar: code e
+ * message. `details`/`hint` do Postgres trazem valores de linha (ex.:
+ * "Key (cnpj)=(...) already exists") — dado pessoal que não vai para log (LGPD).
+ */
+export function safeErrorLog(error: unknown): { code?: string; message: string } {
+  if (error && typeof error === "object") {
+    const e = error as { code?: unknown; message?: unknown; name?: unknown };
+    const code = typeof e.code === "string" ? e.code : undefined;
+    const raw = typeof e.message === "string" ? e.message : typeof e.name === "string" ? e.name : "erro";
+    return code ? { code, message: scrubValues(raw) } : { message: scrubValues(raw) };
+  }
+  return { message: scrubValues(String(error)) };
+}
+
+/** Remove trechos "Key (col)=(valor)" e afins que alguns drivers põem na message. */
+function scrubValues(message: string): string {
+  return message.replace(/\(([^()]*)\)=\([^)]*\)/g, "($1)=(…)").slice(0, 300);
+}
+
+/** Loga só code + message (sem details/hint) e devolve a mensagem amigável em pt-BR. */
 export function failWith<T>(context: string, error: unknown, message: string): Result<T> {
-  console.error(`[data-layer] ${context}:`, error);
+  console.error(`[data-layer] ${context}:`, safeErrorLog(error));
   return fail(message);
 }
 
@@ -84,22 +106,32 @@ export function sanitizeIlike(term: string): string {
   return term.trim().replace(/[,()%_]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** "YYYY-MM" ou "YYYY-MM-DD" do primeiro dia do mês corrente - monthsBack. */
-export function monthStartDate(monthsBack = 0): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  d.setMonth(d.getMonth() - monthsBack);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}-01`;
+// ----------------------------------------------------------------------------
+// Datas no fuso de Curitiba (America/Sao_Paulo)
+// Implementação em src/lib/format.ts (pura, também usada no cliente); aqui
+// ficam os nomes estáveis do data layer. Nunca use toISOString().slice(0, 10)
+// para "hoje": em UTC o dia vira às 21h de Curitiba.
+// ----------------------------------------------------------------------------
+
+export {
+  APP_TIME_ZONE,
+  addDaysToDateKey,
+  dateKeyBRT,
+  startOfDayBRTISO,
+  todayBRT,
+} from "../lib/format";
+
+/** "YYYY-MM-01" do mês corrente em Curitiba menos `monthsBack` meses. */
+export function monthStartDate(monthsBack = 0, now: Date = new Date()): string {
+  return monthStartBRT(monthsBack, now);
 }
 
-/** Diferença em dias entre uma data "YYYY-MM-DD" e hoje (positivo = futuro). */
-export function daysFromToday(isoDate: string): number {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const target = new Date(y, m - 1, d);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+/** Diferença em dias entre "YYYY-MM-DD" e hoje em Curitiba (positivo = futuro). */
+export function daysFromToday(isoDate: string, now: Date = new Date()): number {
+  return daysFromTodayBRT(isoDate, now);
+}
+
+/** Instante ISO de N dias atrás (janelas móveis: "últimos 30 dias"). */
+export function isoDaysAgo(days: number, now: Date = new Date()): string {
+  return new Date(now.getTime() - days * 86_400_000).toISOString();
 }

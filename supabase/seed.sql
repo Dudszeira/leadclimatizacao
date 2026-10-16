@@ -1,3 +1,5 @@
+-- NUNCA rodar em produção. Seed de demonstração/desenvolvimento local apenas
+-- (cria usuários com senha fixa em auth.users).
 -- ============================================================================
 -- Control Lead — seed.sql
 -- Dados fictícios realistas (pt-BR, Curitiba/PR) para demo da Fase 1.
@@ -16,41 +18,44 @@ insert into auth.users
    raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-4000-8000-000000000001',
-   'authenticated', 'authenticated', 'eduardo@leadclimatizacao.com.br',
+   'authenticated', 'authenticated', 'eduardo@example.com',
    crypt('demo12345', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Eduardo Leal","role":"admin"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-4000-8000-000000000002',
-   'authenticated', 'authenticated', 'fernanda@leadclimatizacao.com.br',
+   'authenticated', 'authenticated', 'fernanda@example.com',
    crypt('demo12345', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Fernanda Ribeiro","role":"atendente"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-4000-8000-000000000003',
-   'authenticated', 'authenticated', 'carlos@leadclimatizacao.com.br',
+   'authenticated', 'authenticated', 'carlos@example.com',
    crypt('demo12345', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Carlos Menezes","role":"tecnico"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-4000-8000-000000000004',
-   'authenticated', 'authenticated', 'joaopedro@leadclimatizacao.com.br',
+   'authenticated', 'authenticated', 'joaopedro@example.com',
    crypt('demo12345', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"João Pedro Alves","role":"tecnico"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'a0000000-0000-4000-8000-000000000005',
-   'authenticated', 'authenticated', 'rafael@leadclimatizacao.com.br',
+   'authenticated', 'authenticated', 'rafael@example.com',
    crypt('demo12345', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Rafael Siqueira","role":"tecnico"}', now(), now())
 on conflict (id) do nothing;
 
 -- garante papel/nome/telefone mesmo se o trigger já criou o profile
-insert into public.profiles (id, full_name, role, phone) values
-  ('a0000000-0000-4000-8000-000000000001', 'Eduardo Leal',     'admin',     '(41) 99911-0001'),
-  ('a0000000-0000-4000-8000-000000000002', 'Fernanda Ribeiro', 'atendente', '(41) 99911-0002'),
-  ('a0000000-0000-4000-8000-000000000003', 'Carlos Menezes',   'tecnico',   '(41) 99911-0003'),
-  ('a0000000-0000-4000-8000-000000000004', 'João Pedro Alves', 'tecnico',   '(41) 99911-0004'),
-  ('a0000000-0000-4000-8000-000000000005', 'Rafael Siqueira',  'tecnico',   '(41) 99911-0005')
+-- (0004: o trigger cria todo usuário como tecnico/inativo; aqui ativamos e
+--  definimos o papel — o seed roda sem JWT, então o guard de profiles permite)
+insert into public.profiles (id, full_name, role, phone, ativo) values
+  ('a0000000-0000-4000-8000-000000000001', 'Eduardo Leal',     'admin',     '(41) 99911-0001', true),
+  ('a0000000-0000-4000-8000-000000000002', 'Fernanda Ribeiro', 'atendente', '(41) 99911-0002', true),
+  ('a0000000-0000-4000-8000-000000000003', 'Carlos Menezes',   'tecnico',   '(41) 99911-0003', true),
+  ('a0000000-0000-4000-8000-000000000004', 'João Pedro Alves', 'tecnico',   '(41) 99911-0004', true),
+  ('a0000000-0000-4000-8000-000000000005', 'Rafael Siqueira',  'tecnico',   '(41) 99911-0005', true)
 on conflict (id) do update
-  set full_name = excluded.full_name, role = excluded.role, phone = excluded.phone;
+  set full_name = excluded.full_name, role = excluded.role, phone = excluded.phone,
+      ativo = excluded.ativo;
 
 -- ----------------------------------------------------------------------------
 -- 2. Clientes (12) — shoppings, hospitais, indústrias, condomínios, varejo

@@ -2,12 +2,21 @@ import { isDemoMode } from "@/lib/env";
 import { createClient as createSupabase } from "@/lib/supabase/server";
 import type {
   EquipmentType,
+  OsStatus,
   PmocCalendarItem,
   PmocContadores,
+  PmocPlan,
+  PmocPlanListItem,
   PmocSituacao,
   PmocSituacaoItem,
   Result,
 } from "@/lib/types";
+import { checklistTemplatesFixture } from "@/lib/fixtures";
+import {
+  hojeBrt,
+  situacaoPlano,
+  situacaoPorDias,
+} from "@/components/pmoc/situacao";
 import {
   demoBuildingWithClient,
   demoEquipment,
@@ -17,9 +26,7 @@ import {
 import { daysFromToday, failWith, ok } from "./_shared";
 
 function situacaoDe(diasParaVencer: number): PmocSituacao {
-  if (diasParaVencer < 0) return "atrasado";
-  if (diasParaVencer <= 7) return "vencendo";
-  return "em_dia";
+  return situacaoPorDias(diasParaVencer);
 }
 
 function demoSituacaoItens(): PmocSituacaoItem[] {
@@ -348,5 +355,184 @@ export async function listPmocConcluidasNoMes(
     return ok(items);
   } catch (error) {
     return failWith("listPmocConcluidasNoMes", error, "Não foi possível carregar as manutenções concluídas. Tente novamente.");
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Planos (CRUD): lista com relações, OS em aberto e situação calculada
+// ----------------------------------------------------------------------------
+
+export interface ListPmocPlansParams {
+  /** Só planos de equipamentos deste cliente. */
+  clientId?: string;
+  /** Inclui planos encerrados (ativo = false). Default true. */
+  incluirEncerrados?: boolean;
+}
+
+const OS_ABERTA: OsStatus[] = ["aberto", "agendado", "em_campo"];
+
+function montarItem(
+  plan: PmocPlan,
+  rel: Pick<PmocPlanListItem, "equipment" | "building" | "client">,
+  os: Array<{ id: string; numero: number; status: OsStatus }>,
+  hoje: string,
+): PmocPlanListItem {
+  const s = situacaoPlano({
+    proxima_data: plan.proxima_data,
+    hoje,
+    ativo: true,
+    osStatus: os.map((o) => o.status),
+  });
+  const aberta = os.find((o) => OS_ABERTA.includes(o.status)) ?? null;
+  return {
+    ...plan,
+    ...rel,
+    os_aberta: aberta,
+    dias_para_vencer: s.dias_para_vencer,
+    situacao: s.situacao === "encerrado" ? "em_dia" : s.situacao,
+  };
+}
+
+function ordenarPlanos(items: PmocPlanListItem[]): PmocPlanListItem[] {
+  return items.sort(
+    (a, b) =>
+      Number(b.ativo) - Number(a.ativo) ||
+      a.proxima_data.localeCompare(b.proxima_data) ||
+      a.equipment.codigo_interno.localeCompare(b.equipment.codigo_interno, "pt-BR"),
+  );
+}
+
+/**
+ * Planos PMOC com equipamento, prédio, cliente, OS em aberto e situação pela
+ * regra pura de components/pmoc/situacao.ts (mesma faixa da view do banco).
+ */
+export async function listPmocPlans(
+  params: ListPmocPlansParams = {},
+): Promise<Result<PmocPlanListItem[]>> {
+  const incluirEncerrados = params.incluirEncerrados ?? true;
+  const hoje = hojeBrt();
+  try {
+    if (isDemoMode) {
+      const items: PmocPlanListItem[] = [];
+      for (const plan of pmocPlansFixture) {
+        if (!incluirEncerrados && !plan.ativo) continue;
+        const equipment = demoEquipment(plan.equipment_id);
+        if (!equipment) continue;
+        const building = demoBuildingWithClient(equipment.building_id);
+        if (params.clientId && building.client_id !== params.clientId) continue;
+        const os = serviceOrdersFixture
+          .filter((o) => o.pmoc_plan_id === plan.id)
+          .map((o) => ({ id: o.id, numero: o.numero, status: o.status }));
+        items.push(
+          montarItem(
+            plan,
+            {
+              equipment: {
+                id: equipment.id,
+                codigo_interno: equipment.codigo_interno,
+                tipo: equipment.tipo,
+                marca: equipment.marca,
+                modelo: equipment.modelo,
+                status: equipment.status,
+              },
+              building: { id: building.id, nome: building.nome },
+              client: {
+                id: building.client.id,
+                razao_social: building.client.razao_social,
+                nome_fantasia: building.client.nome_fantasia,
+              },
+            },
+            os,
+            hoje,
+          ),
+        );
+      }
+      return ok(ordenarPlanos(items));
+    }
+
+    const supabase = await createSupabase();
+    let query = supabase
+      .from("pmoc_plans")
+      .select(
+        "*, equipment:equipment!inner(id, codigo_interno, tipo, marca, modelo, status, building:buildings!inner(id, nome, client_id, client:clients!inner(id, razao_social, nome_fantasia)))",
+      )
+      .order("proxima_data", { ascending: true });
+    if (!incluirEncerrados) query = query.eq("ativo", true);
+    if (params.clientId) query = query.eq("equipment.building.client_id", params.clientId);
+
+    const [plansRes, osRes] = await Promise.all([
+      query,
+      supabase
+        .from("service_orders")
+        .select("id, numero, status, pmoc_plan_id")
+        .not("pmoc_plan_id", "is", null)
+        .in("status", OS_ABERTA),
+    ]);
+    if (plansRes.error) {
+      return failWith("listPmocPlans", plansRes.error, "Não foi possível carregar os planos PMOC. Tente novamente.");
+    }
+    if (osRes.error) {
+      return failWith("listPmocPlans", osRes.error, "Não foi possível carregar os planos PMOC. Tente novamente.");
+    }
+
+    type Row = PmocPlan & {
+      equipment: PmocPlanListItem["equipment"] & {
+        building: { id: string; nome: string; client: PmocPlanListItem["client"] };
+      };
+    };
+    const osPorPlano = new Map<string, Array<{ id: string; numero: number; status: OsStatus }>>();
+    for (const o of (osRes.data ?? []) as Array<{ id: string; numero: number; status: OsStatus; pmoc_plan_id: string }>) {
+      const list = osPorPlano.get(o.pmoc_plan_id) ?? [];
+      list.push({ id: o.id, numero: o.numero, status: o.status });
+      osPorPlano.set(o.pmoc_plan_id, list);
+    }
+    const items = ((plansRes.data ?? []) as unknown as Row[]).map((row) => {
+      const { equipment, ...plan } = row;
+      const { building, ...eq } = equipment;
+      return montarItem(
+        plan,
+        {
+          equipment: eq,
+          building: { id: building.id, nome: building.nome },
+          client: building.client,
+        },
+        osPorPlano.get(plan.id) ?? [],
+        hoje,
+      );
+    });
+    return ok(ordenarPlanos(items));
+  } catch (error) {
+    return failWith("listPmocPlans", error, "Não foi possível carregar os planos PMOC. Tente novamente.");
+  }
+}
+
+export interface ChecklistOption {
+  id: string;
+  nome: string;
+}
+
+/** Modelos de checklist ativos de preventiva PMOC (select do plano). */
+export async function listPmocChecklistOptions(): Promise<Result<ChecklistOption[]>> {
+  try {
+    if (isDemoMode) {
+      return ok(
+        checklistTemplatesFixture
+          .filter((t) => t.ativo && t.tipo === "preventiva_pmoc")
+          .map((t) => ({ id: t.id, nome: t.nome })),
+      );
+    }
+    const supabase = await createSupabase();
+    const { data, error } = await supabase
+      .from("checklist_templates")
+      .select("id, nome")
+      .eq("ativo", true)
+      .eq("tipo", "preventiva_pmoc")
+      .order("nome");
+    if (error) {
+      return failWith("listPmocChecklistOptions", error, "Não foi possível carregar os checklists. Tente novamente.");
+    }
+    return ok((data ?? []) as ChecklistOption[]);
+  } catch (error) {
+    return failWith("listPmocChecklistOptions", error, "Não foi possível carregar os checklists. Tente novamente.");
   }
 }

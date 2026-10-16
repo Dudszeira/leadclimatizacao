@@ -47,7 +47,7 @@ export function ChamadosChart({ points }: { points: ChamadosPorMesPoint[] }) {
       config={chartConfig}
       className="aspect-[16/8] w-full"
       role="img"
-      aria-label={`Chamados abertos por mês nos últimos 6 meses — ${resumo}`}
+      aria-label={`Chamados abertos por mês nos últimos 6 meses: ${resumo}`}
     >
       <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -16 }}>
         <CartesianGrid vertical={false} strokeDasharray="2 3" stroke="var(--line)" />

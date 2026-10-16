@@ -56,7 +56,110 @@ export function formatBtu(value: number | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Datas e horas
+// Fuso horário da operação (America/Sao_Paulo)
+// ---------------------------------------------------------------------------
+// O servidor (Vercel) roda em UTC: entre 21h e 23h59 de Curitiba o "hoje" em
+// UTC já é amanhã. Toda conta de calendário passa por estes helpers, que usam
+// Intl com timeZone explícito e não dependem do TZ da máquina.
+
+/** Fuso de referência do negócio (Curitiba, sem horário de verão desde 2019). */
+export const APP_TIME_ZONE = "America/Sao_Paulo"
+
+const ymdBRT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+})
+
+const horaMinBRT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: APP_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+})
+
+const diaMesBRT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: APP_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+})
+
+const dataBRT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: APP_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+})
+
+const diaSemanaBRT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: APP_TIME_ZONE,
+  weekday: "short",
+})
+
+function toDate(value: Date | string): Date | null {
+  const d = typeof value === "string" ? new Date(value) : value
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/** Data civil "YYYY-MM-DD" de um instante, no fuso de Curitiba. */
+export function dateKeyBRT(value: Date | string): string {
+  const d = toDate(value)
+  return d ? ymdBRT.format(d) : ""
+}
+
+/** Hoje em Curitiba, "YYYY-MM-DD" (equivale a public.hoje_brt()). */
+export function todayBRT(now: Date = new Date()): string {
+  return ymdBRT.format(now)
+}
+
+/** Soma dias a uma data civil "YYYY-MM-DD" (aritmética pura, sem fuso). */
+export function addDaysToDateKey(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d + days))
+  return t.toISOString().slice(0, 10)
+}
+
+/** Primeiro dia do mês corrente em Curitiba menos `monthsBack` meses, "YYYY-MM-01". */
+export function monthStartBRT(monthsBack = 0, now: Date = new Date()): string {
+  const [y, m] = todayBRT(now).split("-").map(Number)
+  const t = new Date(Date.UTC(y, m - 1 - monthsBack, 1))
+  return t.toISOString().slice(0, 10)
+}
+
+/** Dias entre uma data "YYYY-MM-DD" e hoje em Curitiba (positivo = futuro). */
+export function daysFromTodayBRT(isoDate: string, now: Date = new Date()): number {
+  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number)
+  const [ty, tm, td] = todayBRT(now).split("-").map(Number)
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86_400_000)
+}
+
+/**
+ * Instante (ISO UTC) da meia-noite de Curitiba de uma data civil. Usa o
+ * deslocamento real do fuso naquela data (Intl), não um -03:00 fixo.
+ */
+export function startOfDayBRTISO(isoDate: string): string {
+  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number)
+  const utcMidnight = Date.UTC(y, m - 1, d)
+  const offsetMin = timeZoneOffsetMinutes(new Date(utcMidnight + 12 * 3_600_000))
+  return new Date(utcMidnight - offsetMin * 60_000).toISOString()
+}
+
+/** Deslocamento de Curitiba em minutos relativo ao UTC (ex.: -180). */
+function timeZoneOffsetMinutes(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    timeZoneName: "longOffset",
+  }).formatToParts(at)
+  const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-03:00"
+  const match = /GMT([+-])(\d{2}):?(\d{2})?/.exec(name)
+  if (!match) return 0
+  const sign = match[1] === "-" ? -1 : 1
+  return sign * (Number(match[2]) * 60 + Number(match[3] ?? 0))
+}
+
+// ---------------------------------------------------------------------------
+// Datas e horas (exibição sempre no fuso de Curitiba)
 // ---------------------------------------------------------------------------
 
 /** "YYYY-MM-DD" → "dd/mm/aaaa" sem risco de fuso deslocar o dia. */
@@ -88,63 +191,62 @@ export function formatCompetenciaLonga(competencia: string): string {
   })
 }
 
-/** ISO → "dd/mm/aaaa" no fuso local. */
+/** ISO → "dd/mm/aaaa" no fuso de Curitiba. */
 export function formatDateTimeBR(iso: string | null): string {
   if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("pt-BR")
+  const d = toDate(iso)
+  return d ? dataBRT.format(d) : "—"
 }
 
-/** ISO → "dd/mm/aaaa às 14h05". */
+/** ISO → "dd/mm/aaaa às 14h05" (Curitiba). */
 export function formatDateTimeFullBR(iso: string | null): string {
   if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "—"
-  return `${d.toLocaleDateString("pt-BR")} às ${horaMin(d)}`
+  const d = toDate(iso)
+  if (!d) return "—"
+  return `${dataBRT.format(d)} às ${horaMin(d)}`
 }
 
-/** ISO → "14h05". */
+/** ISO → "14h05" (Curitiba). */
 export function formatHourBR(iso: string | null): string {
   if (!iso) return "—"
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return "—"
-  return horaMin(d)
+  const d = toDate(iso)
+  return d ? horaMin(d) : "—"
+}
+
+/** ISO → "qua 15/10 · 14h" (agenda compacta, Curitiba). */
+export function formatAgendaCurtaBR(iso: string | null): string {
+  if (!iso) return "—"
+  const d = toDate(iso)
+  if (!d) return "—"
+  const semana = diaSemanaBRT.format(d).replace(".", "")
+  const hora = horaMinBRT.format(d).slice(0, 2)
+  return `${semana} ${diaMesBRT.format(d)} · ${hora}h`
 }
 
 function horaMin(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
+  const [h, m] = horaMinBRT.format(d).split(":")
+  return `${h}h${m}`
 }
 
 /** Hora da lista de conversas: "14h05" hoje, "Ontem" ou "12/09". */
-export function formatListTime(iso: string | null): string {
+export function formatListTime(iso: string | null, now: Date = new Date()): string {
   if (!iso) return ""
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ""
-  const now = new Date()
-  if (isSameDay(d, now)) return horaMin(d)
-  const ontem = new Date(now)
-  ontem.setDate(now.getDate() - 1)
-  if (isSameDay(d, ontem)) return "Ontem"
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+  const d = toDate(iso)
+  if (!d) return ""
+  const dia = dateKeyBRT(d)
+  const hoje = todayBRT(now)
+  if (dia === hoje) return horaMin(d)
+  if (dia === addDaysToDateKey(hoje, -1)) return "Ontem"
+  return diaMesBRT.format(d)
 }
 
 /** Timestamp da bolha: "14h05" hoje, senão "12/09 · 14h05". */
-export function formatMessageTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ""
+export function formatMessageTime(iso: string, now: Date = new Date()): string {
+  const d = toDate(iso)
+  if (!d) return ""
   const hora = horaMin(d)
-  if (isSameDay(d, new Date())) return hora
-  const data = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-  return `${data} · ${hora}`
+  if (dateKeyBRT(d) === todayBRT(now)) return hora
+  return `${diaMesBRT.format(d)} · ${hora}`
 }
 
 // ---------------------------------------------------------------------------

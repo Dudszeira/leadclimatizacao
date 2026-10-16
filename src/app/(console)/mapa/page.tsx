@@ -1,64 +1,27 @@
 import type { Metadata } from "next"
 import { MapPinnedIcon } from "lucide-react"
 
-import type { EquipmentWithBuilding, Result } from "@/lib/types"
-import { listBuildingsForMap } from "@/server/buildings"
-import { listEquipment } from "@/server/equipment"
+import { requireRole } from "@/server/auth"
+import { listMapPins } from "@/server/map"
 import { DataError } from "@/components/data-error"
 import { MapaView } from "@/components/mapa/mapa-view"
-import {
-  derivePinStatus,
-  emptyStatusCounts,
-  type MapaBuilding,
-  type StatusCounts,
-} from "@/components/mapa/status"
+import { derivePinStatus, type MapaBuilding } from "@/components/mapa/status"
 
 export const metadata: Metadata = {
   title: "Mapa de Equipamentos",
 }
 
-const EQUIPMENT_PAGE_SIZE = 100
-const MAX_EQUIPMENT_PAGES = 20
-
-/** Todos os equipamentos (percorre a paginação do data layer). */
-async function listAllEquipment(): Promise<Result<EquipmentWithBuilding[]>> {
-  const first = await listEquipment({ page: 1, pageSize: EQUIPMENT_PAGE_SIZE })
-  if (first.error !== null) return first
-  const all = [...first.data.items]
-  const pageCount = Math.min(first.data.pageCount, MAX_EQUIPMENT_PAGES)
-  for (let page = 2; page <= pageCount; page++) {
-    const res = await listEquipment({ page, pageSize: EQUIPMENT_PAGE_SIZE })
-    if (res.error !== null) return res
-    all.push(...res.data.items)
-  }
-  return { data: all, error: null }
-}
-
 export default async function MapaPage() {
-  const [buildingsRes, equipmentRes] = await Promise.all([
-    listBuildingsForMap(),
-    listAllEquipment(),
-  ])
+  // Mapa é do escritório (nav.ts: admin e atendente); técnico usa /campo.
+  await requireRole("admin", "atendente")
 
-  if (buildingsRes.error !== null) {
-    return <DataError message={buildingsRes.error} />
-  }
-  if (equipmentRes.error !== null) {
-    return <DataError message={equipmentRes.error} />
+  const result = await listMapPins()
+  if (result.error !== null) {
+    return <DataError message={result.error} />
   }
 
-  const countsByBuilding = new Map<string, StatusCounts>()
-  for (const eq of equipmentRes.data) {
-    const counts = countsByBuilding.get(eq.building_id) ?? emptyStatusCounts()
-    counts[eq.status] += 1
-    countsByBuilding.set(eq.building_id, counts)
-  }
-
-  const buildings: MapaBuilding[] = buildingsRes.data
-    .map((b) => {
-      const status_counts = countsByBuilding.get(b.id) ?? emptyStatusCounts()
-      return { ...b, status_counts, pin_status: derivePinStatus(status_counts) }
-    })
+  const buildings: MapaBuilding[] = result.data
+    .map((pin) => ({ ...pin, pin_status: derivePinStatus(pin.status_counts) }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
 
   if (buildings.length === 0) {

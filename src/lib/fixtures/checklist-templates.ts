@@ -1,5 +1,8 @@
-import type { ChecklistTemplate } from "@/lib/types";
+import type { ChecklistItem, ChecklistItemComRegra, ChecklistTemplate } from "@/lib/types";
 import { stamps } from "./dates";
+
+/** Itens com regra de obrigatoriedade explícita (JSONB aceita campos extras). */
+const comRegra = (itens: ChecklistItemComRegra[]): ChecklistItem[] => itens;
 
 /** Templates de checklist — espelho da seção 5 do seed.sql. */
 export const checklistTemplatesFixture: ChecklistTemplate[] = [
@@ -39,13 +42,13 @@ export const checklistTemplatesFixture: ChecklistTemplate[] = [
     id: "ce000000-0000-4000-8000-000000000003",
     nome: "Corretiva — diagnóstico padrão",
     tipo: "corretiva",
-    itens: [
+    itens: comRegra([
       { id: "sintoma_confirmado", label: "Sintoma relatado confirmado em campo", tipo: "checkbox" },
-      { id: "causa_raiz", label: "Causa raiz identificada", tipo: "texto" },
+      { id: "causa_raiz", label: "Causa raiz identificada", tipo: "texto", obrigatorio: true },
       { id: "peca_substituida", label: "Peça(s) substituída(s)", tipo: "texto" },
       { id: "teste_funcionamento", label: "Teste de funcionamento pós-reparo (30 min)", tipo: "checkbox" },
       { id: "obs", label: "Observações", tipo: "texto" },
-    ],
+    ]),
     ativo: true,
     ...stamps(),
   },

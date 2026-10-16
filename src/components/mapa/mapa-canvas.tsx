@@ -156,7 +156,7 @@ export default function MapaCanvas({ buildings, focus }: MapaCanvasProps) {
           key={b.id}
           position={[b.lat as number, b.lng as number]}
           icon={pinIcon(b.pin_status)}
-          alt={`${b.nome} — ${EQUIPMENT_STATUS_META[b.pin_status].label}`}
+          alt={`${b.nome} · ${EQUIPMENT_STATUS_META[b.pin_status].label}`}
           ref={(marker) => {
             if (marker) markersRef.current.set(b.id, marker)
             else markersRef.current.delete(b.id)

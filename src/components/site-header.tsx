@@ -6,6 +6,7 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 import { currentPageTitle } from "@/lib/nav"
+import type { UserRole } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -27,9 +28,9 @@ function useToday() {
   return label && iso ? { label, iso } : null
 }
 
-export function SiteHeader() {
+export function SiteHeader({ role }: { role?: UserRole }) {
   const pathname = usePathname()
-  const title = currentPageTitle(pathname)
+  const title = currentPageTitle(pathname, role)
   const today = useToday()
 
   return (

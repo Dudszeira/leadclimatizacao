@@ -14,12 +14,16 @@ import {
   ListaSkeleton,
   PmocSkeleton,
 } from "@/components/dashboard/skeletons"
+import { requireRole } from "@/server/auth"
 
 export const metadata: Metadata = {
   title: "Dashboard",
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // Técnico não tem dashboard (nav.ts/homeFor): vai para /chamados.
+  await requireRole("admin", "atendente")
+
   return (
     <div className="flex flex-1 flex-col gap-4 md:gap-5">
       <Suspense fallback={<KpisSkeleton />}>

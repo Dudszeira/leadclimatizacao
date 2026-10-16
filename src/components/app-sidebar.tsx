@@ -5,7 +5,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { AirVentIcon } from "lucide-react"
 
-import { NAV_ITEMS, isNavItemActive } from "@/lib/nav"
+import { homeFor, isNavItemActive, navItemsFor } from "@/lib/nav"
+import type { UserRole } from "@/lib/types"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -21,8 +22,22 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+/** Dados do usuário logado exibidos na barra lateral (vindos do layout). */
+export type SidebarUser = {
+  name: string
+  email: string | null
+  role: UserRole
+  roleLabel: string
+  initials: string
+  demo: boolean
+}
+
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   const pathname = usePathname()
+  const items = navItemsFor(user.role)
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -32,7 +47,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton
               size="lg"
               className="max-md:h-12"
-              render={<Link href="/" />}
+              render={<Link href={homeFor(user.role)} />}
             >
               <div
                 className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-signal-dim text-signal"
@@ -59,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     tooltip={item.title}
@@ -77,7 +92,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

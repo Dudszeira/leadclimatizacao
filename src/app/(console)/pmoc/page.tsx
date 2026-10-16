@@ -10,11 +10,15 @@ import {
   ChevronRightIcon,
 } from "lucide-react"
 
+import type { UserRole } from "@/lib/types"
+import { requireRole } from "@/server/auth"
 import {
   getPmocCalendar,
   getPmocContadores,
+  listPmocChecklistOptions,
   listPmocConcluidasNoMes,
   listPmocPlanDetails,
+  listPmocPlans,
 } from "@/server/pmoc"
 import { buttonVariants } from "@/components/ui/button"
 import { DataError } from "@/components/data-error"
@@ -22,6 +26,7 @@ import { EmptyState } from "@/components/empty-state"
 import { AtencaoImediata } from "@/components/pmoc/atencao-imediata"
 import { PmocCalendar } from "@/components/pmoc/calendar"
 import { situacaoDoEvento, type PmocEvento } from "@/components/pmoc/evento"
+import { PlanosTable } from "@/components/pmoc/planos-table"
 import { PmocSituacaoCards } from "@/components/pmoc/situacao-cards"
 import { PmocSectionSkeleton } from "@/components/pmoc/skeletons"
 
@@ -53,8 +58,15 @@ function parseMes(sp: Record<string, string | string[] | undefined>): string {
   return mesAtual()
 }
 
+type FiltroPlanos = "ativos" | "todos"
+
 export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
-  const mes = parseMes(await searchParams)
+  // Só o escritório: a RLS de pmoc_plans (0002) não dá leitura ao técnico —
+  // ele vê as preventivas geradas em "Minhas OS".
+  const profile = await requireRole("admin", "atendente")
+  const sp = await searchParams
+  const mes = parseMes(sp)
+  const filtroPlanos: FiltroPlanos = sp.planos === "todos" ? "todos" : "ativos"
   const [ano, mesNum] = mes.split("-").map(Number)
 
   const anterior = mesNum === 1 ? `${ano - 1}-12` : `${ano}-${pad2(mesNum - 1)}`
@@ -72,7 +84,7 @@ export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
             Calendário PMOC
           </h2>
           <p className="mt-1 text-sm text-ink-dim">
-            Manutenções preventivas previstas e geradas por plano — Lei
+            Manutenções preventivas previstas e geradas por plano, conforme a Lei
             13.589/2018.
           </p>
         </div>
@@ -117,8 +129,14 @@ export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
         </nav>
       </header>
 
-      <Suspense key={mes} fallback={<PmocSectionSkeleton />}>
-        <PmocSection mes={mes} ano={ano} mesNum={mesNum} />
+      <Suspense key={`${mes}|${filtroPlanos}`} fallback={<PmocSectionSkeleton />}>
+        <PmocSection
+          mes={mes}
+          ano={ano}
+          mesNum={mesNum}
+          role={profile.role}
+          filtroPlanos={filtroPlanos}
+        />
       </Suspense>
     </div>
   )
@@ -132,16 +150,23 @@ async function PmocSection({
   mes,
   ano,
   mesNum,
+  role,
+  filtroPlanos,
 }: {
   mes: string
   ano: number
   mesNum: number
+  role: UserRole
+  filtroPlanos: FiltroPlanos
 }) {
-  const [contadores, calendario, concluidas, detalhes] = await Promise.all([
+  const podeEditar = role === "admin" || role === "atendente"
+  const [contadores, calendario, concluidas, detalhes, planos, checklists] = await Promise.all([
     getPmocContadores(),
     getPmocCalendar({ year: ano, month: mesNum }),
     listPmocConcluidasNoMes({ year: ano, month: mesNum }),
     listPmocPlanDetails(),
+    listPmocPlans({ incluirEncerrados: filtroPlanos === "todos" }),
+    podeEditar ? listPmocChecklistOptions() : Promise.resolve({ data: [], error: null }),
   ])
 
   if (contadores.error !== null) return <DataError message={contadores.error} />
@@ -149,7 +174,12 @@ async function PmocSection({
   if (concluidas.error !== null) return <DataError message={concluidas.error} />
   if (detalhes.error !== null) return <DataError message={detalhes.error} />
 
-  if (detalhes.data.length === 0 && concluidas.data.length === 0) {
+  if (planos.error !== null) return <DataError message={planos.error} />
+
+  const hrefFiltro = (f: FiltroPlanos) =>
+    f === "todos" ? `/pmoc?mes=${mes}&planos=todos#planos` : `/pmoc?mes=${mes}#planos`
+
+  if (detalhes.data.length === 0 && concluidas.data.length === 0 && planos.data.length === 0) {
     return (
       <EmptyState
         icon={CalendarCheckIcon}
@@ -206,7 +236,16 @@ async function PmocSection({
         eventos={eventos}
         detalhes={detalheMap}
       />
-      <AtencaoImediata itens={atencao} />
+      <AtencaoImediata itens={atencao} podeGerarOs={role === "admin"} />
+      <div id="planos" className="scroll-mt-4">
+        <PlanosTable
+          planos={planos.data}
+          checklistOptions={checklists.data ?? []}
+          podeEditar={podeEditar}
+          filtro={filtroPlanos}
+          hrefFiltro={hrefFiltro}
+        />
+      </div>
     </>
   )
 }

@@ -5,6 +5,8 @@ import type {
   Result,
 } from "@/lib/types";
 import { AsaasError, asaasFetch, isAsaasConfigured } from "./client";
+import { dueDateForCharge, todayBRT } from "./dates";
+import type { NfseFiscal } from "./fiscal";
 import type {
   AsaasBillingType,
   AsaasCustomer,
@@ -119,7 +121,7 @@ export async function createPayment(
       customer: customerId,
       billingType: BILLING_TYPE[metodo],
       value: invoice.valor,
-      dueDate: invoice.vencimento ?? new Date().toISOString().slice(0, 10),
+      dueDate: dueDateForCharge(invoice.vencimento),
       description: `Manutenção de climatização — competência ${competenciaLabel(invoice.competencia)}`,
       externalReference: invoice.id,
     };
@@ -165,12 +167,23 @@ export async function getPaymentStatus(
  * Agenda a emissão da NFS-e de uma fatura. Quando a cobrança já existe no
  * Asaas (invoice.asaas_id), a nota é vinculada a ela; senão exige customerId.
  * O número da nota chega depois, via consulta ou webhook INVOICE_AUTHORIZED.
+ * Alíquota/retenção de ISS e código de serviço vêm do cadastro do cliente
+ * (fiscalFromClient — fallback 5%).
  */
 export async function scheduleInvoice(
   invoice: InvoiceWithContract,
+  fiscal: NfseFiscal,
   customerId?: string,
 ): Promise<Result<AsaasInvoice>> {
   if (!isAsaasConfigured()) return { data: null, error: NOT_CONFIGURED };
+
+  if (!fiscal.municipalServiceCode) {
+    return {
+      data: null,
+      error:
+        "Cadastre o código de serviço municipal (NFS-e) no cliente antes de emitir a nota.",
+    };
+  }
 
   if (!invoice.asaas_id && !customerId) {
     return {
@@ -181,16 +194,20 @@ export async function scheduleInvoice(
   }
 
   try {
+    const descricao = `Serviços de manutenção de climatização (PMOC) — competência ${competenciaLabel(invoice.competencia)}`;
     const payload: AsaasInvoicePayload = {
       payment: invoice.asaas_id ?? undefined,
       customer: invoice.asaas_id ? undefined : customerId,
-      serviceDescription: `Serviços de manutenção de climatização (PMOC) — competência ${competenciaLabel(invoice.competencia)}`,
+      serviceDescription: descricao,
+      observations: `Fatura ${invoice.id} — competência ${competenciaLabel(invoice.competencia)}.`,
+      municipalServiceCode: fiscal.municipalServiceCode,
+      municipalServiceName: descricao,
       value: invoice.valor,
-      effectiveDate: new Date().toISOString().slice(0, 10),
+      effectiveDate: todayBRT(),
       externalReference: invoice.id,
       taxes: {
-        retainIss: false,
-        iss: 5,
+        retainIss: fiscal.retainIss,
+        iss: fiscal.iss,
         cofins: 0,
         csll: 0,
         inss: 0,
@@ -208,6 +225,56 @@ export async function scheduleInvoice(
       "scheduleInvoice",
       error,
       "Não foi possível agendar a NFS-e no Asaas. Tente novamente.",
+    );
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Reconciliação (antes de criar, procura o que já existe para a fatura)
+// ----------------------------------------------------------------------------
+
+/**
+ * Cobrança ativa já criada no Asaas para a fatura (externalReference =
+ * invoices.id). Evita duplicar quando uma tentativa anterior criou a cobrança
+ * mas não conseguiu gravar o retorno (timeout, queda do processo).
+ */
+export async function findPaymentByReference(
+  invoiceId: string,
+): Promise<Result<AsaasPayment | null>> {
+  if (!isAsaasConfigured()) return { data: null, error: NOT_CONFIGURED };
+  try {
+    const list = await asaasFetch<AsaasListResponse<AsaasPayment>>("/payments", {
+      query: { externalReference: invoiceId, limit: 10 },
+    });
+    return ok(list.data.find((p) => !p.deleted && p.status !== "REFUNDED") ?? null);
+  } catch (error) {
+    return fail(
+      "findPaymentByReference",
+      error,
+      "Não foi possível consultar as cobranças no Asaas. Tente novamente.",
+    );
+  }
+}
+
+/** NFS-e já agendada/autorizada no Asaas para a fatura (externalReference). */
+export async function findInvoiceByReference(
+  invoiceId: string,
+): Promise<Result<AsaasInvoice | null>> {
+  if (!isAsaasConfigured()) return { data: null, error: NOT_CONFIGURED };
+  try {
+    const list = await asaasFetch<AsaasListResponse<AsaasInvoice>>("/invoices", {
+      query: { externalReference: invoiceId, limit: 10 },
+    });
+    return ok(
+      list.data.find(
+        (n) => n.status !== "CANCELED" && n.status !== "ERROR" && n.status !== "PROCESSING_CANCELLATION",
+      ) ?? null,
+    );
+  } catch (error) {
+    return fail(
+      "findInvoiceByReference",
+      error,
+      "Não foi possível consultar as notas fiscais no Asaas. Tente novamente.",
     );
   }
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense } from "react"
 import { cn } from "cn"
-import { SearchXIcon, UsersIcon } from "lucide-react"
+import { FileUpIcon, KanbanSquareIcon, SearchXIcon, UsersIcon } from "lucide-react"
 
 import { formatBRL } from "@/lib/format"
 import {
@@ -11,6 +11,7 @@ import {
   regiaoLabel,
   segmentoLabel,
 } from "@/lib/status-meta"
+import { requireRole } from "@/server/auth"
 import { listClients, listClientsSummary } from "@/server/clients"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
@@ -70,6 +71,7 @@ function buildHref({ q, status, tipo, page }: Filters): string {
 export default async function ClientesPage({
   searchParams,
 }: PageProps<"/clientes">) {
+  const profile = await requireRole("admin", "atendente")
   const filters = parseFilters(await searchParams)
   const suspenseKey = `${filters.q}|${filters.status}|${filters.tipo}|${filters.page}`
 
@@ -84,7 +86,25 @@ export default async function ClientesPage({
             Clientes com contratos, prédios e equipamentos sob gestão.
           </p>
         </div>
-        <ClientFormDialog />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/clientes/funil"
+            className={cn(buttonVariants({ variant: "outline" }), "h-9 px-3 max-md:h-11")}
+          >
+            <KanbanSquareIcon aria-hidden="true" />
+            Funil de leads
+          </Link>
+          {profile.role === "admin" && (
+            <Link
+              href="/importar"
+              className={cn(buttonVariants({ variant: "outline" }), "h-9 px-3 max-md:h-11")}
+            >
+              <FileUpIcon aria-hidden="true" />
+              Importar planilha
+            </Link>
+          )}
+          <ClientFormDialog />
+        </div>
       </header>
       <ClientsToolbar q={filters.q} status={filters.status} tipo={filters.tipo} />
       <Suspense key={suspenseKey} fallback={<ClientsTableSkeleton />}>

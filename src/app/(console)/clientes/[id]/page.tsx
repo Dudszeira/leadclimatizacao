@@ -13,8 +13,10 @@ import {
   UserRoundIcon,
 } from "lucide-react"
 
-import type { BuildingWithEquipment, Equipment } from "@/lib/types"
+import type { BuildingWithEquipment, Equipment, PmocPlanListItem } from "@/lib/types"
+import { requireRole } from "@/server/auth"
 import { getClient } from "@/server/clients"
+import { listPmocChecklistOptions, listPmocPlans } from "@/server/pmoc"
 import { Badge } from "@/components/ui/badge"
 import {
   Breadcrumb,
@@ -50,6 +52,10 @@ import {
   segmentoLabel,
 } from "@/lib/status-meta"
 import { ClientFormDialog } from "@/components/clientes/client-form-dialog"
+import { ClientStatusButton, FiscalDialog } from "@/components/clientes/client-actions"
+import { BuildingCardActions, NewBuildingButton } from "@/components/clientes/building-dialogs"
+import { EquipmentRowActions, NewEquipmentButton } from "@/components/clientes/equipment-dialogs"
+import { PlanoSituacaoBadge } from "@/components/pmoc/plano-situacao-badge"
 import { DataError } from "@/components/data-error"
 
 type PageParams = { params: Promise<{ id: string }> }
@@ -65,10 +71,11 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 function buildAddress(building: BuildingWithEquipment): string {
   const rua = [building.logradouro, building.numero].filter(Boolean).join(", ")
   const cidade = `${building.cidade}/${building.uf}`
-  return [rua, building.bairro, cidade].filter(Boolean).join(" — ")
+  return [rua, building.bairro, cidade].filter(Boolean).join(" · ")
 }
 
 export default async function ClienteDetalhePage({ params }: PageParams) {
+  const profile = await requireRole("admin", "atendente")
   const { id } = await params
   const result = await getClientCached(id)
 
@@ -83,6 +90,17 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
   if (!result.data) notFound()
 
   const client = result.data
+  const [plansResult, checklistResult] = await Promise.all([
+    listPmocPlans({ clientId: client.id }),
+    listPmocChecklistOptions(),
+  ])
+  const planByEquipment = new Map<string, PmocPlanListItem>(
+    (plansResult.data ?? []).map((p) => [p.equipment_id, p]),
+  )
+  const checklistOptions = checklistResult.data ?? []
+  const buildingOptions = client.buildings
+    .map((b) => ({ id: b.id, nome: b.nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
   const statusMeta = client.ativo
     ? CLIENT_STATUS_META.ativo
     : CLIENT_STATUS_META.inativo
@@ -123,7 +141,32 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                 </p>
               )}
             </div>
-            <ClientFormDialog client={client} />
+            <div className="flex flex-wrap gap-2">
+              <ClientFormDialog
+                client={{
+                  id: client.id,
+                  razao_social: client.razao_social,
+                  nome_fantasia: client.nome_fantasia,
+                  cnpj: client.cnpj,
+                  segmento: client.segmento,
+                  contato_nome: client.contato_nome,
+                  contato_email: client.contato_email,
+                  contato_telefone: client.contato_telefone,
+                  observacoes: client.observacoes,
+                }}
+              />
+              <FiscalDialog
+                client={{
+                  id: client.id,
+                  codigo_servico_municipal: client.codigo_servico_municipal,
+                  aliquota_iss: client.aliquota_iss,
+                  reter_iss: client.reter_iss,
+                }}
+              />
+              <ClientStatusButton
+                client={{ id: client.id, razao_social: client.razao_social, ativo: client.ativo }}
+              />
+            </div>
           </div>
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -188,6 +231,35 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                 )}
               </dd>
             </div>
+            <div>
+              <dt className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+                Serviço municipal
+              </dt>
+              <dd className="mt-1 font-mono text-sm text-ink">
+                {client.codigo_servico_municipal ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+                ISS
+              </dt>
+              <dd className="mt-1 font-mono text-sm text-ink">
+                {String(client.aliquota_iss ?? 5).replace(".", ",")}%
+                <span className="ml-2 font-sans text-xs text-ink-dim">
+                  {client.reter_iss ? "retido pelo tomador" : "sem retenção"}
+                </span>
+              </dd>
+            </div>
+            {client.observacoes && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+                  Observações
+                </dt>
+                <dd className="mt-1 text-sm whitespace-pre-line text-ink-dim">
+                  {client.observacoes}
+                </dd>
+              </div>
+            )}
           </dl>
         </CardContent>
       </Card>
@@ -217,7 +289,10 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="predios">
+        <TabsContent value="predios" className="flex flex-col gap-3">
+          <div className="flex justify-end">
+            <NewBuildingButton clientId={client.id} />
+          </div>
           {client.buildings.length === 0 ? (
             <TabEmpty message="Nenhum prédio cadastrado para este cliente." />
           ) : (
@@ -237,14 +312,22 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                     <CardHeader>
                       <CardTitle className="flex items-start justify-between gap-2 text-ink">
                         <span className="min-w-0 truncate">{building.nome}</span>
-                        {building.regiao && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 border-line font-mono text-[10px] tracking-wider text-ink-dim uppercase"
-                          >
-                            {regiaoLabel(building.regiao)}
-                          </Badge>
-                        )}
+                        <span className="flex shrink-0 items-center gap-1">
+                          {building.regiao && (
+                            <Badge
+                              variant="outline"
+                              className="border-line font-mono text-[10px] tracking-wider text-ink-dim uppercase"
+                            >
+                              {regiaoLabel(building.regiao)}
+                            </Badge>
+                          )}
+                          <BuildingCardActions
+                            building={building}
+                            buildings={buildingOptions}
+                            equipmentCount={building.equipment.length}
+                            canDelete={profile.role === "admin"}
+                          />
+                        </span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-1 flex-col gap-3">
@@ -260,6 +343,11 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                               CEP {building.cep}
                             </span>
                           )}
+                          <span className="block font-mono text-xs text-ink-faint">
+                            {building.lat != null && building.lng != null
+                              ? `${building.lat.toFixed(5)}, ${building.lng.toFixed(5)}`
+                              : "sem coordenadas, fora do mapa"}
+                          </span>
                         </span>
                       </p>
                       <div className="mt-auto flex items-center gap-3 border-t border-line-soft pt-3 text-sm">
@@ -296,7 +384,10 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
           )}
         </TabsContent>
 
-        <TabsContent value="equipamentos">
+        <TabsContent value="equipamentos" className="flex flex-col gap-3">
+          <div className="flex justify-end">
+            <NewEquipmentButton buildings={buildingOptions} />
+          </div>
           {equipment.length === 0 ? (
             <TabEmpty message="Nenhum equipamento cadastrado para este cliente." />
           ) : (
@@ -311,7 +402,7 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                       Tipo
                     </TableHead>
                     <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-                      Marca
+                      Marca / série
                     </TableHead>
                     <TableHead className="text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
                       Capacidade
@@ -319,14 +410,21 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                     <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
                       Prédio
                     </TableHead>
-                    <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
+                    <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
                       Status
+                    </TableHead>
+                    <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
+                      PMOC
+                    </TableHead>
+                    <TableHead className="w-12 px-4">
+                      <span className="sr-only">Ações</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {equipment.map((item) => {
                     const meta = EQUIPMENT_STATUS_META[item.status]
+                    const plan = planByEquipment.get(item.id) ?? null
                     return (
                       <TableRow
                         key={item.id}
@@ -339,7 +437,14 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                           {EQUIPMENT_TYPE_LABELS[item.tipo]}
                         </TableCell>
                         <TableCell className="py-3 text-ink-dim">
-                          {item.marca ?? "—"}
+                          <span className="block">
+                            {[item.marca, item.modelo].filter(Boolean).join(" ") || "—"}
+                          </span>
+                          {item.numero_serie && (
+                            <span className="block font-mono text-xs text-ink-faint">
+                              S/N {item.numero_serie}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="py-3 text-right font-mono text-ink">
                           {formatBtu(item.capacidade_btu)}
@@ -349,7 +454,7 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                             {item.predio}
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3">
+                        <TableCell className="py-3">
                           <span className="flex items-center gap-2">
                             <span
                               className={cn(
@@ -360,6 +465,21 @@ export default async function ClienteDetalhePage({ params }: PageParams) {
                             />
                             <span className="text-ink-dim">{meta.label}</span>
                           </span>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          {plan ? (
+                            <PlanoSituacaoBadge plan={plan} />
+                          ) : (
+                            <span className="text-xs text-ink-faint">Sem plano</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <EquipmentRowActions
+                            equipment={item}
+                            buildings={buildingOptions}
+                            plan={plan}
+                            checklistOptions={checklistOptions}
+                          />
                         </TableCell>
                       </TableRow>
                     )

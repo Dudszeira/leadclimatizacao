@@ -6,9 +6,7 @@ import { ptBR } from "date-fns/locale"
 import {
   BanIcon,
   CalendarIcon,
-  CheckCheckIcon,
   LoaderCircleIcon,
-  NavigationIcon,
   UserRoundPlusIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -17,9 +15,7 @@ import type { OsStatus } from "@/lib/types"
 import {
   assignTechnician,
   cancelServiceOrder,
-  concludeServiceOrder,
   scheduleServiceOrder,
-  startServiceOrder,
   type OsActionResult,
 } from "@/server/actions/service-orders"
 import { Button } from "@/components/ui/button"
@@ -56,6 +52,8 @@ type OrderActionsProps = {
   technicianId: string | null
   technicians: TechnicianOption[]
   scheduledAt: string | null
+  /** Aplica a mudança no estado local da tela (modo demo e resposta imediata). */
+  onStatusChange?: (status: OsStatus, patch?: { technicianId?: string; scheduledAt?: string }) => void
 }
 
 const HORARIOS = Array.from({ length: 12 }, (_, i) => {
@@ -64,9 +62,9 @@ const HORARIOS = Array.from({ length: 12 }, (_, i) => {
 })
 
 /**
- * Ações do ciclo de vida da OS, contextuais ao status:
- * aberto → designar/agendar/cancelar · agendado → iniciar/reagendar/cancelar ·
- * em campo → concluir/cancelar. Concluído/cancelado não renderiza nada.
+ * Ações de escritório do ciclo da OS (admin/atendente), contextuais ao status:
+ * aberto/agendado → designar, agendar/reagendar, cancelar · em campo →
+ * cancelar. Check-in e conclusão ficam no painel de execução.
  */
 export function OrderActions({
   osId,
@@ -74,6 +72,7 @@ export function OrderActions({
   technicianId,
   technicians,
   scheduledAt,
+  onStatusChange,
 }: OrderActionsProps) {
   const router = useRouter()
   const [pendingAction, setPendingAction] = React.useState<string | null>(null)
@@ -89,14 +88,20 @@ export function OrderActions({
 
   const busy = pendingAction !== null
 
-  function run(action: string, fn: () => Promise<OsActionResult>) {
+  function run(
+    action: string,
+    fn: () => Promise<OsActionResult>,
+    onSuccess?: () => void,
+  ) {
     setPendingAction(action)
     startTransition(async () => {
       try {
         const result = await fn()
         if (result.status === "success") {
-          toast.success(result.message)
-          router.refresh()
+          if (result.demo) toast.info(result.message)
+          else toast.success(result.message)
+          onSuccess?.()
+          if (!result.demo) router.refresh()
         } else {
           toast.error(result.message)
         }
@@ -122,35 +127,10 @@ export function OrderActions({
     const quando = new Date(dataAgenda)
     quando.setHours(h, m, 0, 0)
     setAgendaOpen(false)
-    run("agendar", () => scheduleServiceOrder(osId, quando.toISOString()))
-  }
-
-  function handleIniciar() {
-    setPendingAction("iniciar")
-    const iniciar = (lat: number | null, lng: number | null) => {
-      startTransition(async () => {
-        try {
-          const result = await startServiceOrder(osId, { lat, lng })
-          if (result.status === "success") {
-            toast.success(result.message)
-            router.refresh()
-          } else {
-            toast.error(result.message)
-          }
-        } finally {
-          setPendingAction(null)
-        }
-      })
-    }
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => iniciar(pos.coords.latitude, pos.coords.longitude),
-        () => iniciar(null, null),
-        { timeout: 5000, maximumAge: 60_000 },
-      )
-    } else {
-      iniciar(null, null)
-    }
+    const iso = quando.toISOString()
+    run("agendar", () => scheduleServiceOrder(osId, iso), () =>
+      onStatusChange?.("agendado", { scheduledAt: iso }),
+    )
   }
 
   return (
@@ -186,7 +166,11 @@ export function OrderActions({
               className="h-9 max-md:h-11"
               disabled={busy || !tecnico || tecnico === technicianId}
               aria-busy={pendingAction === "designar"}
-              onClick={() => run("designar", () => assignTechnician(osId, tecnico))}
+              onClick={() =>
+                run("designar", () => assignTechnician(osId, tecnico), () =>
+                  onStatusChange?.(status, { technicianId: tecnico }),
+                )
+              }
             >
               {pendingAction === "designar" ? (
                 <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
@@ -268,38 +252,6 @@ export function OrderActions({
         </div>
       )}
 
-      {status === "agendado" && (
-        <Button
-          className="h-10 max-md:h-11"
-          disabled={busy}
-          aria-busy={pendingAction === "iniciar"}
-          onClick={handleIniciar}
-        >
-          {pendingAction === "iniciar" ? (
-            <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-          ) : (
-            <NavigationIcon aria-hidden="true" />
-          )}
-          Iniciar atendimento
-        </Button>
-      )}
-
-      {status === "em_campo" && (
-        <Button
-          className="h-10 max-md:h-11"
-          disabled={busy}
-          aria-busy={pendingAction === "concluir"}
-          onClick={() => run("concluir", () => concludeServiceOrder(osId))}
-        >
-          {pendingAction === "concluir" ? (
-            <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-          ) : (
-            <CheckCheckIcon aria-hidden="true" />
-          )}
-          Concluir chamado
-        </Button>
-      )}
-
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogTrigger
           render={
@@ -337,7 +289,9 @@ export function OrderActions({
               className="max-md:h-11"
               onClick={() => {
                 setCancelOpen(false)
-                run("cancelar", () => cancelServiceOrder(osId))
+                run("cancelar", () => cancelServiceOrder(osId), () =>
+                  onStatusChange?.("cancelado"),
+                )
               }}
             >
               {pendingAction === "cancelar" ? (

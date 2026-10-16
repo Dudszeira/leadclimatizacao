@@ -1,7 +1,9 @@
 /**
  * Tipos TypeScript do domínio Control Lead.
- * Fonte da verdade: supabase/migrations/0001_schema.sql (tabelas/enums)
- * e 0003_functions.sql (views e dashboard_resumo()).
+ * Fonte da verdade: supabase/migrations/0001_schema.sql (tabelas/enums),
+ * 0003_functions.sql (views e dashboard_resumo()) e 0004..0006 (colunas novas).
+ * Colunas adicionadas em 0004..0006 estão opcionais (`?`) até as fixtures
+ * do modo demo serem atualizadas; no banco elas sempre existem.
  *
  * Convenções:
  * - Colunas `date` viram string "YYYY-MM-DD".
@@ -83,6 +85,12 @@ export interface Client {
   contato_telefone: string | null;
   observacoes: string | null;
   ativo: boolean;
+  /** 0006 — código do serviço na prefeitura (NFS-e). */
+  codigo_servico_municipal?: string | null;
+  /** 0006 — alíquota de ISS em % (default 5). */
+  aliquota_iss?: number;
+  /** 0006 — ISS retido pelo tomador (default false). */
+  reter_iss?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -191,6 +199,13 @@ export interface ServiceOrder {
   fotos_depois: string[];
   laudo: string | null;
   assinatura_path: string | null;
+  /** 0004 — nome de quem assinou no local. */
+  assinado_por_nome?: string | null;
+  /** 0004 — momento da assinatura. */
+  assinado_em?: string | null;
+  /** 0004 — observações técnicas livres do executor. */
+  observacoes_tecnicas?: string | null;
+  /** Preenchido pelo banco ao mudar status para "concluido". */
   concluded_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -243,11 +258,43 @@ export interface Invoice {
   vencimento: string | null;
   asaas_id: string | null;
   asaas_url: string | null;
+  /** 0006 — id da NFS-e no Asaas (único quando preenchido). */
+  asaas_invoice_id?: string | null;
   nf_numero: string | null;
+  /** 0008 — link (https) do PDF da NFS-e autorizada. */
+  nf_url?: string | null;
   paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** 0004 — public.service_order_photos (evidência no bucket os-fotos). */
+export interface ServiceOrderPhoto {
+  id: string;
+  service_order_id: string;
+  /** "<service_order_id>/<arquivo>" no bucket os-fotos. */
+  storage_path: string;
+  legenda: string | null;
+  etapa: "antes" | "depois" | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** 0006 — public.webhook_events (só service_role). id = id do evento Asaas. */
+export interface WebhookEvent {
+  id: string;
+  event: string;
+  payload: Record<string, unknown>;
+  received_at: string;
+  processed_at: string | null;
+  error: string | null;
+}
+
+/** Buckets privados do Storage (0004). Caminho: "<service_order_id>/<arquivo>". */
+export const STORAGE_BUCKETS = {
+  fotos: "os-fotos",
+  assinaturas: "os-assinaturas",
+} as const;
 
 // ----------------------------------------------------------------------------
 // Tipos compostos (getters com relações e itens de lista das telas)
@@ -255,12 +302,6 @@ export interface Invoice {
 
 export interface BuildingWithClient extends Building {
   client: Pick<Client, "id" | "razao_social" | "nome_fantasia" | "segmento">;
-}
-
-/** Pino do mapa: prédio + cliente + contagem de equipamentos por status. */
-export interface BuildingMapItem extends BuildingWithClient {
-  equipment_total: number;
-  equipment_com_chamado: number;
 }
 
 export interface BuildingWithEquipment extends Building {
@@ -460,4 +501,109 @@ export interface PageParams {
   page?: number;
   /** Default 20. */
   pageSize?: number;
+}
+
+// ----------------------------------------------------------------------------
+// Onda 2D — cadastros (0007_cadastros.sql). Declaration merging: as colunas
+// novas entram opcionais nas interfaces originais.
+// ----------------------------------------------------------------------------
+
+export interface Equipment {
+  /** 0007 — número de série do fabricante (chave natural da importação). */
+  numero_serie?: string | null;
+}
+
+export interface PmocPlan {
+  /** 0007 — responsável técnico do plano (nome / registro CREA). */
+  responsavel_tecnico?: string | null;
+}
+
+/** Plano PMOC com equipamento/prédio/cliente e a OS em aberto (tela de planos). */
+export interface PmocPlanListItem extends PmocPlan {
+  equipment: Pick<Equipment, "id" | "codigo_interno" | "tipo" | "marca" | "modelo" | "status">;
+  building: Pick<Building, "id" | "nome">;
+  client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  /** OS do plano em aberto/agendada/em campo, se houver. */
+  os_aberta: { id: string; numero: number; status: OsStatus } | null;
+  /** Dias até proxima_data (negativo = atrasado). */
+  dias_para_vencer: number;
+  situacao: PmocSituacao;
+}
+
+// ----------------------------------------------------------------------------
+// Execução da OS em campo (Onda 2C)
+// ----------------------------------------------------------------------------
+
+/** Item de checklist com obrigatoriedade explícita (opcional no JSONB). */
+export interface ChecklistItemComRegra extends ChecklistItem {
+  /** Default: checkbox/número obrigatórios, texto opcional. */
+  obrigatorio?: boolean;
+}
+
+/** Foto da OS pronta para exibição (URL assinada gerada no servidor). */
+export interface ServiceOrderPhotoView {
+  /** id da linha em service_order_photos, ou "legado:<path>" (fotos_antes/fotos_depois). */
+  id: string;
+  storage_path: string;
+  etapa: "antes" | "depois";
+  legenda: string | null;
+  created_at: string | null;
+  /** null quando não há arquivo acessível (modo demo / legado sem objeto). */
+  url: string | null;
+}
+
+/** Evidências da OS (fotos + assinatura) com URLs assinadas de curta duração. */
+export interface ServiceOrderEvidence {
+  photos: ServiceOrderPhotoView[];
+  assinaturaUrl: string | null;
+}
+
+/** Card do app de campo: OS + endereço completo do prédio. */
+export interface FieldOrderItem extends ServiceOrder {
+  building: Pick<
+    Building,
+    "id" | "nome" | "logradouro" | "numero" | "bairro" | "cidade" | "uf" | "lat" | "lng"
+  > & {
+    client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  };
+  equipment: Pick<Equipment, "id" | "codigo_interno" | "tipo" | "ambiente"> | null;
+  technician: Pick<Profile, "id" | "full_name"> | null;
+}
+
+/** Opção do combobox de equipamento (busca no servidor). */
+export interface EquipmentOption {
+  id: string;
+  building_id: string;
+  label: string;
+}
+
+// ----------------------------------------------------------------------------
+// Mapa de equipamentos (src/server/map.ts): pino enxuto por prédio
+// ----------------------------------------------------------------------------
+
+/** Contagem de equipamentos do prédio por status. */
+export type EquipmentStatusCounts = Record<EquipmentStatus, number>;
+
+/** Pino do mapa: só o necessário para desenhar, buscar e abrir o cliente. */
+export interface MapPin {
+  id: string;
+  nome: string;
+  lat: number;
+  lng: number;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  cidade: string;
+  uf: string;
+  client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+  equipment_total: number;
+  status_counts: EquipmentStatusCounts;
+}
+
+/** Recorte geográfico opcional do mapa (graus decimais). */
+export interface MapBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
 }
