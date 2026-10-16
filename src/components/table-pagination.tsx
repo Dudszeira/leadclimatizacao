@@ -35,18 +35,18 @@ export function TablePagination({
   return (
     <nav
       aria-label={ariaLabel}
-      className="flex items-center justify-between gap-3 border-t border-line-soft px-4 py-3"
+      className="flex items-center justify-between gap-3 border-t border-line-soft px-4 py-3 md:px-5"
     >
-      <p className="text-xs text-ink-dim">
+      <p className="text-[0.8125rem] text-ink-dim">
         Mostrando{" "}
-        <span className="font-mono text-ink tabular-nums">
+        <span className="text-ink tabular-nums">
           {from}–{to}
         </span>{" "}
-        de <span className="font-mono text-ink tabular-nums">{total}</span>{" "}
+        de <span className="text-ink tabular-nums">{total}</span>{" "}
         {total === 1 ? singular : plural}
       </p>
       <div className="flex items-center gap-2">
-        <span className="hidden font-mono text-xs text-ink-faint tabular-nums sm:block">
+        <span className="hidden text-[0.8125rem] text-ink-faint tabular-nums sm:block">
           Página {page} de {pageCount}
         </span>
         <PaginationLink href={prevHref} disabled={page <= 1} label="Página anterior">
@@ -77,7 +77,6 @@ function PaginationLink({
 }) {
   const className = cn(
     buttonVariants({ variant: "outline", size: "icon" }),
-    "size-9 max-md:size-11",
     disabled && "pointer-events-none opacity-50",
   )
   if (disabled) {

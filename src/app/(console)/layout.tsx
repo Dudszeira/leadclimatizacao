@@ -5,6 +5,7 @@ import { isDemoMode } from "@/lib/env"
 import { ROLE_LABELS, canAccessPath, homeFor } from "@/lib/nav"
 import { getSessionProfile } from "@/server/auth"
 import { AppSidebar, type SidebarUser } from "@/components/app-sidebar"
+import { MobileTabBar } from "@/components/mobile-tab-bar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
@@ -48,8 +49,11 @@ export default async function ConsoleLayout({ children }: LayoutProps<"/">) {
         <AppSidebar user={user} />
         <SidebarInset>
           <SiteHeader role={profile.role} />
-          <div className="flex flex-1 flex-col p-4 md:p-6">{children}</div>
+          <div className="pb-tabbar mx-auto flex w-full max-w-[1520px] flex-1 flex-col px-4 pt-2 md:px-8 md:pt-4">
+            {children}
+          </div>
         </SidebarInset>
+        <MobileTabBar role={profile.role} />
       </SidebarProvider>
       <Toaster theme="dark" />
     </TooltipProvider>

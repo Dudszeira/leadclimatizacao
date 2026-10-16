@@ -16,14 +16,14 @@ export function EmptyState({
   children,
 }: EmptyStateProps) {
   return (
-    <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
+    <section className="flex flex-1 flex-col items-center justify-center rounded-[1.375rem] bg-console px-6 py-14 text-center ring-1 ring-line md:py-20">
       <div
-        className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
+        className="flex size-12 items-center justify-center rounded-full bg-console-2"
         aria-hidden="true"
       >
-        <Icon className="size-7 text-ink-faint" />
+        <Icon className="size-5 text-ink-dim" />
       </div>
-      <h3 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
+      <h3 className="mt-5 font-display text-xl font-medium tracking-[-0.02em] text-ink">
         {title}
       </h3>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">

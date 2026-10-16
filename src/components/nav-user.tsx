@@ -25,7 +25,7 @@ function UserIdentity({ user }: { user: SidebarUser }) {
   return (
     <>
       <Avatar>
-        <AvatarFallback className="bg-signal-dim font-display text-xs font-bold text-signal">
+        <AvatarFallback className="bg-console-3 font-display text-xs font-semibold text-ink">
           {user.initials}
         </AvatarFallback>
       </Avatar>
@@ -52,7 +52,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
             render={
               <SidebarMenuButton
                 size="lg"
-                className="aria-expanded:bg-muted max-md:h-12"
+                className="h-12 rounded-2xl bg-console-2/60 aria-expanded:bg-console-3 group-data-[collapsible=icon]:bg-transparent"
                 aria-label="Menu do usuário"
               />
             }
@@ -71,7 +71,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
                 <UserIdentity user={user} />
               </div>
               {user.email ? (
-                <p className="truncate px-1 pb-1.5 font-mono text-[11px] text-ink-faint">
+                <p className="truncate px-1 pb-1.5 text-xs text-ink-faint">
                   {user.email}
                 </p>
               ) : null}

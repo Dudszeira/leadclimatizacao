@@ -8,8 +8,9 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains);
-  --font-heading: var(--font-space-grotesk);
+  /* Sem monoespaçada de fantasia: "font-mono" vira números tabulares no corpo. */
+  --font-mono: var(--font-inter);
+  --font-heading: var(--font-onest);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,30 +66,40 @@
   --color-ink: var(--ink);
   --color-ink-dim: var(--ink-dim);
   --color-ink-faint: var(--ink-faint);
-  --font-display: var(--font-space-grotesk);
+  --font-display: var(--font-onest);
+  --color-shell: var(--shell);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-line: var(--paper-line);
 }
 
 
 :root {
-  /* Control Lead — tema console dark unico (contrato visual da demo aceita) */
-  --void: #060B14;
-  --console: #0D1729;
-  --console-2: #131F38;
-  --console-3: #182848;
-  --line: #1E2E4A;
-  --line-soft: #16233C;
-  --signal: #5B9BFF;
-  --signal-solid: #1D5FD1;
-  --signal-dim: rgba(91, 155, 255, 0.13);
+  /* Control Lead — grafite monocromático + azul Lead (redesign 16/10/2026).
+   * Nomes de token mantidos da fase console para não quebrar as telas;
+   * os valores agora seguem o mundo das referências (ver DESIGN.md). */
+  --shell: #171717;          /* moldura: barra lateral e fundo externo */
+  --void: #0D0D0D;           /* painel de conteúdo (canvas) */
+  --console: #131313;        /* card */
+  --console-2: #1B1B1B;      /* campo, popover, card elevado */
+  --console-3: #252525;      /* hover / selecionado */
+  --line: #262626;
+  --line-soft: #1D1D1D;
+  --signal: #5B9BFF;         /* azul Lead: marca, foco, ativo, "em campo" */
+  --signal-solid: #2F6FE0;
+  --signal-dim: rgba(91, 155, 255, 0.14);
   --amber: #F5A623;
   --amber-dim: rgba(245, 166, 35, 0.14);
-  --clear: #2FE3A6;
-  --clear-dim: rgba(47, 227, 166, 0.13);
-  --danger: #FF5C7A;
-  --danger-dim: rgba(255, 92, 122, 0.13);
-  --ink: #EAF2FF;
-  --ink-dim: #93A7C9;
-  --ink-faint: #7288AC;
+  --clear: #3DD68C;
+  --clear-dim: rgba(61, 214, 140, 0.13);
+  --danger: #FF6B7F;
+  --danger-dim: rgba(255, 107, 127, 0.14);
+  --ink: #F5F5F4;
+  --ink-dim: #A8A8AD;
+  --ink-faint: #8A8A91;
+  --paper: #F1F1EF;          /* sobreposição clara (seletor de período) */
+  --paper-ink: #0D0D0D;
+  --paper-line: #DCDCD8;
 
   --background: var(--void);
   --foreground: var(--ink);
@@ -96,8 +107,8 @@
   --card-foreground: var(--ink);
   --popover: var(--console-2);
   --popover-foreground: var(--ink);
-  --primary: var(--signal);
-  --primary-foreground: #06101F;
+  --primary: var(--ink);
+  --primary-foreground: var(--void);
   --secondary: var(--console-2);
   --secondary-foreground: var(--ink);
   --muted: var(--console-2);
@@ -108,20 +119,23 @@
   --border: var(--line);
   --input: var(--line);
   --ring: var(--signal);
-  --chart-1: var(--signal);
-  --chart-2: var(--clear);
+  --chart-1: var(--ink);
+  --chart-2: var(--signal);
   --chart-3: var(--amber);
-  --chart-4: var(--danger);
+  --chart-4: var(--clear);
   --chart-5: var(--ink-faint);
-  --radius: 0.625rem;
-  --sidebar: #0A1220;
+  --radius: 0.875rem;
+  --sidebar: var(--shell);
   --sidebar-foreground: var(--ink-dim);
-  --sidebar-primary: var(--signal);
-  --sidebar-primary-foreground: #06101F;
-  --sidebar-accent: var(--signal-dim);
-  --sidebar-accent-foreground: var(--signal);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--void);
+  --sidebar-accent: var(--console-3);
+  --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--line-soft);
   --sidebar-ring: var(--signal);
+
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --tabbar-h: 4.25rem;
 }
 
 
@@ -129,11 +143,24 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
-    @apply font-sans;
+    @apply bg-shell font-sans;
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-shell text-foreground;
+    font-feature-settings: "cv11", "ss03";
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  table, time, .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  .font-mono {
+    letter-spacing: 0;
   }
 }
 
@@ -168,8 +195,7 @@
  * pinos por status e overrides dos controles/popups do Leaflet.
  * -------------------------------------------------------------------------- */
 .map-tiles {
-  filter: invert(1) hue-rotate(200deg) saturate(0.55) brightness(0.7)
-    contrast(1.1);
+  filter: invert(1) grayscale(1) brightness(0.72) contrast(1.08);
 }
 
 .leaflet-container {
@@ -208,7 +234,7 @@
 
 .map-pin--inativo {
   background: var(--ink-faint);
-  box-shadow: 0 0 0 4px rgba(92, 112, 147, 0.18);
+  box-shadow: 0 0 0 4px rgba(138, 138, 145, 0.18);
 }
 
 /* Popup no tema do console. */
@@ -216,8 +242,8 @@
   background: var(--console-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
 .leaflet-popup-content {
@@ -272,9 +298,64 @@
   scrollbar-color: var(--line) transparent;
 }
 ::selection {
-  background: var(--signal-dim);
+  background: rgba(91, 155, 255, 0.28);
   color: var(--ink);
 }
 input, textarea {
   caret-color: var(--signal);
+}
+
+/* ----------------------------------------------------------------------------
+ * Superfície "papel": sobreposição clara sobre o grafite (seletor de período,
+ * referência colado-1792187069322). Grão sutil via ruído SVG.
+ * -------------------------------------------------------------------------- */
+.surface-paper {
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-color: var(--paper);
+  background-image: var(--paper-grain);
+  color: var(--paper-ink);
+  --ink: var(--paper-ink);
+  --ink-dim: #4A4A4F;
+  --ink-faint: #6B6B70;
+  --line: var(--paper-line);
+  --line-soft: #E6E6E2;
+  --console: #FFFFFF;
+  --console-2: #E7E7E3;
+  --console-3: #D9D9D4;
+  --foreground: var(--paper-ink);
+  --muted: #E7E7E3;
+  --muted-foreground: #4A4A4F;
+  --accent: #E2E2DE;
+  --accent-foreground: var(--paper-ink);
+  --primary: var(--paper-ink);
+  --primary-foreground: #FFFFFF;
+  --border: var(--paper-line);
+  --input: var(--paper-line);
+}
+.surface-paper ::selection {
+  background: rgba(13, 13, 13, 0.14);
+}
+
+/* Barra de abas inferior (celular): reserva espaço e respeita a área segura. */
+.pb-tabbar {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1.5rem);
+}
+@media (min-width: 768px) {
+  .pb-tabbar {
+    padding-bottom: 2rem;
+  }
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Toque: sem rolagem elástica que recarrega a página nas listas internas. */
+.scroll-contain {
+  overscroll-behavior: contain;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

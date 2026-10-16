@@ -3,6 +3,7 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { LoaderCircleIcon, SearchIcon, XIcon } from "lucide-react"
+import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -90,10 +91,10 @@ export function FilterToolbar({
     q !== "" || selects.some((s) => s.value !== s.defaultValue)
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative w-full min-w-0 sm:max-w-xs">
+    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-2">
+      <div className="relative w-full min-w-0 md:max-w-xs">
         <SearchIcon
-          className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-faint"
+          className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-faint"
           aria-hidden="true"
         />
         <Input
@@ -102,15 +103,17 @@ export function FilterToolbar({
           onChange={(e) => setText(e.target.value)}
           placeholder={searchPlaceholder}
           aria-label={searchAriaLabel}
-          className="h-9 pl-8 max-md:h-11 [&::-webkit-search-cancel-button]:hidden"
+          className="pl-10 [&::-webkit-search-cancel-button]:hidden"
         />
         {isPending && (
           <LoaderCircleIcon
-            className="absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-ink-faint"
+            className="absolute top-1/2 right-3.5 size-4 -translate-y-1/2 animate-spin text-ink-faint"
             aria-hidden="true"
           />
         )}
       </div>
+      {/* Celular: filtros em chips roláveis numa linha só; desktop: em linha. */}
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0">
       {selects.map((select, index) => (
         <Select
           key={select.param}
@@ -127,7 +130,12 @@ export function FilterToolbar({
         >
           <SelectTrigger
             aria-label={select.ariaLabel}
-            className={`h-9 ${select.triggerClassName ?? "min-w-36"} max-md:h-11`}
+            className={cn(
+              "shrink-0 rounded-full",
+              select.triggerClassName ?? "md:min-w-36",
+              select.value !== select.defaultValue &&
+                "border-transparent bg-ink text-void hover:border-transparent [&_svg]:text-void/60",
+            )}
           >
             <SelectValue />
           </SelectTrigger>
@@ -143,7 +151,7 @@ export function FilterToolbar({
       {hasFilters && (
         <Button
           variant="ghost"
-          className="h-9 px-2.5 text-ink-dim max-md:h-11"
+          className="shrink-0"
           onClick={() => {
             setText("")
             apply(
@@ -156,6 +164,7 @@ export function FilterToolbar({
           Limpar filtros
         </Button>
       )}
+      </div>
     </div>
   )
 }

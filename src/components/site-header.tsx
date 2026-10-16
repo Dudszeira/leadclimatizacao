@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { cn } from "cn"
 
-import { currentPageTitle } from "@/lib/nav"
+import { currentPageTitle, homeFor } from "@/lib/nav"
 import type { UserRole } from "@/lib/types"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { BrandMark } from "@/components/brand-mark"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 const emptySubscribe = () => () => {}
@@ -17,7 +18,7 @@ function useToday() {
   // Data formatada só no cliente (evita data de build congelada no HTML estático).
   const label = React.useSyncExternalStore(
     emptySubscribe,
-    () => format(new Date(), "EEE · dd MMM yyyy", { locale: ptBR }),
+    () => format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR }),
     () => null
   )
   const iso = React.useSyncExternalStore(
@@ -28,41 +29,62 @@ function useToday() {
   return label && iso ? { label, iso } : null
 }
 
-export function SiteHeader({ role }: { role?: UserRole }) {
+/** true depois que o título grande da página saiu da tela. */
+function useScrolledPastTitle(pathname: string) {
+  const [past, setPast] = React.useState(false)
+  React.useEffect(() => {
+    const title = document.querySelector("[data-page-title]")
+    if (!title) {
+      // Página sem título grande: o título compacto fica sempre visível.
+      const raf = requestAnimationFrame(() => setPast(true))
+      return () => cancelAnimationFrame(raf)
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => setPast(!entry.isIntersecting),
+      { rootMargin: "-64px 0px 0px 0px" }
+    )
+    io.observe(title)
+    return () => io.disconnect()
+  }, [pathname])
+  return past
+}
+
+export function SiteHeader({ role }: { role: UserRole }) {
   const pathname = usePathname()
   const title = currentPageTitle(pathname, role)
   const today = useToday()
+  const past = useScrolledPastTitle(pathname)
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-line-soft bg-background/85 px-3 backdrop-blur md:px-4">
+    <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 bg-void/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:h-16 md:rounded-t-[1.75rem] md:px-6">
+      <Link
+        href={homeFor(role)}
+        className="-m-1 rounded-xl p-1 outline-none focus-visible:ring-3 focus-visible:ring-signal/60 md:hidden"
+        aria-label="Início"
+      >
+        <BrandMark className="size-8" />
+      </Link>
       <SidebarTrigger
-        className="-ml-1 max-md:size-11"
-        aria-label="Abrir ou fechar a barra lateral"
+        className="-ml-2 hidden md:inline-flex"
+        aria-label="Recolher ou expandir a barra lateral"
       />
-      <Separator
-        orientation="vertical"
-        className="mr-1 data-[orientation=vertical]:h-4"
-      />
-      <h1 className="min-w-0 flex-1 truncate font-display text-sm font-bold tracking-tight text-ink md:text-base">
-        {title}
-      </h1>
-      <div className="flex shrink-0 items-center gap-3">
-        {today && (
-          <time
-            dateTime={today.iso}
-            className="hidden font-mono text-xs tracking-wider text-ink-dim uppercase sm:block"
-          >
-            {today.label}
-          </time>
+      <p
+        aria-hidden={!past}
+        className={cn(
+          "min-w-0 flex-1 truncate font-display text-base font-medium tracking-[-0.015em] text-ink transition-[opacity,transform] duration-200 ease-(--ease-out-expo)",
+          past ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
         )}
-        <Badge
-          variant="outline"
-          className="gap-1.5 border-line bg-clear-dim font-mono text-[10px] tracking-wider text-clear uppercase"
+      >
+        {title}
+      </p>
+      {today && (
+        <time
+          dateTime={today.iso}
+          className="hidden shrink-0 text-sm text-ink-faint first-letter:uppercase sm:block"
         >
-          <span className="size-1.5 rounded-full bg-clear" aria-hidden="true" />
-          Sistema operacional
-        </Badge>
-      </div>
+          {today.label}
+        </time>
+      )}
     </header>
   )
 }

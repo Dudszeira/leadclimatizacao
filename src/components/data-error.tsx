@@ -23,7 +23,7 @@ export function DataError({ message, className, compact = false }: DataErrorProp
     <Button
       variant="outline"
       size={compact ? "sm" : "default"}
-      className={compact ? undefined : "mt-6 h-11 px-5"}
+      className={compact ? undefined : "mt-6"}
       disabled={pending}
       onClick={() => startTransition(() => router.refresh())}
     >
@@ -37,7 +37,7 @@ export function DataError({ message, className, compact = false }: DataErrorProp
       <div
         role="alert"
         className={cn(
-          "flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-danger/40 bg-danger-dim/50 px-6 py-8 text-center",
+          "flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl bg-danger-dim/60 px-6 py-8 text-center",
           className,
         )}
       >
@@ -52,17 +52,17 @@ export function DataError({ message, className, compact = false }: DataErrorProp
     <section
       role="alert"
       className={cn(
-        "flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center",
+        "flex flex-1 flex-col items-center justify-center rounded-[1.375rem] bg-console px-6 py-14 text-center ring-1 ring-line md:py-20",
         className,
       )}
     >
       <div
-        className="flex size-14 items-center justify-center rounded-2xl border border-line-soft bg-danger-dim"
+        className="flex size-12 items-center justify-center rounded-full bg-danger-dim"
         aria-hidden="true"
       >
-        <TriangleAlertIcon className="size-7 text-danger" />
+        <TriangleAlertIcon className="size-5 text-danger" />
       </div>
-      <h2 className="mt-5 font-display text-lg font-bold tracking-tight text-ink">
+      <h2 className="mt-5 font-display text-xl font-medium tracking-[-0.02em] text-ink">
         Algo deu errado
       </h2>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">

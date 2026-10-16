@@ -22,13 +22,17 @@ export type NavItem = {
   roles: readonly UserRole[]
   /** Título alternativo por papel (ex.: técnico vê "Minhas OS"). */
   titleFor?: Partial<Record<UserRole, string>>
+  /** Rótulo curto para a barra de abas do celular. */
+  short?: string
+  /** "admin" vai para o grupo de administração da barra lateral. */
+  group?: "ops" | "admin"
 }
 
 const ALL: readonly UserRole[] = ["admin", "atendente", "tecnico"]
 const OFFICE: readonly UserRole[] = ["admin", "atendente"]
 
 export const NAV_ITEMS: NavItem[] = [
-  { title: "Dashboard", href: "/", icon: LayoutDashboardIcon, roles: OFFICE },
+  { title: "Dashboard", short: "Início", href: "/", icon: LayoutDashboardIcon, roles: OFFICE },
   { title: "Clientes", href: "/clientes", icon: UsersIcon, roles: OFFICE },
   {
     title: "Chamados",
@@ -38,13 +42,20 @@ export const NAV_ITEMS: NavItem[] = [
     titleFor: { tecnico: "Minhas OS" },
   },
   { title: "Campo", href: "/campo", icon: SmartphoneIcon, roles: ["tecnico", "admin"] },
-  { title: "Calendário PMOC", href: "/pmoc", icon: CalendarCheckIcon, roles: OFFICE },
-  { title: "Mapa de Equipamentos", href: "/mapa", icon: MapPinnedIcon, roles: OFFICE },
-  { title: "Atendimento IA", href: "/atendimento", icon: BotIcon, roles: OFFICE },
-  { title: "Financeiro", href: "/financeiro", icon: WalletIcon, roles: ["admin"] },
-  { title: "Equipe", href: "/equipe", icon: ShieldCheckIcon, roles: ["admin"] },
-  { title: "Importar", href: "/importar", icon: FileUpIcon, roles: ["admin"] },
+  { title: "Calendário PMOC", short: "PMOC", href: "/pmoc", icon: CalendarCheckIcon, roles: OFFICE },
+  { title: "Mapa de Equipamentos", short: "Mapa", href: "/mapa", icon: MapPinnedIcon, roles: OFFICE },
+  { title: "Atendimento IA", short: "Atendimento", href: "/atendimento", icon: BotIcon, roles: OFFICE },
+  { title: "Financeiro", href: "/financeiro", icon: WalletIcon, roles: ["admin"], group: "admin" },
+  { title: "Equipe", href: "/equipe", icon: ShieldCheckIcon, roles: ["admin"], group: "admin" },
+  { title: "Importar", href: "/importar", icon: FileUpIcon, roles: ["admin"], group: "admin" },
 ]
+
+/** Abas fixas da barra inferior no celular, por papel (o resto fica em "Mais"). */
+export const MOBILE_TABS: Record<UserRole, readonly string[]> = {
+  admin: ["/", "/chamados", "/clientes", "/financeiro"],
+  atendente: ["/", "/chamados", "/clientes", "/pmoc"],
+  tecnico: ["/chamados", "/campo"],
+}
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrador",

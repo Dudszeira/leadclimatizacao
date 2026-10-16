@@ -26,7 +26,7 @@ type StatCardProps = {
   style?: CSSProperties
 }
 
-/** Card de KPI no padrão "console de operações": label uppercase, número grande em mono, sublegenda colorida. */
+/** Card de KPI: rótulo em frase, número grande em Onest, sublegenda com a cor do estado. */
 export function StatCard({
   label,
   value,
@@ -45,20 +45,15 @@ export function StatCard({
       style={style}
       aria-label={`${label}: ${value}, ${sub}`}
     >
-      <div className="flex items-start justify-between gap-2 px-(--card-spacing)">
-        <span className="text-[0.71rem] leading-snug tracking-[0.05em] text-ink-faint uppercase">
+      <div className="flex items-start justify-between gap-3 px-(--card-spacing)">
+        <span className="text-[0.8125rem] leading-snug text-ink-dim md:text-sm">
           {label}
         </span>
-        <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-console-3 text-signal"
-          aria-hidden="true"
-        >
-          <Icon className="size-4" />
-        </span>
+        <Icon className="mt-0.5 size-4 shrink-0 text-ink-faint" aria-hidden="true" />
       </div>
       <div
         className={cn(
-          "mt-2 px-(--card-spacing) font-mono text-[1.75rem] leading-none font-semibold tracking-tight text-ink tabular-nums",
+          "mt-3 px-(--card-spacing) font-display text-[1.875rem] leading-none font-medium tracking-[-0.03em] text-ink tabular-nums md:mt-4 md:text-[2.25rem]",
           valueClassName
         )}
       >
@@ -66,11 +61,11 @@ export function StatCard({
       </div>
       <div
         className={cn(
-          "mt-2 flex items-center gap-1.5 px-(--card-spacing) text-xs",
+          "mt-3 flex items-start gap-1.5 px-(--card-spacing) text-xs leading-snug",
           toneClass[tone]
         )}
       >
-        {SubIcon ? <SubIcon className="size-3 shrink-0" aria-hidden="true" /> : null}
+        {SubIcon ? <SubIcon className="mt-px size-3 shrink-0" aria-hidden="true" /> : null}
         <span>{sub}</span>
       </div>
     </Card>

@@ -3,10 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { AirVentIcon } from "lucide-react"
 
-import { homeFor, isNavItemActive, navItemsFor } from "@/lib/nav"
+import { homeFor, isNavItemActive, navItemsFor, type NavItem } from "@/lib/nav"
 import type { UserRole } from "@/lib/types"
+import { BrandMark } from "@/components/brand-mark"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -20,6 +20,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 /** Dados do usuário logado exibidos na barra lateral (vindos do layout). */
@@ -32,35 +33,54 @@ export type SidebarUser = {
   demo: boolean
 }
 
+function NavList({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  const { isMobile, setOpenMobile } = useSidebar()
+  return (
+    <SidebarMenu className="gap-0.5">
+      {items.map((item) => (
+        <SidebarMenuItem key={item.href}>
+          <SidebarMenuButton
+            tooltip={item.title}
+            isActive={isNavItemActive(item, pathname)}
+            className="max-md:h-12 max-md:text-[0.9375rem]"
+            onClick={isMobile ? () => setOpenMobile(false) : undefined}
+            render={<Link href={item.href} />}
+          >
+            <item.icon />
+            <span>{item.title}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  )
+}
+
 export function AppSidebar({
   user,
   ...props
 }: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   const pathname = usePathname()
   const items = navItemsFor(user.role)
+  const ops = items.filter((i) => i.group !== "admin")
+  const admin = items.filter((i) => i.group === "admin")
 
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar collapsible="icon" variant="inset" {...props}>
+      <SidebarHeader className="px-2 pt-3 pb-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              className="max-md:h-12"
+              className="h-12 gap-3 px-2 hover:bg-transparent group-data-[collapsible=icon]:px-0!"
               render={<Link href={homeFor(user.role)} />}
             >
-              <div
-                className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-signal-dim text-signal"
-                aria-hidden="true"
-              >
-                <AirVentIcon className="size-4" />
-              </div>
+              <BrandMark className="size-9" />
               <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-display text-sm font-bold tracking-tight text-ink">
+                <span className="truncate font-display text-[1.0625rem] font-semibold tracking-[-0.02em] text-ink">
                   Control Lead
                 </span>
-                <span className="truncate font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-                  Console · Lead Climatização
+                <span className="truncate text-xs text-ink-faint">
+                  Lead Climatização
                 </span>
               </div>
             </SidebarMenuButton>
@@ -69,29 +89,22 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="font-mono tracking-wider uppercase">
-            Módulos
-          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={isNavItemActive(item, pathname)}
-                    className="max-md:h-11"
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <NavList items={ops} pathname={pathname} />
           </SidebarGroupContent>
         </SidebarGroup>
+        {admin.length > 0 ? (
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupLabel className="px-3 text-xs font-normal text-ink-faint">
+              Administração
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <NavList items={admin} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="p-2 pb-3">
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
