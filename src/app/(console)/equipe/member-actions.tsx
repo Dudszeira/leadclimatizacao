@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { LoaderCircleIcon, PowerIcon, PowerOffIcon } from "lucide-react"
+import { EllipsisVerticalIcon, LoaderCircleIcon, PowerIcon, PowerOffIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { UserRole } from "@/lib/types"
@@ -18,12 +18,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const ROLE_ITEMS: Record<UserRole, string> = ROLE_LABELS
 
@@ -35,12 +39,14 @@ const ROLE_SCOPE: Record<UserRole, string> = {
   tecnico: "apenas as OS atribuídas a ele, pelo celular",
 }
 
+const ITEM = "min-h-11 rounded-xl px-2.5 py-2.5 md:min-h-9 md:py-2"
+
 type MemberActionsProps = {
   member: { id: string; full_name: string; role: UserRole; ativo: boolean }
   isSelf: boolean
 }
 
-/** Papel (Select) + ativar/desativar (com confirmação) de um membro. */
+/** Menu do membro: trocar papel e ativar/desativar (com confirmação quando reduz acesso). */
 export function MemberActions({ member, isSelf }: MemberActionsProps) {
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
@@ -61,82 +67,82 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-    <div className="flex items-center justify-end gap-2">
-      <Select
-        items={ROLE_ITEMS}
-        value={member.role}
-        onValueChange={(value: string | null) => {
-          if (!value || value === member.role) return
-          const next = value as UserRole
-          if (ROLE_RANK[next] < ROLE_RANK[member.role]) setDowngradeTo(next)
-          else apply(next, member.ativo)
-        }}
-        disabled={pending || isSelf}
-      >
-        <SelectTrigger
-          aria-label={`Papel de ${member.full_name}`}
-          className="h-9 w-[150px] max-md:h-11"
-        >
-          <SelectValue>
-            {(value: string | null) => (value ? ROLE_ITEMS[value as UserRole] : "Papel")}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(ROLE_ITEMS).map(([value, label]) => (
-            <SelectItem key={value} value={value}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {member.ativo ? (
-        <Button
-          variant="outline"
-          className="h-9 max-md:h-11"
-          disabled={pending || isSelf}
-          onClick={() => setConfirmOpen(true)}
-          aria-label={`Desativar ${member.full_name}`}
-          aria-describedby={isSelf ? `self-${member.id}` : undefined}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pending}
+              aria-label={`Acesso de ${member.full_name}`}
+              className="text-ink-dim hover:text-ink"
+            />
+          }
         >
           {pending ? (
             <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
           ) : (
-            <PowerOffIcon aria-hidden="true" />
+            <EllipsisVerticalIcon aria-hidden="true" />
           )}
-          <span className="max-lg:sr-only">Desativar</span>
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          className="h-9 max-md:h-11"
-          disabled={pending}
-          onClick={() => apply(member.role, true)}
-          aria-label={`Ativar ${member.full_name}`}
-        >
-          {pending ? (
-            <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          {isSelf ? (
+            <p className="px-2.5 py-2 text-[0.8125rem] leading-snug text-ink-dim">
+              Você não pode alterar o próprio papel nem desativar o próprio acesso.
+            </p>
           ) : (
-            <PowerIcon aria-hidden="true" />
+            <>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="px-2.5 pt-1.5 text-[0.8125rem] font-normal">
+                  Papel
+                </DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={member.role}
+                  onValueChange={(value: string) => {
+                    if (!value || value === member.role) return
+                    const next = value as UserRole
+                    if (ROLE_RANK[next] < ROLE_RANK[member.role]) setDowngradeTo(next)
+                    else apply(next, member.ativo)
+                  }}
+                >
+                  {(Object.keys(ROLE_ITEMS) as UserRole[]).map((role) => (
+                    <DropdownMenuRadioItem key={role} value={role} className={ITEM} disabled={pending}>
+                      {ROLE_ITEMS[role]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              {member.ativo ? (
+                <DropdownMenuItem
+                  variant="destructive"
+                  className={ITEM}
+                  disabled={pending}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  <PowerOffIcon aria-hidden="true" />
+                  Desativar acesso
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className={ITEM}
+                  disabled={pending}
+                  onClick={() => apply(member.role, true)}
+                >
+                  <PowerIcon aria-hidden="true" />
+                  Ativar acesso
+                </DropdownMenuItem>
+              )}
+            </>
           )}
-          <span className="max-lg:sr-only">Ativar</span>
-        </Button>
-      )}
-
-    </div>
-      {isSelf && (
-        <p id={`self-${member.id}`} className="text-right text-xs text-ink-faint">
-          Você não pode alterar o próprio papel nem desativar o próprio acesso.
-        </p>
-      )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={downgradeTo !== null} onOpenChange={(open) => !open && setDowngradeTo(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              Reduzir o acesso de {member.full_name}?
-            </DialogTitle>
+            <DialogTitle>Reduzir o acesso de {member.full_name}?</DialogTitle>
             <DialogDescription>
               {downgradeTo
                 ? `De ${ROLE_ITEMS[member.role]} para ${ROLE_ITEMS[downgradeTo]}. A pessoa passa a ver ${ROLE_SCOPE[downgradeTo]}. Telas abertas deixam de funcionar no próximo carregamento.`
@@ -144,17 +150,11 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              className="max-md:h-11"
-              onClick={() => setDowngradeTo(null)}
-              disabled={pending}
-            >
+            <Button variant="outline" onClick={() => setDowngradeTo(null)} disabled={pending}>
               Manter {ROLE_ITEMS[member.role]}
             </Button>
             <Button
               variant="destructive"
-              className="max-md:h-11"
               disabled={pending}
               onClick={() => {
                 const next = downgradeTo
@@ -173,22 +173,17 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
           <DialogHeader>
             <DialogTitle>Desativar {member.full_name}?</DialogTitle>
             <DialogDescription>
-              A pessoa perde o acesso ao console imediatamente e é desconectada no próximo
-              carregamento. O histórico de chamados é mantido e você pode reativar depois.
+              A pessoa perde o acesso ao Control Lead na hora e é desconectada no
+              próximo carregamento. O histórico de chamados fica guardado e você
+              pode reativar depois.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              className="max-md:h-11"
-              onClick={() => setConfirmOpen(false)}
-              disabled={pending}
-            >
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={pending}>
               Manter acesso
             </Button>
             <Button
               variant="destructive"
-              className="max-md:h-11"
               disabled={pending}
               onClick={() => {
                 setConfirmOpen(false)
@@ -201,6 +196,6 @@ export function MemberActions({ member, isSelf }: MemberActionsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

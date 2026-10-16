@@ -4,7 +4,6 @@ import { UserRoundIcon } from "lucide-react"
 
 import type { ConversationWithMessages } from "@/lib/types"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { formatListTime, formatTelefoneBR, initials } from "@/lib/format"
 import { CONVERSATION_STATUS_META } from "@/lib/status-meta"
 import { conversationName, lastMessage } from "@/components/atendimento/format"
@@ -12,23 +11,29 @@ import { conversationName, lastMessage } from "@/components/atendimento/format"
 type ConversationListProps = {
   conversations: ConversationWithMessages[]
   selectedId: string | null
+  /**
+   * true quando o usuário abriu a conversa (`?c=`). Sem isso, o destaque da
+   * conversa padrão só aparece a partir de lg, onde a conversa fica ao lado.
+   */
+  selectionOnMobile: boolean
   /** Gera o href do item (mantém filtros e troca só o `c`). */
   hrefFor: (conversationId: string) => string
 }
 
 /**
- * Lista de conversas (coluna esquerda): avatar com iniciais, nome/telefone,
- * prévia da última mensagem, hora e badge de status. Navegação por URL —
- * cada item é um Link que define `?c=` para o server component.
+ * Lista de conversas: linhas arredondadas com avatar, nome, hora, prévia da
+ * última mensagem e status em pílula. Navegação por URL: cada item é um Link
+ * que define `?c=` para o server component.
  */
 export function ConversationList({
   conversations,
   selectedId,
+  selectionOnMobile,
   hrefFor,
 }: ConversationListProps) {
   return (
     <ul
-      className="flex min-h-0 flex-1 flex-col divide-y divide-line-soft overflow-y-auto"
+      className="scroll-contain flex flex-col gap-0.5 rounded-[1.375rem] bg-console p-1.5 ring-1 ring-line md:-mx-1 md:min-h-0 md:flex-1 md:overflow-y-auto md:rounded-none md:bg-transparent md:p-1 md:ring-0"
       aria-label="Conversas do atendimento"
     >
       {conversations.map((conversation) => {
@@ -44,14 +49,15 @@ export function ConversationList({
               aria-current={selected ? "true" : undefined}
               aria-label={`Abrir conversa com ${nome} (${telefone}), status ${statusMeta.label}`}
               className={cn(
-                "flex min-h-11 items-start gap-3 px-3 py-3 transition-colors outline-none focus-visible:bg-console-2",
-                selected
-                  ? "border-l-2 border-l-signal bg-console-2"
-                  : "border-l-2 border-l-transparent hover:bg-console-2/60",
+                "flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-150 outline-none hover:bg-console-2 focus-visible:ring-3 focus-visible:ring-signal/50",
+                selected &&
+                  (selectionOnMobile
+                    ? "bg-console-3 hover:bg-console-3"
+                    : "lg:bg-console-3 lg:hover:bg-console-3"),
               )}
             >
-              <Avatar className="mt-0.5">
-                <AvatarFallback className="bg-console-3 font-mono text-[11px] text-ink-dim">
+              <Avatar size="lg">
+                <AvatarFallback className="bg-console-3 text-xs font-medium text-ink-dim">
                   {conversation.client ? (
                     initials(nome)
                   ) : (
@@ -59,29 +65,25 @@ export function ConversationList({
                   )}
                 </AvatarFallback>
               </Avatar>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-ink">
+                  <span className="truncate text-[0.9375rem] font-medium text-ink">
                     {nome}
                   </span>
-                  <time className="shrink-0 font-mono text-[10px] text-ink-faint tabular-nums">
+                  <time className="shrink-0 text-xs text-ink-faint tabular-nums">
                     {formatListTime(conversation.last_message_at)}
                   </time>
                 </span>
-                <span className="font-mono text-[11px] text-ink-faint tabular-nums">
-                  {telefone}
-                </span>
                 <span className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs text-ink-dim">{preview}</span>
-                  <Badge
-                    variant="outline"
+                  <span className="truncate text-[0.8125rem] text-ink-dim">{preview}</span>
+                  <span
                     className={cn(
-                      "shrink-0 font-mono text-[9px] tracking-wider uppercase",
+                      "inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-xs font-medium",
                       statusMeta.badgeClassName,
                     )}
                   >
                     {statusMeta.label}
-                  </Badge>
+                  </span>
                 </span>
               </span>
             </Link>

@@ -62,7 +62,7 @@ export function LeadFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{lead ? "Editar lead" : "Novo lead"}</DialogTitle>
           <DialogDescription>Contato comercial e etapa no funil.</DialogDescription>
@@ -97,7 +97,6 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
             value={form.nome_contato}
             onChange={(e) => set("nome_contato")(e.target.value)}
             autoComplete="name"
-            className="max-md:h-11"
             {...invalidProps("lead-nome", errors.nome_contato)}
           />
         </Field>
@@ -107,7 +106,6 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
             value={form.empresa}
             onChange={(e) => set("empresa")(e.target.value)}
             autoComplete="organization"
-            className="max-md:h-11"
             {...invalidProps("lead-empresa", errors.empresa)}
           />
         </Field>
@@ -121,7 +119,7 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
             onChange={(e) => set("telefone")(maskPhone(e.target.value))}
             placeholder="(41) 99999-9999"
             inputMode="tel"
-            className="font-mono max-md:h-11"
+            autoComplete="tel"
             {...invalidProps("lead-telefone", errors.telefone)}
           />
         </Field>
@@ -136,26 +134,24 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
             spellCheck={false}
             value={form.email}
             onChange={(e) => set("email")(e.target.value)}
-            className="max-md:h-11"
             {...invalidProps("lead-email", errors.email)}
           />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field id="lead-origem" label="Origem" error={errors.origem}>
           <SelectField id="lead-origem" value={form.origem} onChange={set("origem")} items={ORIGIN_LABELS} error={errors.origem} />
         </Field>
         <Field id="lead-etapa" label="Etapa" error={errors.estagio}>
           <SelectField id="lead-etapa" value={form.estagio} onChange={set("estagio")} items={STAGE_LABELS} error={errors.estagio} />
         </Field>
-        <Field id="lead-valor" label="Valor estimado (R$)" error={errors.valor_estimado}>
+        <Field id="lead-valor" label="Valor estimado (R$)" error={errors.valor_estimado} className="sm:col-span-2">
           <Input
             id="lead-valor"
             value={form.valor_estimado}
             onChange={(e) => set("valor_estimado")(e.target.value.replace(/[^\d.,]/g, ""))}
             inputMode="decimal"
             placeholder="12.500,00"
-            className="font-mono max-md:h-11"
             {...invalidProps("lead-valor", errors.valor_estimado)}
           />
         </Field>
@@ -166,7 +162,6 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
             id="lead-motivo"
             value={form.motivo_perda}
             onChange={(e) => set("motivo_perda")(e.target.value)}
-            className="max-md:h-11"
             {...invalidProps("lead-motivo", errors.motivo_perda)}
           />
         </Field>
@@ -181,7 +176,7 @@ function LeadForm({ lead, onClose }: { lead?: Lead; onClose: () => void }) {
         />
       </Field>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose} disabled={pending} className="max-md:h-11">
+        <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
           Cancelar
         </Button>
         <SubmitButton pending={pending}>{lead ? "Salvar alterações" : "Cadastrar lead"}</SubmitButton>
@@ -194,7 +189,7 @@ export function NewLeadButton() {
   const [open, setOpen] = React.useState(false)
   return (
     <>
-      <Button className="h-9 px-3 max-md:h-11" onClick={() => setOpen(true)}>
+      <Button onClick={() => setOpen(true)}>
         <PlusIcon aria-hidden="true" />
         Novo lead
       </Button>
@@ -219,13 +214,17 @@ export function LeadAdvanceButton({ lead }: { lead: Lead }) {
   return (
     <Button
       type="button"
-      variant="outline"
-      className="mt-3 h-9 w-full justify-center max-md:h-11"
+      variant="secondary"
+      className="mt-3 w-full min-w-0 justify-center"
       disabled={pending}
       aria-busy={pending}
+      title={`Avançar para ${STAGE_LABELS[next]}`}
+      aria-label={`Avançar para ${STAGE_LABELS[next]}`}
       onClick={() => run(() => moveLeadStage({ id: lead.id, estagio: next }))}
     >
-      Avançar para {STAGE_LABELS[next]}
+      {/* Kanban do desktop tem colunas estreitas: só o verbo, o destino vai no title. */}
+      <span className="truncate lg:hidden">Avançar para {STAGE_LABELS[next]}</span>
+      <span className="max-lg:hidden">Avançar</span>
       <ArrowRightIcon aria-hidden="true" />
     </Button>
   )
@@ -256,7 +255,7 @@ export function LeadCardActions({ lead, canDelete }: { lead: Lead; canDelete: bo
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 shrink-0 max-md:size-11"
+              className="shrink-0"
               aria-label={`Ações do lead ${lead.nome_contato}`}
               aria-busy={pending}
             />
@@ -302,7 +301,6 @@ export function LeadCardActions({ lead, canDelete }: { lead: Lead; canDelete: bo
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Ex.: fechou com concorrente por preço"
-            className="max-md:h-11"
           />
         </Field>
       </ConfirmDialog>

@@ -40,7 +40,7 @@ export function TablePagination({
       <p className="text-[0.8125rem] text-ink-dim">
         Mostrando{" "}
         <span className="text-ink tabular-nums">
-          {from}–{to}
+          {from} a {to}
         </span>{" "}
         de <span className="text-ink tabular-nums">{total}</span>{" "}
         {total === 1 ? singular : plural}

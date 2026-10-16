@@ -11,7 +11,8 @@ import {
   useSectionSync,
   type SectionSync,
 } from "@/components/chamados/execucao/autosave"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { StepHeading } from "@/components/chamados/execucao/section-heading"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -22,6 +23,7 @@ type LaudoSectionProps = {
   observacoes: string
   onSaved: (v: { laudo: string; observacoes: string }) => void
   sync?: SectionSync
+  step?: number
 }
 
 const MAX = 4000
@@ -34,6 +36,7 @@ export function LaudoSection({
   observacoes,
   onSaved,
   sync,
+  step,
 }: LaudoSectionProps) {
   const [draftLaudo, setDraftLaudo] = React.useState(laudo)
   const [draftObs, setDraftObs] = React.useState(observacoes)
@@ -74,10 +77,8 @@ export function LaudoSection({
 
   if (!editable && !laudo && !observacoes) {
     return (
-      <Card size="sm" className="border border-line bg-console ring-0">
-        <CardHeader>
-          <CardTitle className="text-ink">Laudo técnico</CardTitle>
-        </CardHeader>
+      <Card>
+        <StepHeading step={step} title="Laudo técnico" done={false} />
         <CardContent>
           <p className="text-sm text-ink-faint">Laudo ainda não registrado pelo técnico.</p>
         </CardContent>
@@ -86,15 +87,18 @@ export function LaudoSection({
   }
 
   return (
-    <Card size="sm" className="border border-line bg-console ring-0">
-      <CardHeader>
-        <CardTitle className="text-ink">Laudo técnico</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <Card>
+      <StepHeading
+        step={step}
+        title="Laudo técnico"
+        done={laudo.trim().length > 0}
+        aside={<span className="shrink-0 text-[0.8125rem] text-ink-faint">Opcional</span>}
+      />
+      <CardContent className="flex flex-col gap-5">
         {editable ? (
           <>
-            <div className="grid gap-1.5">
-              <Label htmlFor="os-laudo">Laudo (visível ao cliente)</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="os-laudo">Laudo para o cliente</Label>
               <Textarea
                 id="os-laudo"
                 rows={4}
@@ -104,8 +108,8 @@ export function LaudoSection({
                 placeholder="O que foi encontrado, o que foi feito e o estado final do equipamento."
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="os-obs-tecnicas">Observações técnicas (internas)</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="os-obs-tecnicas">Observações internas</Label>
               <Textarea
                 id="os-obs-tecnicas"
                 rows={3}
@@ -126,9 +130,7 @@ export function LaudoSection({
             {laudo && <p className="text-sm leading-relaxed whitespace-pre-line text-ink-dim">{laudo}</p>}
             {observacoes && (
               <div>
-                <p className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-                  Observações técnicas
-                </p>
+                <p className="text-[0.8125rem] text-ink-faint">Observações internas</p>
                 <p className="mt-1 text-sm leading-relaxed whitespace-pre-line text-ink-dim">
                   {observacoes}
                 </p>

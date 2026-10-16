@@ -86,16 +86,16 @@ export function EquipmentCombobox({
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             disabled={disabled}
-            className="h-8 w-full justify-between font-normal max-md:h-11"
+            className="h-11 w-full justify-between rounded-xl border-line bg-console-2 pr-3 pl-3.5 text-base font-normal hover:border-[#333] hover:bg-console-2 md:h-10 md:text-sm"
           />
         }
       >
-        <span className={cn("truncate", !label && "text-muted-foreground")}>
+        <span className={cn("min-w-0 truncate", !label && "text-ink-faint")}>
           {label || (buildingId ? "Sem equipamento específico" : "Escolha o prédio primeiro")}
         </span>
         <ChevronsUpDownIcon className="text-ink-faint" aria-hidden="true" />
       </PopoverTrigger>
-      <PopoverContent className="w-(--anchor-width) min-w-72 p-0" align="start">
+      <PopoverContent className="w-(--anchor-width) min-w-[min(18rem,calc(100vw-2rem))] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Buscar código, ambiente, marca…"
@@ -121,7 +121,7 @@ export function EquipmentCombobox({
                   setSelectedLabel("")
                   setOpen(false)
                 }}
-                className="min-h-11 md:min-h-8"
+                className="min-h-11 md:min-h-9"
               >
                 Sem equipamento específico
               </CommandItem>
@@ -135,7 +135,7 @@ export function EquipmentCombobox({
                     setSelectedLabel(item.label)
                     setOpen(false)
                   }}
-                  className="min-h-11 md:min-h-8"
+                  className="min-h-11 md:min-h-9"
                 >
                   <span className="truncate">{item.label}</span>
                 </CommandItem>

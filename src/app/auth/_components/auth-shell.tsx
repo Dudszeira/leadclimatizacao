@@ -1,55 +1,106 @@
-import { AirVentIcon } from "lucide-react"
+import { BrandMark } from "@/components/brand-mark"
 
 type AuthShellProps = {
-  /** Rótulo mono acima do título (ex.: "Acesso restrito"). */
-  eyebrow: string
   title: string
   description?: React.ReactNode
   children: React.ReactNode
   footer?: React.ReactNode
 }
 
-/** Moldura das telas públicas de autenticação (login, recuperação, senha). */
-export function AuthShell({ eyebrow, title, description, children, footer }: AuthShellProps) {
+/**
+ * Moldura das telas públicas de autenticação (login, recuperação, senha).
+ * Celular: tela cheia em grafite, marca no topo e formulário direto no fundo.
+ * Desktop: painel arredondado sobre a moldura, como o resto do sistema, com a
+ * coluna da marca à esquerda e o formulário em cartão à direita.
+ */
+export function AuthShell({ title, description, children, footer }: AuthShellProps) {
   return (
-    <main className="relative flex min-h-dvh flex-1 flex-col bg-void">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-signal/40 to-transparent"
-      />
-      <header className="flex items-center gap-3 px-4 pt-6 sm:px-8 sm:pt-8">
-        <div
-          className="flex size-9 items-center justify-center rounded-lg bg-signal-dim text-signal"
-          aria-hidden="true"
-        >
-          <AirVentIcon className="size-4" />
-        </div>
-        <div className="leading-tight">
-          <p className="font-display text-sm font-bold tracking-tight text-ink">Control Lead</p>
-          <p className="font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-            Console · Lead Climatização
+    <main className="flex min-h-dvh flex-1 flex-col bg-void lg:bg-shell lg:p-2">
+      <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:overflow-hidden lg:rounded-[1.75rem] lg:bg-void lg:ring-1 lg:ring-line-soft">
+        {/* Marca (topo no celular, coluna inteira no desktop) */}
+        <div className="flex flex-col pt-[calc(env(safe-area-inset-top)+1.25rem)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] sm:px-8 lg:justify-between lg:p-12 xl:p-14">
+          <BrandLockup />
+          <div className="hidden lg:block">
+            <AirflowLines />
+            <p className="mt-10 max-w-[18ch] font-display text-[2.5rem] leading-[1.06] font-medium tracking-[-0.03em] text-ink xl:text-[2.875rem]">
+              Chamados, PMOC e equipe de campo no mesmo painel.
+            </p>
+          </div>
+          <p className="hidden text-[0.8125rem] text-ink-faint lg:block">
+            Acesso restrito à equipe autorizada da Lead Climatização.
           </p>
         </div>
-      </header>
 
-      <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
-        <section className="w-full max-w-[400px]">
-          <p className="font-mono text-[11px] tracking-[0.18em] text-signal uppercase">{eyebrow}</p>
-          <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-            {title}
-          </h1>
-          {description ? (
-            <div className="mt-2 text-sm leading-relaxed text-ink-dim">{description}</div>
-          ) : null}
-          <div className="mt-8 rounded-xl border border-line bg-console p-5 sm:p-6">{children}</div>
-          {footer ? <div className="mt-6 text-sm text-ink-dim">{footer}</div> : null}
-        </section>
+        {/* Formulário */}
+        <div className="flex flex-1 flex-col justify-center pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] pt-10 pb-8 sm:px-8 lg:px-12 lg:py-12">
+          <section className="mx-auto w-full max-w-[25rem] lg:max-w-[27rem] lg:rounded-[1.375rem] lg:bg-console lg:p-9 lg:ring-1 lg:ring-line">
+            <h1 className="font-display text-[1.75rem] leading-[1.1] font-medium tracking-[-0.03em] text-ink sm:text-[2rem] lg:text-[1.875rem]">
+              {title}
+            </h1>
+            {description ? (
+              <div className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-dim">
+                {description}
+              </div>
+            ) : null}
+            <div className="mt-8">{children}</div>
+            {footer ? (
+              <div className="mt-8 border-t border-line-soft pt-6 text-sm leading-relaxed text-ink-dim">
+                {footer}
+              </div>
+            ) : null}
+          </section>
+        </div>
+
+        <footer className="pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pl-[max(1rem,env(safe-area-inset-left))] text-[0.8125rem] text-ink-faint sm:px-8 lg:hidden">
+          Acesso restrito à equipe autorizada da Lead Climatização.
+        </footer>
       </div>
-
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft px-4 py-4 font-mono text-[10px] tracking-wider text-ink-faint uppercase sm:px-8">
-        <span>Acesso monitorado · somente equipe autorizada</span>
-        <span>Lead Climatização</span>
-      </footer>
     </main>
+  )
+}
+
+function BrandLockup() {
+  return (
+    <div className="flex items-center gap-3">
+      <BrandMark className="size-10 lg:size-11" />
+      <div className="leading-tight">
+        <p className="font-display text-base font-medium tracking-[-0.015em] text-ink">
+          Control Lead
+        </p>
+        <p className="text-[0.8125rem] text-ink-dim">Lead Climatização</p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Linhas de fluxo de ar saindo de um difusor: o mesmo traço curvo do símbolo,
+ * repetido em linhas finas. Só decoração (cor de linha, sem brilho).
+ */
+function AirflowLines() {
+  const rows = [-3, -2, -1, 0, 1, 2, 3]
+  return (
+    <svg
+      viewBox="0 0 560 220"
+      fill="none"
+      aria-hidden="true"
+      className="h-auto w-full max-w-[34rem]"
+    >
+      {rows.map((r) => {
+        const y = 110 + r * 22
+        const end = 110 + r * 34
+        return (
+          <path
+            key={r}
+            d={`M0 ${y} H200 C300 ${y} 330 ${end} 560 ${end}`}
+            stroke={r === 1 ? "var(--signal)" : "var(--line)"}
+            strokeOpacity={r === 1 ? 0.7 : 1}
+            strokeWidth={r === 1 ? 2 : 1.25}
+            strokeLinecap="round"
+          />
+        )
+      })}
+      <rect x="0" y="36" width="10" height="148" rx="5" fill="var(--console-3)" />
+    </svg>
   )
 }

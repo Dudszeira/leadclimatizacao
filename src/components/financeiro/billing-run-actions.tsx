@@ -82,10 +82,9 @@ export function BillingRunActions({ competencias }: BillingRunActionsProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-col-reverse gap-2 md:w-auto md:flex-row md:items-center">
       <Button
-        variant="outline"
-        className="h-9 px-3 max-md:h-11"
+        variant="secondary"
         disabled={pending !== null}
         aria-busy={pending === "atrasadas"}
         onClick={() => run("atrasadas", () => markOverdueInvoices())}
@@ -106,29 +105,27 @@ export function BillingRunActions({ competencias }: BillingRunActionsProps) {
           if (next) setLastResult(null)
         }}
       >
-        <DialogTrigger
-          render={<Button className="h-9 px-3 max-md:h-11" disabled={pending !== null} />}
-        >
+        <DialogTrigger render={<Button disabled={pending !== null} />}>
           <CalendarPlusIcon aria-hidden="true" />
           Gerar faturas do mês
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Gerar faturas da competência</DialogTitle>
+            <DialogTitle>Gerar faturas do mês</DialogTitle>
             <DialogDescription>
-              Cria uma fatura pendente para cada contrato ativo (exceto
-              corretiva avulsa) vigente no mês, com vencimento no dia do
-              contrato. Faturas que já existem não são duplicadas.
+              Cria uma fatura pendente para cada contrato ativo no mês escolhido,
+              com vencimento no dia do contrato. Corretivas avulsas ficam de fora
+              e nenhuma fatura é duplicada.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-1.5">
+          <div className="grid gap-2">
             <Label htmlFor="gerar-competencia">Competência</Label>
             <Select
               items={items}
               value={competencia}
               onValueChange={(value: string | null) => value && setCompetencia(value)}
             >
-              <SelectTrigger id="gerar-competencia" aria-label="Competência" className="w-full max-md:h-11">
+              <SelectTrigger id="gerar-competencia" aria-label="Competência" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -140,36 +137,30 @@ export function BillingRunActions({ competencias }: BillingRunActionsProps) {
               </SelectContent>
             </Select>
           </div>
-          <p className="rounded-lg border border-line bg-console-2 px-3 py-2 text-sm text-ink-dim" aria-live="polite">
-            Competência selecionada: <strong className="font-medium text-ink">{label}</strong>.
-            Só contratos ativos e vigentes nesse mês entram; quem já tem fatura de {label} é pulado.
+          <p className="rounded-2xl bg-console-3/60 px-4 py-3 text-sm leading-relaxed text-ink-dim" aria-live="polite">
+            Entram só os contratos vigentes em <strong className="font-medium text-ink">{label}</strong>.
+            Quem já tem fatura dessa competência é pulado.
           </p>
           {lastResult && lastResult.status !== "success" ? (
             <p
               role="status"
               className={
                 lastResult.status === "error"
-                  ? "rounded-lg border border-danger/40 bg-danger-dim px-3 py-2 text-sm text-danger"
-                  : "rounded-lg border border-line bg-console-2 px-3 py-2 text-sm text-ink-dim"
+                  ? "rounded-2xl bg-danger-dim px-4 py-3 text-sm text-danger"
+                  : "rounded-2xl bg-console-3/60 px-4 py-3 text-sm text-ink-dim"
               }
             >
               {lastResult.message}
             </p>
           ) : null}
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending !== null}
-              className="max-md:h-11"
-            >
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={pending !== null}>
               Cancelar
             </Button>
             <Button
               onClick={() => run("gerar", () => generateMonthlyInvoices(competencia))}
               disabled={pending !== null || !competencia}
               aria-busy={pending === "gerar"}
-              className="max-md:h-11"
             >
               {pending === "gerar" ? (
                 <LoaderCircleIcon className="animate-spin" aria-hidden="true" />

@@ -18,7 +18,6 @@ type SignaturePadProps = {
   label?: string
 }
 
-const HEIGHT = 180
 const INK = "#0B1220"
 const PAPER = "#FFFFFF"
 
@@ -63,8 +62,9 @@ export function SignaturePad({ disabled, onInkChange, ref, label = "Quadro de as
     if (inked.current && canvas.width > 0) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const width = Math.max(1, Math.floor(wrap.clientWidth))
+    const height = Math.max(1, Math.floor(wrap.clientHeight))
     canvas.width = Math.floor(width * dpr)
-    canvas.height = Math.floor(HEIGHT * dpr)
+    canvas.height = Math.floor(height * dpr)
     const ctx = canvas.getContext("2d")
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -177,10 +177,22 @@ export function SignaturePad({ disabled, onInkChange, ref, label = "Quadro de as
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex min-h-11 items-center justify-between gap-3">
+        <p className="text-sm text-ink-dim">Assinatura do responsável</p>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={clear}
+          disabled={disabled || !hasInk}
+        >
+          <EraserIcon aria-hidden="true" />
+          Limpar
+        </Button>
+      </div>
+      {/* touch-none + overscroll: o traço não rola nem recarrega a página */}
       <div
         ref={wrapRef}
-        className="relative overflow-hidden rounded-lg border border-line bg-white"
-        style={{ height: HEIGHT }}
+        className="relative h-56 touch-none overflow-hidden overscroll-contain rounded-2xl bg-white select-none sm:h-52"
       >
         <canvas
           ref={canvasRef}
@@ -194,25 +206,13 @@ export function SignaturePad({ disabled, onInkChange, ref, label = "Quadro de as
           onPointerLeave={endStroke}
         />
         {!hasInk && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-10 mx-6 border-b border-dashed border-slate-300 text-center" aria-hidden="true" />
+          <span className="pointer-events-none absolute inset-x-0 bottom-12 mx-6 border-b border-dashed border-neutral-300" aria-hidden="true" />
         )}
         {!hasInk && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-slate-500" aria-hidden="true">
+          <span className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-[0.8125rem] text-neutral-500" aria-hidden="true">
             Assine aqui com o dedo ou a caneta
           </span>
         )}
-      </div>
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-11 md:h-8"
-          onClick={clear}
-          disabled={disabled || !hasInk}
-        >
-          <EraserIcon aria-hidden="true" />
-          Limpar
-        </Button>
       </div>
     </div>
   )

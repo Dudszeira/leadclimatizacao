@@ -53,7 +53,7 @@ export function InviteDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="h-9 max-md:h-11" />}>
+      <DialogTrigger render={<Button />}>
         <MailPlusIcon aria-hidden="true" />
         Convidar pessoa
       </DialogTrigger>
@@ -65,7 +65,7 @@ export function InviteDialog() {
             escolhido.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-4" noValidate>
+        <form action={formAction} className="flex flex-col gap-5" noValidate>
           <div className="flex flex-col gap-2">
             <Label htmlFor="invite-name">Nome completo</Label>
             <Input
@@ -73,7 +73,6 @@ export function InviteDialog() {
               name="full_name"
               autoComplete="off"
               required
-              className="h-10"
               aria-invalid={errors.full_name ? true : undefined}
               aria-describedby={errors.full_name ? "invite-name-error" : undefined}
             />
@@ -94,7 +93,6 @@ export function InviteDialog() {
               autoCapitalize="none"
               spellCheck={false}
               required
-              className="h-10"
               aria-invalid={errors.email ? true : undefined}
               aria-describedby={errors.email ? "invite-email-error" : undefined}
             />
@@ -114,7 +112,7 @@ export function InviteDialog() {
                 if (value) setRole(value as UserRole)
               }}
             >
-              <SelectTrigger id="invite-role" aria-label="Papel" className="h-10 w-full">
+              <SelectTrigger id="invite-role" aria-label="Papel" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -127,17 +125,16 @@ export function InviteDialog() {
             </Select>
             {errors.role && <p className="text-xs text-danger">{errors.role}</p>}
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
-              className="max-md:h-11"
               onClick={() => setOpen(false)}
               disabled={pending}
             >
               Cancelar
             </Button>
-            <Button type="submit" className="max-md:h-11" disabled={pending} aria-busy={pending}>
+            <Button type="submit" disabled={pending} aria-busy={pending}>
               {pending ? (
                 <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
               ) : (

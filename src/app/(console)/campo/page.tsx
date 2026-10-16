@@ -11,6 +11,7 @@ import { groupFieldOrders } from "@/components/chamados/execution-rules"
 import { FieldOrderCard } from "@/components/campo/field-order-card"
 import { DataError } from "@/components/data-error"
 import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 
 export const metadata: Metadata = {
   title: "Minhas OS",
@@ -27,8 +28,8 @@ const todayFmt = new Intl.DateTimeFormat("pt-BR", {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 /**
- * App de campo (técnico e admin): OS ativas em cards, agrupadas por
- * Em andamento / Hoje / Próximas. Técnico vê só as dele; admin escolhe o
+ * App de campo (técnico e admin): OS ativas em cards, agrupadas em
+ * Em andamento, Hoje e Próximas. Técnico vê só as dele; admin escolhe o
  * técnico (padrão: todos).
  */
 export default async function CampoPage({ searchParams }: { searchParams: SearchParams }) {
@@ -50,39 +51,40 @@ export default async function CampoPage({ searchParams }: { searchParams: Search
   const hojeLabel = todayFmt.format(now)
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5">
-      <header>
-        <h2 className="font-display text-xl font-bold tracking-tight text-ink">
-          {isAdmin && !filtroTecnico ? "OS em campo" : "Minhas OS"}
-        </h2>
-        <p className="mt-1 text-sm text-ink-dim first-letter:uppercase">{hojeLabel}</p>
-      </header>
-
-      {isAdmin && technicians?.data && technicians.data.length > 0 && (
-        <nav aria-label="Filtrar por técnico" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-          <ul className="flex w-max gap-2">
-            {[{ id: "", full_name: "Todos" }, ...technicians.data].map((t) => {
-              const active = (t.id || undefined) === filtroTecnico
-              return (
-                <li key={t.id || "todos"}>
-                  <Link
-                    href={t.id ? `/campo?tecnico=${t.id}` : "/campo"}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap transition-colors",
-                      active
-                        ? "border-signal/40 bg-signal-dim text-signal"
-                        : "border-line bg-console text-ink-dim hover:text-ink",
-                    )}
-                  >
-                    {t.full_name}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
-      )}
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        title={isAdmin && !filtroTecnico ? "OS em campo" : "Minhas OS"}
+        description={<span className="block first-letter:uppercase">{hojeLabel}</span>}
+      >
+        {isAdmin && technicians?.data && technicians.data.length > 0 && (
+          <nav
+            aria-label="Filtrar por técnico"
+            className="no-scrollbar -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0"
+          >
+            <ul className="flex w-max gap-2">
+              {[{ id: "", full_name: "Todos" }, ...technicians.data].map((t) => {
+                const active = (t.id || undefined) === filtroTecnico
+                return (
+                  <li key={t.id || "todos"}>
+                    <Link
+                      href={t.id ? `/campo?tecnico=${t.id}` : "/campo"}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "inline-flex h-11 items-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-[color,background-color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50 md:h-10",
+                        active
+                          ? "bg-ink text-void"
+                          : "bg-console-2 text-ink-dim hover:bg-console-3 hover:text-ink",
+                      )}
+                    >
+                      {t.full_name}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </nav>
+        )}
+      </PageHeader>
 
       {result.error !== null ? (
         <DataError message={result.error} />
@@ -122,26 +124,30 @@ function FieldGroups({
   ]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {sections.map((section) =>
         section.items.length === 0 ? null : (
           <section key={section.key} aria-labelledby={`campo-${section.key}`} className="flex flex-col gap-3">
-            <h3
+            <h2
               id={`campo-${section.key}`}
-              className="flex items-center justify-between text-xs font-medium tracking-wider text-ink-faint uppercase"
+              className="flex items-center gap-2 font-display text-lg font-medium tracking-[-0.02em] text-ink"
             >
               {section.titulo}
-              <span className="font-mono tabular-nums">{section.items.length}</span>
-            </h3>
-            {section.items.map((os) => (
-              <FieldOrderCard
-                key={os.id}
-                os={os}
-                mode={section.key}
-                now={now}
-                showTechnician={showTechnician}
-              />
-            ))}
+              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-console-2 px-2 font-sans text-xs font-medium text-ink-dim tabular-nums">
+                {section.items.length}
+              </span>
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              {section.items.map((os) => (
+                <FieldOrderCard
+                  key={os.id}
+                  os={os}
+                  mode={section.key}
+                  now={now}
+                  showTechnician={showTechnician}
+                />
+              ))}
+            </div>
           </section>
         ),
       )}

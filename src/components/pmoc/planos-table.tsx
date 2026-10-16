@@ -4,6 +4,12 @@ import { cn } from "cn"
 import type { PmocPlanListItem } from "@/lib/types"
 import { EQUIPMENT_TYPE_LABELS } from "@/lib/status-meta"
 import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
   Table,
   TableBody,
   TableCell,
@@ -15,11 +21,53 @@ import { PlanoSituacaoBadge, prazoLabel } from "./plano-situacao-badge"
 import { PlanRowActions } from "./plan-row-actions"
 import type { ChecklistOption } from "./plan-form-dialog"
 
-const HEAD = "text-xs font-medium tracking-wider text-ink-faint uppercase"
+const FILTROS = [
+  { value: "ativos", label: "Ativos" },
+  { value: "todos", label: "Todos" },
+] as const
+
+function nomeCliente(p: PmocPlanListItem): string {
+  return p.client.nome_fantasia ?? p.client.razao_social
+}
+
+function prazoTexto(p: PmocPlanListItem): string {
+  if (!p.ativo) return "Plano encerrado"
+  const t = prazoLabel(p.dias_para_vencer)
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+function Acoes({
+  p,
+  checklistOptions,
+}: {
+  p: PmocPlanListItem
+  checklistOptions: ChecklistOption[]
+}) {
+  const label = `${p.equipment.codigo_interno}, ${EQUIPMENT_TYPE_LABELS[p.equipment.tipo]}${p.equipment.marca ? ` ${p.equipment.marca}` : ""}`
+  return (
+    <PlanRowActions
+      plan={{
+        id: p.id,
+        equipment_id: p.equipment_id,
+        periodicidade_dias: p.periodicidade_dias,
+        proxima_data: p.proxima_data,
+        checklist_template_id: p.checklist_template_id,
+        ativo: p.ativo,
+        observacoes: p.observacoes,
+        responsavel_tecnico: p.responsavel_tecnico ?? null,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      }}
+      equipmentLabel={label}
+      equipmentInativo={p.equipment.status === "inativo"}
+      checklistOptions={checklistOptions}
+    />
+  )
+}
 
 /**
- * Tabela de planos PMOC (cadastro): situação pela proxima_data + OS em
- * aberto, responsável técnico e ações (só escritório).
+ * Planos PMOC (cadastro): situação pela proxima_data + OS em aberto,
+ * responsável técnico e ações (só escritório). Tabela no desktop, lista no celular.
  */
 export function PlanosTable({
   planos,
@@ -35,112 +83,163 @@ export function PlanosTable({
   hrefFiltro: (f: "ativos" | "todos") => string
 }) {
   return (
-    <section aria-label="Planos PMOC" className="overflow-hidden rounded-xl border border-line bg-console">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-4 py-3">
-        <div>
-          <h3 className="font-display text-sm font-bold tracking-tight text-ink">Planos PMOC</h3>
-          <p className="mt-0.5 text-xs text-ink-dim">
-            Um plano por equipamento. Para criar, abra o cliente › Equipamentos › Criar plano PMOC.
-          </p>
+    <Card className="gap-0 pb-0 md:pb-0">
+      <CardHeader className="gap-3 md:flex md:items-start md:justify-between md:gap-6">
+        <div className="min-w-0 space-y-1">
+          <CardTitle>
+            <h2>Planos PMOC</h2>
+          </CardTitle>
+          <CardDescription>
+            Um plano por equipamento. Para criar, abra o cliente, depois Equipamentos e
+            Criar plano PMOC.
+          </CardDescription>
         </div>
-        <nav aria-label="Filtrar planos" className="flex gap-1 text-xs">
-          {(["ativos", "todos"] as const).map((f) => (
+        <nav
+          aria-label="Filtrar planos"
+          className="flex h-11 w-full shrink-0 items-center gap-1 rounded-full bg-console-2 p-1 md:h-10 md:w-auto"
+        >
+          {FILTROS.map((f) => (
             <Link
-              key={f}
-              href={hrefFiltro(f)}
-              aria-current={filtro === f ? "page" : undefined}
+              key={f.value}
+              href={hrefFiltro(f.value)}
+              aria-current={filtro === f.value ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-8 items-center rounded-md px-2.5 max-md:min-h-11",
-                filtro === f ? "bg-signal-dim text-signal" : "text-ink-dim hover:text-ink",
+                "inline-flex h-full flex-1 items-center justify-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50",
+                filtro === f.value ? "bg-ink text-void" : "text-ink-dim hover:text-ink"
               )}
             >
-              {f === "ativos" ? "Ativos" : "Todos (inclui encerrados)"}
+              {f.value === "todos" ? (
+                <>
+                  Todos<span className="max-md:hidden">, com encerrados</span>
+                </>
+              ) : (
+                f.label
+              )}
             </Link>
           ))}
         </nav>
-      </header>
+      </CardHeader>
+
       {planos.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-ink-dim">Nenhum plano para exibir.</p>
+        <p className="px-(--card-spacing) pt-4 pb-6 text-sm text-ink-dim">
+          Nenhum plano para exibir neste filtro.
+        </p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table aria-label="Planos PMOC">
-            <TableHeader>
-              <TableRow className="border-line-soft hover:bg-transparent">
-                <TableHead className={cn(HEAD, "px-4")}>Equipamento</TableHead>
-                <TableHead className={HEAD}>Cliente / prédio</TableHead>
-                <TableHead className={HEAD}>Situação</TableHead>
-                <TableHead className={HEAD}>Prazo</TableHead>
-                <TableHead className={HEAD}>Responsável técnico</TableHead>
-                {podeEditar && (
-                  <TableHead className="w-12 px-4">
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {planos.map((p) => {
-                const label = `${p.equipment.codigo_interno} · ${EQUIPMENT_TYPE_LABELS[p.equipment.tipo]}${p.equipment.marca ? ` ${p.equipment.marca}` : ""}`
-                return (
-                  <TableRow key={p.id} className={cn("border-line-soft hover:bg-console-2/60", !p.ativo && "opacity-70")}>
-                    <TableCell className="px-4 py-3">
-                      <span className="block font-mono text-signal">{p.equipment.codigo_interno}</span>
+        <>
+          {/* Desktop: tabela */}
+          <div className="mt-4 hidden border-t border-line-soft md:block">
+            <Table aria-label="Planos PMOC">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Equipamento</TableHead>
+                  <TableHead>Cliente e prédio</TableHead>
+                  <TableHead>Situação</TableHead>
+                  <TableHead>Prazo</TableHead>
+                  <TableHead>Responsável técnico</TableHead>
+                  {podeEditar && (
+                    <TableHead className="w-14">
+                      <span className="sr-only">Ações</span>
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {planos.map((p) => (
+                  <TableRow key={p.id} className={cn(!p.ativo && "opacity-70")}>
+                    <TableCell>
+                      <span className="block font-medium text-ink">
+                        {p.equipment.codigo_interno}
+                      </span>
                       <span className="block text-xs text-ink-faint">
                         {EQUIPMENT_TYPE_LABELS[p.equipment.tipo]}
-                        {p.equipment.marca ? ` · ${p.equipment.marca}` : ""}
+                        {p.equipment.marca ? `, ${p.equipment.marca}` : ""}
                       </span>
                     </TableCell>
-                    <TableCell className="max-w-64 py-3">
+                    <TableCell className="max-w-64">
                       <Link
                         href={`/clientes/${p.client.id}`}
                         className="block truncate text-ink hover:text-signal"
                       >
-                        {p.client.nome_fantasia ?? p.client.razao_social}
+                        {nomeCliente(p)}
                       </Link>
-                      <span className="block truncate text-xs text-ink-faint">{p.building.nome}</span>
+                      <span className="block truncate text-xs text-ink-faint">
+                        {p.building.nome}
+                      </span>
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell>
                       <PlanoSituacaoBadge plan={p} />
                     </TableCell>
-                    <TableCell className="py-3 text-xs text-ink-dim">
-                      {p.ativo ? prazoLabel(p.dias_para_vencer) : "—"}
+                    <TableCell className="text-[0.8125rem] text-ink-dim">
+                      {prazoTexto(p)}
                       {p.ativo && !p.os_aberta && p.situacao !== "em_dia" && (
-                        <span className="block text-ink-faint">sem OS gerada</span>
+                        <span className="block text-xs text-ink-faint">Sem OS gerada</span>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-56 py-3">
-                      <span className="block truncate text-sm text-ink-dim">
-                        {p.responsavel_tecnico ?? "—"}
+                    <TableCell className="max-w-56">
+                      <span
+                        className={cn(
+                          "block truncate text-sm",
+                          p.responsavel_tecnico ? "text-ink-dim" : "text-ink-faint"
+                        )}
+                      >
+                        {p.responsavel_tecnico ?? "Não informado"}
                       </span>
                     </TableCell>
                     {podeEditar && (
-                      <TableCell className="px-4 py-3 text-right">
-                        <PlanRowActions
-                          plan={{
-                            id: p.id,
-                            equipment_id: p.equipment_id,
-                            periodicidade_dias: p.periodicidade_dias,
-                            proxima_data: p.proxima_data,
-                            checklist_template_id: p.checklist_template_id,
-                            ativo: p.ativo,
-                            observacoes: p.observacoes,
-                            responsavel_tecnico: p.responsavel_tecnico ?? null,
-                            created_at: p.created_at,
-                            updated_at: p.updated_at,
-                          }}
-                          equipmentLabel={label}
-                          equipmentInativo={p.equipment.status === "inativo"}
-                          checklistOptions={checklistOptions}
-                        />
+                      <TableCell className="text-right">
+                        <Acoes p={p} checklistOptions={checklistOptions} />
                       </TableCell>
                     )}
                   </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Celular: lista */}
+          <ul role="list" className="mt-4 divide-y divide-line-soft border-t border-line-soft md:hidden">
+            {planos.map((p) => (
+              <li
+                key={p.id}
+                className={cn("flex items-start gap-2 py-3.5 pr-2 pl-4", !p.ativo && "opacity-70")}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-baseline gap-2">
+                    <span className="text-[0.9375rem] font-medium text-ink">
+                      {p.equipment.codigo_interno}
+                    </span>
+                    <span className="truncate text-[0.8125rem] text-ink-faint">
+                      {EQUIPMENT_TYPE_LABELS[p.equipment.tipo]}
+                      {p.equipment.marca ? `, ${p.equipment.marca}` : ""}
+                    </span>
+                  </p>
+                  <Link
+                    href={`/clientes/${p.client.id}`}
+                    className="mt-0.5 block truncate text-sm text-ink-dim hover:text-signal"
+                  >
+                    {nomeCliente(p)}, {p.building.nome}
+                  </Link>
+                  <div className="mt-2.5 flex flex-wrap items-start gap-x-3 gap-y-1">
+                    <PlanoSituacaoBadge plan={p} />
+                  </div>
+                  <p className="mt-1.5 text-[0.8125rem] text-ink-dim">
+                    {prazoTexto(p)}
+                    {p.ativo && !p.os_aberta && p.situacao !== "em_dia" && (
+                      <span className="text-ink-faint">, sem OS gerada</span>
+                    )}
+                  </p>
+                  {p.responsavel_tecnico && (
+                    <p className="mt-0.5 truncate text-xs text-ink-faint">
+                      RT: {p.responsavel_tecnico}
+                    </p>
+                  )}
+                </div>
+                {podeEditar && <Acoes p={p} checklistOptions={checklistOptions} />}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-    </section>
+    </Card>
   )
 }

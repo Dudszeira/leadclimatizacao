@@ -1,51 +1,31 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { ChevronLeftIcon } from "lucide-react"
 
 import { requireRole } from "@/server/auth"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageHeader } from "@/components/page-header"
 import { Importer } from "@/components/importar/importer"
 
 export const metadata: Metadata = {
   title: "Importar planilha",
 }
 
-/** Carga inicial por CSV — só admin (a action também exige admin). */
+/** Carga inicial por CSV, só admin (a action também exige admin). */
 export default async function ImportarPage() {
   await requireRole("admin")
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink
-              render={<Link href="/clientes" />}
-              className="inline-flex min-h-11 items-center md:min-h-0"
-            >
-              Clientes
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Importar planilha</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <header>
-        <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-          Importar planilha
-        </h2>
-        <p className="mt-1 text-sm text-ink-dim">
-          Carga inicial de clientes, prédios e equipamentos a partir de CSV, com
-          pré-visualização e validação linha a linha antes de gravar.
-        </p>
-      </header>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <Link
+        href="/clientes"
+        className="-ml-1 mb-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-full pr-2 text-sm text-ink-dim transition-colors hover:text-ink focus-visible:ring-3 focus-visible:ring-signal/50 focus-visible:outline-none md:min-h-8"
+      >
+        <ChevronLeftIcon className="size-4" aria-hidden="true" />
+        Clientes
+      </Link>
+      <PageHeader
+        title="Importar planilha"
+        description="Traga clientes, prédios e equipamentos de um CSV. Você confere linha a linha antes de gravar."
+      />
       <Importer />
     </div>
   )

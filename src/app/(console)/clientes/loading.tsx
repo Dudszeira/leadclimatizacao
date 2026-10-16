@@ -1,20 +1,19 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { ClientsTableSkeleton } from "@/components/clientes/skeletons"
+import {
+  ClientsTableSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/clientes/skeletons"
 
 export default function ClientesLoading() {
   return (
-    <div className="flex flex-1 flex-col gap-4" aria-busy="true">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-4 w-72 max-w-full" />
+    <div className="flex flex-1 flex-col" aria-busy="true">
+      <PageHeaderSkeleton actions={3} />
+      <div className="-mt-1 mb-6 flex flex-col gap-3 md:mb-8 md:flex-row md:items-center md:gap-2">
+        <Skeleton className="h-11 w-full rounded-xl md:h-10 md:max-w-xs" />
+        <div className="flex gap-2">
+          <Skeleton className="h-11 w-36 rounded-full md:h-10" />
+          <Skeleton className="h-11 w-36 rounded-full md:h-10" />
         </div>
-        <Skeleton className="h-9 w-32" />
-      </header>
-      <div className="flex flex-wrap items-center gap-2">
-        <Skeleton className="h-9 w-full sm:max-w-xs" />
-        <Skeleton className="h-9 w-36" />
-        <Skeleton className="h-9 w-36" />
       </div>
       <ClientsTableSkeleton />
     </div>

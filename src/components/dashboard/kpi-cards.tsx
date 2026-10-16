@@ -1,69 +1,118 @@
 import type { CSSProperties } from "react"
-import {
-  AirVentIcon,
-  BotIcon,
-  TimerIcon,
-  TrendingUpIcon,
-  TriangleAlertIcon,
-  WrenchIcon,
-} from "lucide-react"
 
-import { getDashboardKpis } from "@/server/dashboard"
 import { DataError } from "@/components/data-error"
-import { formatInteiro, formatMinutos, formatPct } from "@/lib/format"
+import { formatBRLInteiro, formatInteiro, formatPct } from "@/lib/format"
+import type { UserRole } from "@/lib/types"
+import { kpisDoRequest, plural, pmocDoRequest, resumoDoRequest } from "./data"
 import { StatCard } from "./stat-card"
 
 function delay(s: number): CSSProperties {
   return { "--enter-delay": `${s}s` } as CSSProperties
 }
 
-/** Linha de 4 KPIs do topo — espelho do "Console de Operações" da demo aceita. */
-export async function KpiCards() {
-  const result = await getDashboardKpis()
-  if (result.error !== null) {
-    return <DataError message={result.error} compact />
+/**
+ * Os 4 números que o dono olha de relance, na ordem de urgência:
+ * chamados em andamento, PMOC vencendo, a receber no mês (só admin) e a base
+ * de equipamentos. Grade 2x2 no celular, 4 colunas no desktop.
+ */
+export async function KpiCards({ role }: { role: UserRole }) {
+  const [kpisR, resumoR, pmocR] = await Promise.all([
+    kpisDoRequest(),
+    resumoDoRequest(),
+    pmocDoRequest(),
+  ])
+
+  // Se tudo falhou, um aviso só; se falhou uma fonte, o card dela avisa sozinho.
+  if (kpisR.error !== null && resumoR.error !== null && pmocR.error !== null) {
+    return <DataError message={kpisR.error} compact />
   }
-  const kpis = result.data
+
+  const kpis = kpisR.data
+  const resumo = resumoR.data
+  const pmoc = pmocR.data
+  const isAdmin = role === "admin"
+
+  const aReceber = resumo
+    ? Math.max(0, resumo.faturamento_previsto_mes - resumo.faturamento_recebido_mes)
+    : null
 
   return (
     <section
       aria-label="Indicadores da operação"
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-4"
     >
       <StatCard
         style={delay(0.02)}
-        label="Equipamentos sob contrato"
-        value={formatInteiro(kpis.equipamentos_sob_contrato)}
-        icon={AirVentIcon}
-        sub="ativos em prédios com contrato vigente"
-        subIcon={TrendingUpIcon}
-        tone="clear"
-      />
-      <StatCard
-        style={delay(0.08)}
+        href="/chamados"
         label="Chamados abertos"
-        value={formatInteiro(kpis.chamados_abertos)}
-        icon={WrenchIcon}
-        sub="aguardando, agendados e em campo"
-        subIcon={TriangleAlertIcon}
-        tone={kpis.chamados_abertos > 0 ? "amber" : "clear"}
+        value={kpis ? formatInteiro(kpis.chamados_abertos) : null}
+        pill={
+          resumo && resumo.os_em_campo > 0
+            ? { text: `${formatInteiro(resumo.os_em_campo)} em campo`, tone: "signal" }
+            : null
+        }
+        sub={
+          resumo
+            ? resumo.os_abertas > 0
+              ? `${formatInteiro(resumo.os_abertas)} ${plural(resumo.os_abertas, "aguarda", "aguardam")} despacho`
+              : "Nenhum aguardando despacho"
+            : undefined
+        }
+        tone={resumo && resumo.os_abertas > 0 ? "amber" : "neutral"}
       />
       <StatCard
-        style={delay(0.14)}
-        label="Resolvidos pela IA"
-        value={formatPct(kpis.triagem_ia_pct)}
-        icon={BotIcon}
-        sub="das triagens sem transferir para humano"
-        subIcon={TrendingUpIcon}
-        tone="clear"
+        style={delay(0.07)}
+        href="/pmoc"
+        label="PMOC vencendo"
+        value={pmoc ? formatInteiro(pmoc.vencendo_7d) : null}
+        pill={
+          pmoc && pmoc.atrasados > 0
+            ? {
+                text: `${formatInteiro(pmoc.atrasados)} ${plural(pmoc.atrasados, "atrasado", "atrasados")}`,
+                tone: "danger",
+              }
+            : null
+        }
+        sub={pmoc ? `Nos próximos 7 dias, de ${formatInteiro(pmoc.total)} planos` : undefined}
       />
+      {isAdmin ? (
+        <StatCard
+          style={delay(0.12)}
+          href="/financeiro"
+          label="A receber no mês"
+          value={aReceber === null ? null : formatBRLInteiro(aReceber)}
+          sub={
+            resumo
+              ? `${formatBRLInteiro(resumo.faturamento_recebido_mes)} recebidos de ${formatBRLInteiro(resumo.faturamento_previsto_mes)}`
+              : undefined
+          }
+        />
+      ) : (
+        <StatCard
+          style={delay(0.12)}
+          href="/atendimento"
+          label="Resolvidos pela IA"
+          value={
+            kpis && kpis.triagem_ia_pct !== null ? formatPct(kpis.triagem_ia_pct) : null
+          }
+          valueFallback={kpis ? "Sem conversas ainda" : undefined}
+          sub="Triagens sem passar para humano"
+        />
+      )}
       <StatCard
-        style={delay(0.2)}
-        label="Tempo médio de 1ª resposta"
-        value={formatMinutos(kpis.tempo_primeira_resposta_min)}
-        icon={TimerIcon}
-        sub="entre a mensagem do cliente e a resposta"
-        tone="neutral"
+        style={delay(0.17)}
+        href="/mapa"
+        label="Equipamentos"
+        value={kpis ? formatInteiro(kpis.equipamentos_sob_contrato) : null}
+        pill={
+          resumo && resumo.equip_com_chamado > 0
+            ? {
+                text: `${formatInteiro(resumo.equip_com_chamado)} com chamado`,
+                tone: "amber",
+              }
+            : null
+        }
+        sub="Sob contrato vigente"
       />
     </section>
   )

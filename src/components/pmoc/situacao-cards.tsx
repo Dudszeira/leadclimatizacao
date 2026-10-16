@@ -2,6 +2,7 @@ import type { CSSProperties } from "react"
 import {
   CalendarClockIcon,
   CircleCheckIcon,
+  ClipboardListIcon,
   TriangleAlertIcon,
 } from "lucide-react"
 
@@ -13,16 +14,23 @@ function delay(s: number): CSSProperties {
   return { "--enter-delay": `${s}s` } as CSSProperties
 }
 
-/** Linha de 3 cards de situação PMOC no topo do calendário. */
+/** Situação dos planos PMOC: grade 2x2 no celular, 4 colunas no desktop. */
 export function PmocSituacaoCards({ contadores }: { contadores: PmocContadores }) {
   return (
     <section
       aria-label="Situação dos planos PMOC (Lei 13.589/2018)"
-      className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+      className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4"
     >
       <StatCard
         style={delay(0)}
-        label="PMOCs em dia"
+        label="Planos ativos"
+        value={formatInteiro(contadores.total)}
+        icon={ClipboardListIcon}
+        sub="com visita programada"
+      />
+      <StatCard
+        style={delay(0.05)}
+        label="Em dia"
         value={formatInteiro(contadores.em_dia)}
         icon={CircleCheckIcon}
         sub={`de ${formatInteiro(contadores.total)} planos ativos`}
@@ -30,8 +38,8 @@ export function PmocSituacaoCards({ contadores }: { contadores: PmocContadores }
         valueClassName="text-clear"
       />
       <StatCard
-        style={delay(0.06)}
-        label="Vencendo nos próximos 7 dias"
+        style={delay(0.1)}
+        label="Vencendo em 7 dias"
         value={formatInteiro(contadores.vencendo_7d)}
         icon={CalendarClockIcon}
         sub={
@@ -39,23 +47,21 @@ export function PmocSituacaoCards({ contadores }: { contadores: PmocContadores }
             ? "agendar visita esta semana"
             : "nada a vencer esta semana"
         }
-        subIcon={contadores.vencendo_7d > 0 ? TriangleAlertIcon : undefined}
         tone={contadores.vencendo_7d > 0 ? "amber" : "neutral"}
-        valueClassName="text-amber"
+        valueClassName={contadores.vencendo_7d > 0 ? "text-amber" : undefined}
       />
       <StatCard
-        style={delay(0.12)}
+        style={delay(0.15)}
         label="Atrasados"
         value={formatInteiro(contadores.atrasados)}
         icon={TriangleAlertIcon}
         sub={
           contadores.atrasados > 0
-            ? "risco de multa · Lei 13.589/2018"
+            ? "risco de multa pela Lei 13.589"
             : "nenhum plano em atraso"
         }
-        subIcon={contadores.atrasados > 0 ? TriangleAlertIcon : undefined}
         tone={contadores.atrasados > 0 ? "danger" : "neutral"}
-        valueClassName="text-danger"
+        valueClassName={contadores.atrasados > 0 ? "text-danger" : undefined}
       />
     </section>
   )

@@ -23,7 +23,6 @@ export function ForgotForm() {
           autoCapitalize="none"
           spellCheck={false}
           required
-          className="h-11"
         />
       </div>
       <FormMessage state={state} />

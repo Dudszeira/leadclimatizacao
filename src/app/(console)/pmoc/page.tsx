@@ -1,14 +1,6 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { Suspense } from "react"
-import { cn } from "cn"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import {
-  CalendarCheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react"
+import { CalendarCheckIcon } from "lucide-react"
 
 import type { UserRole } from "@/lib/types"
 import { requireRole } from "@/server/auth"
@@ -20,12 +12,13 @@ import {
   listPmocPlanDetails,
   listPmocPlans,
 } from "@/server/pmoc"
-import { buttonVariants } from "@/components/ui/button"
+import { PageHeader } from "@/components/page-header"
 import { DataError } from "@/components/data-error"
 import { EmptyState } from "@/components/empty-state"
 import { AtencaoImediata } from "@/components/pmoc/atencao-imediata"
 import { PmocCalendar } from "@/components/pmoc/calendar"
 import { situacaoDoEvento, type PmocEvento } from "@/components/pmoc/evento"
+import { PmocMonthNav } from "@/components/pmoc/month-nav"
 import { PlanosTable } from "@/components/pmoc/planos-table"
 import { PmocSituacaoCards } from "@/components/pmoc/situacao-cards"
 import { PmocSectionSkeleton } from "@/components/pmoc/skeletons"
@@ -69,65 +62,19 @@ export default async function PmocPage({ searchParams }: PageProps<"/pmoc">) {
   const filtroPlanos: FiltroPlanos = sp.planos === "todos" ? "todos" : "ativos"
   const [ano, mesNum] = mes.split("-").map(Number)
 
-  const anterior = mesNum === 1 ? `${ano - 1}-12` : `${ano}-${pad2(mesNum - 1)}`
-  const proximo = mesNum === 12 ? `${ano + 1}-01` : `${ano}-${pad2(mesNum + 1)}`
-  const rotuloBruto = format(new Date(ano, mesNum - 1, 1), "MMMM 'de' yyyy", {
-    locale: ptBR,
-  })
-  const rotulo = rotuloBruto.charAt(0).toUpperCase() + rotuloBruto.slice(1)
-
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-            Calendário PMOC
-          </h2>
-          <p className="mt-1 text-sm text-ink-dim">
-            Manutenções preventivas previstas e geradas por plano, conforme a Lei
-            13.589/2018.
-          </p>
-        </div>
-        <nav aria-label="Navegação de mês" className="flex items-center gap-1.5">
-          <Link
-            href={`/pmoc?mes=${anterior}`}
-            aria-label="Mês anterior"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "icon" }),
-              "size-9 max-md:size-11"
-            )}
-          >
-            <ChevronLeftIcon aria-hidden="true" />
-          </Link>
-          <span
-            aria-live="polite"
-            className="min-w-36 text-center font-display text-sm font-bold tracking-tight text-ink"
-          >
-            {rotulo}
-          </span>
-          <Link
-            href={`/pmoc?mes=${proximo}`}
-            aria-label="Próximo mês"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "icon" }),
-              "size-9 max-md:size-11"
-            )}
-          >
-            <ChevronRightIcon aria-hidden="true" />
-          </Link>
-          {mes !== mesAtual() && (
-            <Link
-              href="/pmoc"
-              className={cn(
-                buttonVariants({ variant: "ghost" }),
-                "h-9 px-2.5 text-ink-dim max-md:h-11"
-              )}
-            >
-              Hoje
-            </Link>
-          )}
-        </nav>
-      </header>
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        title="Calendário PMOC"
+        description="Manutenções preventivas previstas e geradas por plano, conforme a Lei 13.589/2018."
+        actions={
+          <PmocMonthNav
+            mes={mes}
+            mesAtual={mesAtual()}
+            query={filtroPlanos === "todos" ? "&planos=todos" : ""}
+          />
+        }
+      />
 
       <Suspense key={`${mes}|${filtroPlanos}`} fallback={<PmocSectionSkeleton />}>
         <PmocSection
@@ -228,7 +175,7 @@ async function PmocSection({
     .sort((a, b) => a.dias_para_vencer - b.dias_para_vencer)
 
   return (
-    <>
+    <div className="flex flex-col gap-6 md:gap-8">
       <PmocSituacaoCards contadores={contadores.data} />
       <PmocCalendar
         mes={mes}
@@ -237,7 +184,7 @@ async function PmocSection({
         detalhes={detalheMap}
       />
       <AtencaoImediata itens={atencao} podeGerarOs={role === "admin"} />
-      <div id="planos" className="scroll-mt-4">
+      <div id="planos" className="scroll-mt-20">
         <PlanosTable
           planos={planos.data}
           checklistOptions={checklists.data ?? []}
@@ -246,6 +193,6 @@ async function PmocSection({
           hrefFiltro={hrefFiltro}
         />
       </div>
-    </>
+    </div>
   )
 }

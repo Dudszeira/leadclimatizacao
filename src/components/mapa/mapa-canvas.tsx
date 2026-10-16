@@ -5,7 +5,14 @@ import "leaflet/dist/leaflet.css"
 import * as React from "react"
 import Link from "next/link"
 import L from "leaflet"
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet"
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+  useMap,
+} from "react-leaflet"
 import { cn } from "cn"
 import { ArrowUpRightIcon } from "lucide-react"
 
@@ -74,25 +81,38 @@ function FocusController({ focus, markers }: FocusControllerProps) {
   return null
 }
 
+/**
+ * O contêiner do mapa muda de tamanho depois de montar (altura calculada pela
+ * área útil, painel lateral, rotação do celular): avisa o Leaflet para
+ * recalcular e carregar os tiles que faltam.
+ */
+function SizeWatcher() {
+  const map = useMap()
+  React.useEffect(() => {
+    const el = map.getContainer()
+    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [map])
+  return null
+}
+
 function PinPopup({ building }: { building: MapaBuilding }) {
   const statuses = LEGEND_ORDER.filter((s) => building.status_counts[s] > 0)
 
   return (
-    <div className="min-w-56 p-3.5 font-sans">
-      <p className="font-display text-sm font-bold tracking-tight text-ink">
+    <div className="w-60 p-4 font-sans">
+      <p className="font-display text-base leading-snug font-medium tracking-[-0.015em] text-ink">
         {building.nome}
       </p>
-      <p className="mt-0.5 text-xs text-ink-dim">{clientName(building)}</p>
+      <p className="mt-0.5 text-[0.8125rem] text-ink-dim">{clientName(building)}</p>
       <p className="mt-1 text-xs leading-relaxed text-ink-faint">
         {buildingAddress(building)}
       </p>
 
-      <ul className="mt-3 space-y-1.5 border-t border-line-soft pt-3">
+      <ul className="mt-3 space-y-2 border-t border-line pt-3">
         {statuses.map((status) => (
-          <li
-            key={status}
-            className="flex items-center gap-2 text-xs text-ink-dim"
-          >
+          <li key={status} className="flex items-center gap-2 text-[0.8125rem] text-ink-dim">
             <span
               className={cn(
                 "size-2 shrink-0 rounded-full",
@@ -101,21 +121,19 @@ function PinPopup({ building }: { building: MapaBuilding }) {
               aria-hidden="true"
             />
             <span className="flex-1">{EQUIPMENT_STATUS_META[status].label}</span>
-            <span className="font-mono text-ink">
+            <span className="font-medium text-ink tabular-nums">
               {building.status_counts[status]}
             </span>
           </li>
         ))}
         {statuses.length === 0 && (
-          <li className="text-xs text-ink-faint">
-            Nenhum equipamento cadastrado
-          </li>
+          <li className="text-[0.8125rem] text-ink-faint">Nenhum equipamento cadastrado</li>
         )}
       </ul>
 
       <Link
         href={`/clientes/${building.client.id}`}
-        className={cn(buttonVariants({ size: "sm" }), "mt-3 w-full")}
+        className={cn(buttonVariants(), "mt-4 w-full text-void! no-underline!")}
         aria-label={`Ver cliente ${clientName(building)}`}
       >
         Ver cliente
@@ -132,7 +150,8 @@ export type MapaCanvasProps = {
 
 /**
  * Mapa Leaflet (só cliente — importado com dynamic ssr:false).
- * Tiles OSM recebem .map-tiles (filtro CSS que adapta ao console dark).
+ * Tiles OSM recebem .map-tiles (filtro CSS em escala de cinza escura).
+ * Atribuição no canto superior direito: o rodapé fica com a alça da gaveta.
  */
 export default function MapaCanvas({ buildings, focus }: MapaCanvasProps) {
   const markersRef = React.useRef<Map<string, L.Marker>>(new Map())
@@ -142,6 +161,7 @@ export default function MapaCanvas({ buildings, focus }: MapaCanvasProps) {
       center={CURITIBA}
       zoom={DEFAULT_ZOOM}
       scrollWheelZoom
+      attributionControl={false}
       className="absolute inset-0 z-0 h-full w-full"
       aria-label="Mapa de prédios atendidos em Curitiba"
     >
@@ -150,19 +170,21 @@ export default function MapaCanvas({ buildings, focus }: MapaCanvasProps) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <AttributionControl position="topright" />
+      <SizeWatcher />
       <FocusController focus={focus} markers={markersRef} />
       {buildings.map((b) => (
         <Marker
           key={b.id}
           position={[b.lat as number, b.lng as number]}
           icon={pinIcon(b.pin_status)}
-          alt={`${b.nome} · ${EQUIPMENT_STATUS_META[b.pin_status].label}`}
+          alt={`${b.nome}, ${EQUIPMENT_STATUS_META[b.pin_status].label}`}
           ref={(marker) => {
             if (marker) markersRef.current.set(b.id, marker)
             else markersRef.current.delete(b.id)
           }}
         >
-          <Popup minWidth={224} maxWidth={280} closeButton={false}>
+          <Popup minWidth={240} maxWidth={280} closeButton={false}>
             <PinPopup building={b} />
           </Popup>
         </Marker>

@@ -69,7 +69,7 @@ export function BuildingFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{building ? "Editar prédio" : "Novo prédio"}</DialogTitle>
           <DialogDescription>
@@ -142,7 +142,6 @@ function BuildingForm({
                 value={form.nome}
                 onChange={(e) => set("nome")(e.target.value)}
                 placeholder="Ex.: Torre A, Matriz, Loja Batel"
-                className="max-md:h-11"
                 {...invalidProps("predio-nome", errors.nome)}
               />
             </Field>
@@ -151,7 +150,6 @@ function BuildingForm({
                 id="predio-regiao"
                 value={form.regiao}
                 onChange={(e) => set("regiao")(e.target.value)}
-                className="max-md:h-11"
                 {...invalidProps("predio-regiao", errors.regiao)}
               />
             </Field>
@@ -165,7 +163,6 @@ function BuildingForm({
                 placeholder="00000-000"
                 inputMode="numeric"
                 autoComplete="postal-code"
-                className="font-mono max-md:h-11"
                 {...invalidProps("predio-cep", errors.cep)}
               />
             </Field>
@@ -176,7 +173,6 @@ function BuildingForm({
                 onChange={(e) => set("logradouro")(e.target.value)}
                 placeholder="Rua, avenida…"
                 autoComplete="address-line1"
-                className="max-md:h-11"
                 {...invalidProps("predio-logradouro", errors.logradouro)}
               />
             </Field>
@@ -185,7 +181,6 @@ function BuildingForm({
                 id="predio-numero"
                 value={form.numero}
                 onChange={(e) => set("numero")(e.target.value)}
-                className="max-md:h-11"
                 {...invalidProps("predio-numero", errors.numero)}
               />
             </Field>
@@ -196,7 +191,6 @@ function BuildingForm({
                 id="predio-bairro"
                 value={form.bairro}
                 onChange={(e) => set("bairro")(e.target.value)}
-                className="max-md:h-11"
                 {...invalidProps("predio-bairro", errors.bairro)}
               />
             </Field>
@@ -206,7 +200,6 @@ function BuildingForm({
                 value={form.cidade}
                 onChange={(e) => set("cidade")(e.target.value)}
                 autoComplete="address-level2"
-                className="max-md:h-11"
                 {...invalidProps("predio-cidade", errors.cidade)}
               />
             </Field>
@@ -214,8 +207,8 @@ function BuildingForm({
               <SelectField id="predio-uf" value={form.uf} onChange={set("uf")} items={UF_ITEMS} error={errors.uf} />
             </Field>
           </div>
-          <fieldset className="grid gap-3 rounded-lg border border-line bg-console-2/40 p-3">
-            <legend className="px-1 text-xs font-medium tracking-wider text-ink-faint uppercase">
+          <fieldset className="grid gap-3 rounded-2xl bg-console/60 p-4 ring-1 ring-line-soft">
+            <legend className="px-1 text-sm font-medium text-ink-dim">
               Coordenadas
             </legend>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -226,7 +219,6 @@ function BuildingForm({
                   onChange={(e) => set("lat")(e.target.value)}
                   placeholder="-25.4284"
                   inputMode="decimal"
-                  className="font-mono max-md:h-11"
                   {...invalidProps("predio-lat", errors.lat)}
                 />
               </Field>
@@ -237,7 +229,6 @@ function BuildingForm({
                   onChange={(e) => set("lng")(e.target.value)}
                   placeholder="-49.2733"
                   inputMode="decimal"
-                  className="font-mono max-md:h-11"
                   {...invalidProps("predio-lng", errors.lng)}
                 />
               </Field>
@@ -246,7 +237,7 @@ function BuildingForm({
               <Button
                 type="button"
                 variant="outline"
-                className="h-8 max-md:h-11"
+                className="max-sm:w-full"
                 onClick={handleGeocode}
                 disabled={busy}
                 aria-busy={geoPending}
@@ -269,7 +260,6 @@ function BuildingForm({
               variant="outline"
               onClick={onClose}
               disabled={busy}
-              className="max-md:h-11"
             >
               Cancelar
             </Button>
@@ -285,7 +275,7 @@ export function NewBuildingButton({ clientId, label = "Novo prédio" }: { client
   const [open, setOpen] = React.useState(false)
   return (
     <>
-      <Button className="h-9 px-3 max-md:h-11" onClick={() => setOpen(true)}>
+      <Button onClick={() => setOpen(true)}>
         <PlusIcon aria-hidden="true" />
         {label}
       </Button>
@@ -316,7 +306,7 @@ export function BuildingCardActions({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 shrink-0 max-md:size-11"
+              className="shrink-0"
               aria-label={`Ações do prédio ${building.nome}`}
             />
           }

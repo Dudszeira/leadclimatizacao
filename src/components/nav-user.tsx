@@ -10,7 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -66,7 +65,8 @@ export function NavUser({ user }: { user: SidebarUser }) {
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
+            {/* Identidade como bloco simples: GroupLabel do Base UI exige um Group. */}
+            <div className="px-1.5 pt-1">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <UserIdentity user={user} />
               </div>
@@ -75,7 +75,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
                   {user.email}
                 </p>
               ) : null}
-            </DropdownMenuLabel>
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={pending}

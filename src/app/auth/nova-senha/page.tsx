@@ -34,17 +34,16 @@ export default async function NovaSenhaPage() {
   if (email === false) {
     return (
       <AuthShell
-        eyebrow="Link inválido"
         title="Este link expirou"
         description="Links de convite e de recuperação valem por pouco tempo e só podem ser usados uma vez."
       >
         <div className="flex flex-col gap-3">
-          <Link href="/login/recuperar" className={buttonVariants({ className: "h-11 w-full" })}>
+          <Link href="/login/recuperar" className={buttonVariants({ size: "lg", className: "w-full" })}>
             Pedir um novo link
           </Link>
           <Link
             href="/login"
-            className={buttonVariants({ variant: "outline", className: "h-11 w-full" })}
+            className={buttonVariants({ variant: "secondary", size: "lg", className: "w-full" })}
           >
             Voltar para o login
           </Link>
@@ -55,12 +54,11 @@ export default async function NovaSenhaPage() {
 
   return (
     <AuthShell
-      eyebrow="Definir senha"
-      title="Crie sua senha de acesso"
+      title="Crie sua senha"
       description={
         email ? (
           <>
-            Conta <span className="font-mono text-ink">{email}</span>. Use pelo menos 8 caracteres.
+            Conta <span className="break-all text-ink">{email}</span>. Use pelo menos 8 caracteres.
           </>
         ) : (
           "Use pelo menos 8 caracteres."

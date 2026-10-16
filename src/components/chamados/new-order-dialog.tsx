@@ -124,9 +124,7 @@ export function NewOrderDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          <Button
-            className={triggerClassName ?? "h-9 px-3 max-md:h-11 max-md:px-4"}
-          />
+          <Button className={triggerClassName} />
         }
       >
         <PlusIcon aria-hidden="true" />
@@ -134,10 +132,9 @@ export function NewOrderDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Abrir chamado</DialogTitle>
+          <DialogTitle>Novo chamado</DialogTitle>
           <DialogDescription>
-            Ordem de serviço manual: local, tipo de serviço e descrição do
-            problema.
+            Informe o local, o tipo de serviço e o que está acontecendo.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} noValidate>
@@ -162,7 +159,7 @@ export function NewOrderDialog({
                   id="os-cliente"
                   aria-label="Cliente"
                   aria-invalid={errors.client_id ? true : undefined}
-                  className="w-full max-md:h-11"
+                  className="w-full"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -194,7 +191,7 @@ export function NewOrderDialog({
                     aria-label="Prédio"
                     aria-invalid={errors.building_id ? true : undefined}
                     disabled={!clienteId}
-                    className="w-full max-md:h-11"
+                    className="w-full"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -240,7 +237,7 @@ export function NewOrderDialog({
                     id="os-tipo"
                     aria-label="Tipo de serviço"
                     aria-invalid={errors.tipo ? true : undefined}
-                    className="w-full max-md:h-11"
+                    className="w-full"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -268,7 +265,7 @@ export function NewOrderDialog({
                   <SelectTrigger
                     id="os-prioridade"
                     aria-label="Prioridade"
-                    className="w-full max-md:h-11"
+                    className="w-full"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -301,13 +298,12 @@ export function NewOrderDialog({
               )}
             </div>
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
               disabled={pending}
-              className="max-md:h-11"
             >
               Cancelar
             </Button>
@@ -315,7 +311,6 @@ export function NewOrderDialog({
               type="submit"
               disabled={pending}
               aria-busy={pending}
-              className="max-md:h-11"
             >
               {pending ? (
                 <>

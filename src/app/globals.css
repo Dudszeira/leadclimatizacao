@@ -124,7 +124,7 @@
   --chart-3: var(--amber);
   --chart-4: var(--clear);
   --chart-5: var(--ink-faint);
-  --radius: 0.875rem;
+  --radius: 0.625rem; /* lg 10 · xl 14 · 2xl 18 · 3xl 22 */
   --sidebar: var(--shell);
   --sidebar-foreground: var(--ink-dim);
   --sidebar-primary: var(--ink);
@@ -192,13 +192,13 @@
 
 /* ----------------------------------------------------------------------------
  * Mapa de Equipamentos (/mapa) — tiles OSM adaptados ao console dark,
- * pinos por status e overrides dos controles/popups do Leaflet.
+ * pinos por status (anel, sem brilho) e overrides dos controles/popups.
  * -------------------------------------------------------------------------- */
 .map-tiles {
   filter: invert(1) grayscale(1) brightness(0.72) contrast(1.08);
 }
 
-.leaflet-container {
+.leaflet-container.leaflet-container {
   background: var(--void);
   font-family: inherit;
 }
@@ -219,17 +219,17 @@
 
 .map-pin--operacional {
   background: var(--clear);
-  box-shadow: 0 0 0 4px var(--clear-dim), 0 0 14px 2px var(--clear-dim);
+  box-shadow: 0 0 0 4px var(--clear-dim);
 }
 
 .map-pin--chamado_aberto {
   background: var(--amber);
-  box-shadow: 0 0 0 4px var(--amber-dim), 0 0 14px 2px var(--amber-dim);
+  box-shadow: 0 0 0 4px var(--amber-dim);
 }
 
 .map-pin--tecnico_em_campo {
   background: var(--signal);
-  box-shadow: 0 0 0 4px var(--signal-dim), 0 0 14px 2px var(--signal-dim);
+  box-shadow: 0 0 0 4px var(--signal-dim);
 }
 
 .map-pin--inativo {
@@ -237,61 +237,83 @@
   box-shadow: 0 0 0 4px rgba(138, 138, 145, 0.18);
 }
 
-/* Popup no tema do console. */
-.leaflet-popup-content-wrapper {
+/* Popup no tema do console. Prefixo .leaflet-container: o leaflet.css do
+ * chunk do mapa carrega depois deste arquivo e venceria na mesma especificidade. */
+.leaflet-container .leaflet-popup-content-wrapper {
   background: var(--console-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px -12px rgba(0, 0, 0, 0.7);
 }
 
-.leaflet-popup-content {
+.leaflet-container .leaflet-popup-content {
   margin: 0;
   line-height: 1.45;
 }
 
-.leaflet-popup-content p {
+.leaflet-container .leaflet-popup-content p {
   margin: 0;
 }
 
-.leaflet-popup-tip {
+.leaflet-container .leaflet-popup-tip {
   background: var(--console-2);
   border: 1px solid var(--line);
   box-shadow: none;
 }
 
-/* Controles de zoom e atribuição. */
-.leaflet-bar a {
+/* Controles de zoom (44px no toque) e atribuição. */
+.leaflet-container .leaflet-bar {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.7);
+}
+
+.leaflet-container .leaflet-bar a {
   background: var(--console-2);
   color: var(--ink);
   border-bottom-color: var(--line);
 }
 
-.leaflet-bar a:hover,
-.leaflet-bar a:focus {
+.leaflet-touch .leaflet-container .leaflet-bar a,
+.leaflet-container.leaflet-touch .leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+}
+
+@media (min-width: 768px) {
+  .leaflet-touch .leaflet-container .leaflet-bar a,
+  .leaflet-container.leaflet-touch .leaflet-bar a {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+  }
+}
+
+.leaflet-container .leaflet-bar a:hover,
+.leaflet-container .leaflet-bar a:focus {
   background: var(--console-3);
   color: var(--ink);
 }
 
-.leaflet-bar a.leaflet-disabled {
+.leaflet-container .leaflet-bar a.leaflet-disabled {
   background: var(--console);
   color: var(--ink-faint);
 }
 
-.leaflet-touch .leaflet-bar,
-.leaflet-touch .leaflet-control-attribution {
-  border: 1px solid var(--line);
-}
-
-.leaflet-control-attribution.leaflet-control-attribution {
-  background: rgba(6, 11, 20, 0.78);
+.leaflet-container .leaflet-control-attribution.leaflet-control-attribution {
+  background: rgba(13, 13, 13, 0.78);
   color: var(--ink-faint);
+  border: none;
+  border-radius: 0 0 0 10px;
 }
 
-.leaflet-control-attribution a {
+.leaflet-container .leaflet-control-attribution a {
   color: var(--ink-dim);
 }
+
 /* Superfícies do navegador no tema console (craft floor) */
 * {
   scrollbar-width: thin;
@@ -310,7 +332,7 @@ input, textarea {
  * referência colado-1792187069322). Grão sutil via ruído SVG.
  * -------------------------------------------------------------------------- */
 .surface-paper {
-  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .17 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-color: var(--paper);
   background-image: var(--paper-grain);
   color: var(--paper-ink);
@@ -320,8 +342,8 @@ input, textarea {
   --line: var(--paper-line);
   --line-soft: #E6E6E2;
   --console: #FFFFFF;
-  --console-2: #E7E7E3;
-  --console-3: #D9D9D4;
+  --console-2: #E0E0DB;
+  --console-3: #D0D0CA;
   --foreground: var(--paper-ink);
   --muted: #E7E7E3;
   --muted-foreground: #4A4A4F;
@@ -358,4 +380,11 @@ input, textarea {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Números de exibição (KPIs, totais) em Onest: proporcionais. O "1" tabular
+ * do Onest é largo e fazia "11" ler como "1 1". Fora das camadas de propósito,
+ * para vencer o utilitário tabular-nums; tabelas e horários seguem tabulares. */
+.font-display {
+  font-variant-numeric: proportional-nums;
 }

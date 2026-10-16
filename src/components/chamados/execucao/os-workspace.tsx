@@ -4,7 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 import {
   CheckCheckIcon,
-  ChevronDownIcon,
+  ChevronUpIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   FlaskConicalIcon,
@@ -37,7 +37,8 @@ import {
 } from "@/components/chamados/execucao/signature-section"
 import { OrderActions, type TechnicianOption } from "@/components/chamados/order-actions"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { StepHeading } from "@/components/chamados/execucao/section-heading"
 import {
   Dialog,
   DialogContent,
@@ -75,6 +76,8 @@ type OsWorkspaceProps = {
   evidenceError: string | null
   /** Linha do tempo renderizada no servidor. */
   timeline: React.ReactNode
+  /** Resumo (cliente, local, equipamento, técnico) renderizado no servidor. */
+  summary: React.ReactNode
 }
 
 /** Campo de digitação focado (o teclado do celular está aberto). */
@@ -134,6 +137,7 @@ export function OsWorkspace({
   technicianError,
   evidenceError,
   timeline,
+  summary,
 }: OsWorkspaceProps) {
   const [status, setStatus] = React.useState<OsStatus>(os.status)
   const [syncedStatus, setSyncedStatus] = React.useState<OsStatus>(os.status)
@@ -248,51 +252,48 @@ export function OsWorkspace({
   }
 
   const showExecution = status === "em_campo" || encerrada
+  const canCheckin = canExecute && (status === "aberto" || status === "agendado")
+  const showBar = editable || canCheckin
+  const etapas = {
+    checklist: os.template ? 1 : undefined,
+    fotos: os.template ? 2 : 1,
+    laudo: os.template ? 3 : 2,
+    assinatura: os.template ? 4 : 3,
+  }
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-3">
-      <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+    // Celular: uma coluna (resumo, execução, ações, ciclo). Desktop (lg):
+    // execução à esquerda e resumo/ações/ciclo numa coluna lateral.
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-none lg:col-start-1 lg:row-start-1">
         {demo && (
-          <p className="flex items-start gap-2 rounded-lg border border-amber/30 bg-amber-dim px-3 py-2 text-sm text-amber">
+          <p className="flex items-start gap-2.5 rounded-2xl bg-amber-dim px-4 py-3 text-sm text-amber">
             <FlaskConicalIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Modo demo: o fluxo funciona, mas nada é salvo (fotos ficam só na memória desta aba).
+            Modo demo: o fluxo funciona, mas nada é salvo. Fotos ficam só nesta aba.
           </p>
         )}
 
         {(status === "aberto" || status === "agendado") && (
-          <Card size="sm" className="border border-line bg-console ring-0">
-            <CardHeader>
-              <CardTitle className="text-ink">Execução em campo</CardTitle>
-            </CardHeader>
+          <Card>
+            <StepHeading title="Execução em campo" />
             <CardContent className="flex flex-col gap-3">
               {canExecute ? (
                 <>
-                  <p className="text-sm leading-relaxed text-ink-dim">
+                  <p className="text-[0.9375rem] leading-relaxed text-ink-dim">
                     Ao chegar no local, faça o check-in. Checklist, fotos, laudo e assinatura
-                    são liberados em seguida. A localização é pedida ao aparelho e é opcional.
+                    são liberados em seguida.
                   </p>
-                  <Button
-                    type="button"
-                    className="h-12 w-full text-base sm:w-fit sm:px-6"
-                    onClick={handleCheckin}
-                    disabled={pending !== null}
-                    aria-busy={pending === "checkin"}
-                  >
-                    {pending === "checkin" ? (
-                      <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-                    ) : (
-                      <NavigationIcon aria-hidden="true" />
-                    )}
-                    {pending === "checkin" ? "Registrando check-in…" : "Fazer check-in e iniciar"}
-                  </Button>
+                  <p className="text-[0.8125rem] text-ink-faint">
+                    A localização do aparelho é pedida no check-in e é opcional.
+                  </p>
                   {!technicianId && office && (
-                    <p className="text-xs text-ink-faint">
-                      Dica: designe o técnico antes, pois ele só enxerga OS atribuídas a ele.
+                    <p className="text-[0.8125rem] text-amber">
+                      Designe o técnico antes: ele só enxerga as OS atribuídas a ele.
                     </p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-ink-dim">
+                <p className="text-[0.9375rem] text-ink-dim">
                   Aguardando o técnico responsável fazer o check-in no local.
                 </p>
               )}
@@ -301,7 +302,7 @@ export function OsWorkspace({
         )}
 
         {evidenceError && (
-          <p className="rounded-lg border border-danger/30 bg-danger-dim px-3 py-2 text-sm text-danger">
+          <p className="rounded-2xl bg-danger-dim px-4 py-3 text-sm text-danger">
             {evidenceError}
           </p>
         )}
@@ -317,6 +318,7 @@ export function OsWorkspace({
                 editable={editable}
                 onSaved={setRespostas}
                 sync={sync}
+                step={etapas.checklist}
               />
             )}
             <PhotosSection
@@ -326,6 +328,7 @@ export function OsWorkspace({
               photos={photos}
               onAdded={(p) => setPhotos((list) => [...list, p])}
               sync={sync}
+              step={etapas.fotos}
             />
             <LaudoSection
               osId={os.id}
@@ -334,6 +337,7 @@ export function OsWorkspace({
               observacoes={laudo.observacoes}
               onSaved={setLaudo}
               sync={sync}
+              step={etapas.laudo}
             />
             <SignatureSection
               osId={os.id}
@@ -341,179 +345,211 @@ export function OsWorkspace({
               editable={editable}
               value={assinatura}
               onSaved={setAssinatura}
+              step={etapas.assinatura}
             />
           </>
         )}
 
-        {editable && (
+        {showBar && (
           <div
             className={cn(
-              "sticky bottom-3 z-10",
+              // Celular: faixa única opaca que desce até o rodapé, por trás do dock
+              // de abas (z-40), sem vão entre a barra e o dock. md+: laje que gruda
+              // no rodapé da coluna.
+              "fixed inset-x-0 bottom-0 z-30 border-t border-line-soft bg-void/95 px-3 pt-2 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1.25rem)] backdrop-blur-xl md:sticky md:inset-x-auto md:bottom-4 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none",
               // teclado aberto no celular: a barra sai da frente do campo
               typing && "max-md:hidden",
             )}
           >
-            <Card
-              size="sm"
-              className="border border-line bg-console-2/95 shadow-lg ring-0 backdrop-blur supports-[backdrop-filter]:bg-console-2/85"
-            >
-              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0" aria-live="polite">
-                  {readiness.ready ? (
-                    <p className="flex items-center gap-2 text-sm text-clear">
-                      <CircleCheckIcon className="size-4 shrink-0" aria-hidden="true" />
-                      Tudo pronto para concluir.
-                    </p>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left text-sm font-medium text-amber focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:hidden"
-                        aria-expanded={pendenciasOpen}
-                        aria-controls="os-pendencias"
-                        onClick={() => setPendenciasOpen((v) => !v)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <CircleAlertIcon className="size-4 shrink-0" aria-hidden="true" />
-                          Faltam {readiness.pendencias.length}{" "}
-                          {readiness.pendencias.length === 1 ? "item" : "itens"}
-                        </span>
-                        <ChevronDownIcon
-                          className={cn(
-                            "size-4 shrink-0 transition-transform motion-reduce:transition-none",
-                            pendenciasOpen && "rotate-180",
-                          )}
-                          aria-hidden="true"
-                        />
-                      </button>
-                      <ul
-                        id="os-pendencias"
-                        className={cn(
-                          "flex-col gap-1 text-sm text-ink-dim max-sm:mt-1",
-                          pendenciasOpen ? "flex" : "hidden sm:flex",
-                        )}
-                      >
-                        {readiness.pendencias.map((p) => (
-                          <li key={p} className="flex items-start gap-2">
-                            <CircleAlertIcon
-                              className="mt-0.5 size-4 shrink-0 text-amber"
+            <div className="md:rounded-[1.5rem] md:bg-console-2/92 md:p-2 md:shadow-[0_-8px_32px_rgba(0,0,0,0.55)] md:ring-1 md:ring-line md:backdrop-blur-xl">
+              {canCheckin ? (
+                <div className="flex items-center gap-3">
+                  <p className="hidden min-w-0 flex-1 pl-3 text-sm text-ink-dim sm:block">
+                    Chegou no local? Faça o check-in para liberar a execução.
+                  </p>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-full sm:w-auto"
+                    onClick={handleCheckin}
+                    disabled={pending !== null}
+                    aria-busy={pending === "checkin"}
+                  >
+                    {pending === "checkin" ? (
+                      <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <NavigationIcon aria-hidden="true" />
+                    )}
+                    {pending === "checkin" ? "Registrando check-in…" : "Fazer check-in e iniciar"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {!readiness.ready && (
+                    <ul
+                      id="os-pendencias"
+                      className={cn(
+                        "max-h-[40dvh] flex-col gap-2 overflow-y-auto px-3 pt-2 pb-3 text-sm text-ink-dim md:hidden",
+                        pendenciasOpen ? "flex" : "hidden",
+                      )}
+                    >
+                      {readiness.pendencias.map((p) => (
+                        <li key={p} className="flex items-start gap-2">
+                          <CircleAlertIcon
+                            className="mt-0.5 size-4 shrink-0 text-amber"
+                            aria-hidden="true"
+                          />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1" aria-live="polite">
+                      {readiness.ready ? (
+                        <p className="flex min-h-12 items-center gap-2 pl-3 text-sm font-medium text-clear">
+                          <CircleCheckIcon className="size-4 shrink-0" aria-hidden="true" />
+                          Tudo pronto
+                        </p>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="flex min-h-12 w-full items-center gap-2 rounded-full pr-2 pl-3 text-left text-sm font-medium text-amber outline-none focus-visible:ring-3 focus-visible:ring-signal/50 md:hidden"
+                            aria-expanded={pendenciasOpen}
+                            aria-controls="os-pendencias"
+                            onClick={() => setPendenciasOpen((v) => !v)}
+                          >
+                            <CircleAlertIcon className="size-4 shrink-0" aria-hidden="true" />
+                            <span className="truncate">
+                              Faltam {readiness.pendencias.length}{" "}
+                              {readiness.pendencias.length === 1 ? "item" : "itens"}
+                            </span>
+                            <ChevronUpIcon
+                              className={cn(
+                                "size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none",
+                                pendenciasOpen && "rotate-180",
+                              )}
                               aria-hidden="true"
                             />
-                            {p}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
+                          </button>
+                          <ul className="hidden flex-col gap-1 py-1 pl-3 text-sm text-ink-dim md:flex">
+                            {readiness.pendencias.map((p) => (
+                              <li key={p} className="flex items-start gap-2">
+                                <CircleAlertIcon
+                                  className="mt-0.5 size-4 shrink-0 text-amber"
+                                  aria-hidden="true"
+                                />
+                                {p}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="shrink-0"
+                      disabled={!readiness.ready || pending !== null}
+                      aria-busy={pending === "concluir"}
+                      onClick={() => setConfirmOpen(true)}
+                    >
+                      {pending === "concluir" ? (
+                        <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+                      ) : (
+                        <CheckCheckIcon aria-hidden="true" />
+                      )}
+                      {pending === "concluir" ? "Concluindo…" : "Concluir OS"}
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  type="button"
-                  className="h-12 w-full shrink-0 text-base sm:w-auto sm:px-6"
-                  disabled={!readiness.ready || pending !== null}
-                  aria-busy={pending === "concluir"}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  {pending === "concluir" ? (
-                    <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <CheckCheckIcon aria-hidden="true" />
-                  )}
-                  {pending === "concluir" ? "Salvando e concluindo…" : "Concluir OS"}
-                </Button>
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </div>
         )}
-
-        {timeline}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
-        <Card size="sm" className="border border-line bg-console ring-0">
-          <CardHeader>
-            <CardTitle className="text-ink">Ações</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {encerrada ? (
-              <p className="text-sm leading-relaxed text-ink-dim">
-                {status === "concluido"
-                  ? "Chamado concluído. Nenhuma ação pendente."
-                  : "Chamado cancelado. Nenhuma ação disponível."}
-              </p>
-            ) : office ? (
-              <OrderActions
-                osId={os.id}
-                status={status}
-                technicianId={technicianId}
-                technicians={technicians}
-                scheduledAt={scheduledAt}
-                onStatusChange={(next, patch) => {
-                  setStatus(next)
-                  if (patch?.technicianId) setTechnicianId(patch.technicianId)
-                  if (patch?.scheduledAt) setScheduledAt(patch.scheduledAt)
-                }}
-              />
-            ) : (
-              <p className="text-sm leading-relaxed text-ink-dim">
-                {status === "em_campo"
-                  ? "Preencha checklist, fotos, laudo e assinatura; depois conclua a OS."
-                  : "Faça o check-in ao chegar no local."}
-              </p>
-            )}
-            {technicianError && office && !encerrada && (
-              <p className="mt-3 text-xs text-danger">{technicianError}</p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Coluna lateral no desktop; no celular os filhos entram na ordem da página. */}
+      <div className="contents lg:col-start-2 lg:row-start-1 lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="order-1 min-w-0 lg:order-none">{summary}</div>
+
+        {(office || !encerrada) && (
+          <Card className={cn("order-3 lg:order-none", !office && "max-lg:hidden")}>
+            <StepHeading title={office ? "Ações do chamado" : "Próximo passo"} />
+            <CardContent>
+              {encerrada ? (
+                <p className="text-sm leading-relaxed text-ink-dim">
+                  {status === "concluido"
+                    ? "Chamado concluído. Nenhuma ação pendente."
+                    : "Chamado cancelado. Nenhuma ação disponível."}
+                </p>
+              ) : office ? (
+                <OrderActions
+                  osId={os.id}
+                  status={status}
+                  technicianId={technicianId}
+                  technicians={technicians}
+                  scheduledAt={scheduledAt}
+                  onStatusChange={(next, patch) => {
+                    setStatus(next)
+                    if (patch?.technicianId) setTechnicianId(patch.technicianId)
+                    if (patch?.scheduledAt) setScheduledAt(patch.scheduledAt)
+                  }}
+                />
+              ) : (
+                <p className="text-sm leading-relaxed text-ink-dim">
+                  {status === "em_campo"
+                    ? "Preencha checklist, fotos e assinatura. Depois conclua a OS."
+                    : "Faça o check-in ao chegar no local."}
+                </p>
+              )}
+              {technicianError && office && !encerrada && (
+                <p className="mt-3 text-[0.8125rem] text-danger">{technicianError}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {checkin.at && (
-          <Card size="sm" className="border border-line bg-console ring-0">
-            <CardHeader>
-              <CardTitle className="text-ink">Check-in em campo</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p className="flex items-center gap-1.5 text-ink-dim">
+          <Card className="order-3 lg:order-none">
+            <StepHeading title="Check-in" />
+            <CardContent className="flex flex-col gap-1.5 text-sm">
+              <p className="text-ink tabular-nums">{formatDateTimeFullBR(checkin.at)}</p>
+              <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-dim">
                 <MapPinIcon className="size-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
                 {checkin.lat !== null && checkin.lng !== null ? (
-                  <span className="font-mono text-xs tabular-nums">
+                  <span className="tabular-nums">
                     {checkin.lat.toFixed(4)}, {checkin.lng.toFixed(4)}
                   </span>
                 ) : (
                   <span className="text-ink-faint">Sem coordenadas registradas</span>
                 )}
               </p>
-              <p className="font-mono text-xs text-ink-dim tabular-nums">
-                {formatDateTimeFullBR(checkin.at)}
-              </p>
             </CardContent>
           </Card>
         )}
+
+        <div className="order-4 min-w-0 lg:order-none">{timeline}</div>
       </div>
+
+      {/* Espaço para a barra fixa não cobrir o fim da página no celular. */}
+      {showBar && <div aria-hidden="true" className="order-last h-20 md:hidden" />}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Concluir a OS {formatOsNumero(os.numero)}?</DialogTitle>
             <DialogDescription>
-              Depois de concluída, o técnico não consegue mais alterar checklist, fotos ou
+              Depois de concluída, ninguém consegue mais alterar checklist, fotos ou
               assinatura. A próxima preventiva PMOC é reprogramada automaticamente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 md:h-9"
-              onClick={() => setConfirmOpen(false)}
-            >
+            <Button type="button" variant="secondary" onClick={() => setConfirmOpen(false)}>
               Voltar
             </Button>
-            <Button
-              type="button"
-              className={cn("h-11 md:h-9")}
-              onClick={handleConcluir}
-              disabled={pending !== null}
-            >
+            <Button type="button" onClick={handleConcluir} disabled={pending !== null}>
               <CheckCheckIcon aria-hidden="true" />
               Concluir OS
             </Button>

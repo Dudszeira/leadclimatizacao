@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -113,7 +114,7 @@ export function InvoiceActions({
             size="icon"
             disabled={busy}
             aria-label={`Ações da fatura de ${clienteNome}`}
-            className="relative z-10 size-8 text-ink-dim hover:text-ink max-md:size-11"
+            className="relative z-10 text-ink-dim hover:text-ink"
           />
         }
       >
@@ -123,35 +124,37 @@ export function InvoiceActions({
           <EllipsisVerticalIcon className="size-4" aria-hidden="true" />
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-60">
-        <DropdownMenuLabel>Cobrança</DropdownMenuLabel>
-        <DropdownMenuItem
-          disabled={busy || !podeGerarCobranca}
-          onClick={() => handleGerarCobranca("pix")}
-        >
-          <QrCodeIcon aria-hidden="true" />
-          Gerar cobrança Pix
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={busy || !podeGerarCobranca}
-          onClick={() => handleGerarCobranca("boleto")}
-        >
-          <BarcodeIcon aria-hidden="true" />
-          Gerar cobrança por boleto
-        </DropdownMenuItem>
-        {asaasUrl ? (
-          <DropdownMenuItem disabled={busy} onClick={handleCopiarLink}>
-            <Link2Icon aria-hidden="true" />
-            Copiar link de pagamento
+      <DropdownMenuContent align="end" className="min-w-64 [&_[data-slot=dropdown-menu-item]]:min-h-11 md:[&_[data-slot=dropdown-menu-item]]:min-h-9">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-2.5 pt-1.5 text-[0.8125rem] font-normal">Cobrança</DropdownMenuLabel>
+          <DropdownMenuItem
+            disabled={busy || !podeGerarCobranca}
+            onClick={() => handleGerarCobranca("pix")}
+          >
+            <QrCodeIcon aria-hidden="true" />
+            Gerar cobrança Pix
           </DropdownMenuItem>
-        ) : null}
+          <DropdownMenuItem
+            disabled={busy || !podeGerarCobranca}
+            onClick={() => handleGerarCobranca("boleto")}
+          >
+            <BarcodeIcon aria-hidden="true" />
+            Gerar cobrança por boleto
+          </DropdownMenuItem>
+          {asaasUrl ? (
+            <DropdownMenuItem disabled={busy} onClick={handleCopiarLink}>
+              <Link2Icon aria-hidden="true" />
+              Copiar link de pagamento
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={busy || !emAberto}
           onClick={() => run("pagar", () => markInvoicePaid(invoiceId))}
         >
           <CheckCheckIcon aria-hidden="true" />
-          Marcar como pago (manual)
+          Marcar como pago à mão
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={busy || !podeEmitirNf}

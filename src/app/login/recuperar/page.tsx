@@ -17,13 +17,12 @@ export default async function RecuperarSenhaPage() {
 
   return (
     <AuthShell
-      eyebrow="Recuperação de acesso"
-      title="Esqueci minha senha"
+      title="Recuperar senha"
       description="Informe o e-mail cadastrado. Enviaremos um link para você definir uma nova senha."
       footer={
         <Link
           href="/login"
-          className="inline-flex items-center gap-1.5 rounded text-signal underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+          className="-my-3 -ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-signal underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-signal/50"
         >
           <ArrowLeftIcon className="size-4" aria-hidden="true" />
           Voltar para o login

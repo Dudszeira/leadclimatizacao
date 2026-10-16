@@ -5,20 +5,19 @@ import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { ChamadosPorMesPoint } from "@/lib/types"
 
+const BARRAS = [55, 70, 48, 62, 38, 80]
+
 /** Placeholder com a mesma proporção do gráfico (sem salto de layout). */
 function ChamadosChartPlaceholder() {
   return (
     <div
-      className="flex aspect-[16/8] w-full items-end gap-4 px-2 pb-6"
+      className="flex h-52 w-full items-end gap-3 pb-7 pl-8 sm:h-64 sm:gap-5 lg:h-72"
       aria-label="Carregando gráfico de chamados"
       aria-busy="true"
     >
-      <Skeleton className="h-[70%] flex-1" />
-      <Skeleton className="h-[85%] flex-1" />
-      <Skeleton className="h-[60%] flex-1" />
-      <Skeleton className="h-[75%] flex-1" />
-      <Skeleton className="h-[45%] flex-1" />
-      <Skeleton className="h-[55%] flex-1" />
+      {BARRAS.map((h, i) => (
+        <Skeleton key={i} className="flex-1 rounded-t-md rounded-b-sm" style={{ height: `${h}%` }} />
+      ))}
     </div>
   )
 }

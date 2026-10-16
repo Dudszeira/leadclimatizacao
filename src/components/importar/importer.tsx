@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { cn } from "cn"
 import {
+  CheckIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   DownloadIcon,
@@ -60,7 +61,6 @@ type Resultado = {
   mensagem: string
 }
 
-const HEAD = "text-xs font-medium tracking-wider text-ink-faint uppercase"
 const MAX_ERROS_TELA = 200
 
 function baixar(nome: string, conteudo: string) {
@@ -187,139 +187,222 @@ export function Importer() {
     }
   }
 
+  const [arrastando, setArrastando] = React.useState(false)
   const errosTela = preview?.erros.slice(0, MAX_ERROS_TELA) ?? []
   const amostra = preview?.validas.slice(0, 10) ?? []
   const colunasAmostra = def.colunas.filter((c) => preview?.cabecalhos.includes(c.nome)).slice(0, 7)
+  const linhasComErro = preview ? new Set(preview.erros.map((e) => e.linha)).size : 0
+  const etapa = resultado ? 3 : preview ? 2 : 1
+  const bloqueado = enviando || lendo
 
   return (
-    <div className="flex flex-col gap-4">
-      <section className="rounded-xl border border-line bg-console p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div
-            role="radiogroup"
-            aria-label="O que importar"
-            className="flex flex-wrap gap-1 rounded-lg bg-console-2 p-1"
-            onKeyDown={(ev) => {
-              // Setas trocam a opção (padrão de radiogroup); Tab sai do grupo.
-              const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]
-              if (!keys.includes(ev.key) || enviando) return
-              ev.preventDefault()
-              const lista = Object.keys(ENTIDADES) as Entidade[]
-              const atual = lista.indexOf(entidade)
-              const alvo =
-                ev.key === "Home"
-                  ? 0
-                  : ev.key === "End"
-                    ? lista.length - 1
-                    : ev.key === "ArrowRight" || ev.key === "ArrowDown"
-                      ? (atual + 1) % lista.length
-                      : (atual - 1 + lista.length) % lista.length
-              trocarEntidade(lista[alvo])
-              const botoes = ev.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')
-              botoes[alvo]?.focus()
-            }}
+    <div className="flex min-w-0 flex-col gap-6 md:gap-8">
+      <Etapas atual={etapa} />
+
+      {/* 1. Tipo de cadastro + arquivo */}
+      <section aria-labelledby="importar-passo-1" className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2
+            id="importar-passo-1"
+            className="font-heading text-[1.0625rem] font-medium tracking-[-0.01em] text-ink"
           >
-            {(Object.keys(ENTIDADES) as Entidade[]).map((e, i) => (
-              <button
-                key={e}
-                type="button"
-                role="radio"
-                aria-checked={entidade === e}
-                tabIndex={entidade === e ? 0 : -1}
-                disabled={enviando}
-                onClick={() => trocarEntidade(e)}
-                className={cn(
-                  "inline-flex min-h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none max-md:min-h-11",
-                  entidade === e ? "bg-signal-dim text-signal" : "text-ink-dim hover:text-ink",
-                )}
-              >
-                <span className="font-mono text-xs text-ink-faint" aria-hidden="true">{i + 1}</span>
-                {ENTIDADES[e].label}
-              </button>
-            ))}
-          </div>
+            O que você vai importar
+          </h2>
           <Button
             variant="outline"
-            className="h-9 px-3 max-md:h-11"
             onClick={() => baixar(`modelo-${entidade}.csv`, modeloCsv(entidade))}
           >
             <DownloadIcon aria-hidden="true" />
-            Baixar modelo CSV
+            Baixar modelo de {def.label.toLowerCase()}
           </Button>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-ink-dim">
-          Importe na ordem <strong className="text-ink">clientes → prédios → equipamentos</strong>.
-          Chave de atualização: <span className="font-mono text-signal">{def.chave}</span>. Se já
-          existir, o registro é atualizado (só as colunas presentes no arquivo); senão, é criado.
-          Limite: {MAX_LINHAS.toLocaleString("pt-BR")} linhas e 2 MB por arquivo; separador ; ou ,.
+
+        <div
+          role="radiogroup"
+          aria-label="O que importar"
+          className="flex h-11 w-full gap-1 rounded-full bg-console-2 p-1 md:h-10 md:w-fit"
+          onKeyDown={(ev) => {
+            // Setas trocam a opção (padrão de radiogroup); Tab sai do grupo.
+            const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]
+            if (!keys.includes(ev.key) || enviando) return
+            ev.preventDefault()
+            const lista = Object.keys(ENTIDADES) as Entidade[]
+            const atual = lista.indexOf(entidade)
+            const alvo =
+              ev.key === "Home"
+                ? 0
+                : ev.key === "End"
+                  ? lista.length - 1
+                  : ev.key === "ArrowRight" || ev.key === "ArrowDown"
+                    ? (atual + 1) % lista.length
+                    : (atual - 1 + lista.length) % lista.length
+            trocarEntidade(lista[alvo])
+            const botoes = ev.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+            botoes[alvo]?.focus()
+          }}
+        >
+          {(Object.keys(ENTIDADES) as Entidade[]).map((e) => (
+            <button
+              key={e}
+              type="button"
+              role="radio"
+              aria-checked={entidade === e}
+              tabIndex={entidade === e ? 0 : -1}
+              disabled={enviando}
+              onClick={() => trocarEntidade(e)}
+              className={cn(
+                "inline-flex flex-1 items-center justify-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50 disabled:opacity-50 md:flex-none",
+                entidade === e ? "bg-ink text-void" : "text-ink-dim hover:text-ink",
+              )}
+            >
+              {ENTIDADES[e].label}
+            </button>
+          ))}
+        </div>
+
+        <p className="max-w-[72ch] text-sm leading-relaxed text-ink-dim">
+          Importe nesta ordem: clientes, depois prédios, depois equipamentos. Quem
+          já está cadastrado é reconhecido pela chave{" "}
+          <span className="font-medium text-ink">{def.chave}</span> e só tem
+          atualizadas as colunas presentes no arquivo; o resto é criado. Até{" "}
+          {MAX_LINHAS.toLocaleString("pt-BR")} linhas e 2 MB por arquivo, separado por ; ou ,.
         </p>
-        <details className="mt-3 text-xs">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-ink-dim hover:text-ink md:min-h-0">
+
+        <label
+          htmlFor="importar-arquivo"
+          onDragOver={(ev) => {
+            if (bloqueado) return
+            ev.preventDefault()
+            setArrastando(true)
+          }}
+          onDragLeave={() => setArrastando(false)}
+          onDrop={(ev) => {
+            ev.preventDefault()
+            setArrastando(false)
+            if (bloqueado) return
+            handleFile(ev.dataTransfer.files?.[0])
+          }}
+          className={cn(
+            "group flex min-h-44 cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.375rem] border border-dashed px-6 py-8 text-center transition-colors duration-150 focus-within:border-signal/70 focus-within:ring-3 focus-within:ring-signal/20 md:min-h-52",
+            arrastando
+              ? "border-signal/70 bg-signal-dim"
+              : "border-line bg-console hover:border-[#3a3a3a] hover:bg-console-2/60",
+            bloqueado && "pointer-events-none opacity-60",
+          )}
+        >
+          <span
+            className="flex size-12 items-center justify-center rounded-full bg-console-2 transition-colors group-hover:bg-console-3"
+            aria-hidden="true"
+          >
+            {lendo ? (
+              <LoaderCircleIcon className="size-5 animate-spin text-ink-dim" />
+            ) : (
+              <FileSpreadsheetIcon className="size-5 text-ink-dim" />
+            )}
+          </span>
+          <span className="flex flex-col gap-1">
+            <span className="text-[0.9375rem] font-medium text-ink">
+              {lendo
+                ? "Validando linhas…"
+                : preview
+                  ? preview.arquivo
+                  : `Escolher o CSV de ${def.label.toLowerCase()}`}
+            </span>
+            <span className="text-[0.8125rem] text-ink-faint">
+              {preview ? (
+                "Toque para trocar de arquivo"
+              ) : (
+                <>
+                  <span className="md:hidden">Toque para escolher o arquivo</span>
+                  <span className="max-md:hidden">Clique para escolher, ou arraste o arquivo para cá</span>
+                </>
+              )}
+            </span>
+          </span>
+          <input
+            ref={inputRef}
+            id="importar-arquivo"
+            type="file"
+            accept=".csv,text/csv,.txt"
+            disabled={bloqueado}
+            onChange={(e) => handleFile(e.target.files?.[0])}
+            className="sr-only"
+          />
+        </label>
+
+        <details className="group/det rounded-[1.375rem] bg-console ring-1 ring-line">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-medium text-ink md:px-5 [&::-webkit-details-marker]:hidden">
             O que vai em cada coluna
+            <span className="text-[0.8125rem] font-normal text-ink-faint group-open/det:hidden">
+              Ver colunas
+            </span>
+            <span className="hidden text-[0.8125rem] font-normal text-ink-faint group-open/det:inline">
+              Fechar
+            </span>
           </summary>
-          <p className="mt-2 text-ink-dim">
-            A primeira linha do arquivo traz o nome das colunas, escrito exatamente como abaixo.
-            Colunas opcionais podem ficar de fora.
-          </p>
-          <dl className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {def.colunas.map((c) => (
-              <div key={c.nome} className="flex flex-col gap-0.5">
-                <dt className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-ink">{c.nome}</span>
-                  <span className={c.obrigatoria ? "text-amber" : "text-ink-faint"}>
-                    {c.obrigatoria ? "obrigatória" : "opcional"}
-                  </span>
-                </dt>
-                {c.descricao && <dd className="text-ink-dim">{c.descricao}</dd>}
-              </div>
-            ))}
-          </dl>
+          <div className="border-t border-line-soft px-4 pt-3 pb-4 md:px-5">
+            <p className="text-[0.8125rem] leading-relaxed text-ink-dim">
+              A primeira linha do arquivo traz o nome das colunas, escrito exatamente
+              como abaixo. As opcionais podem ficar de fora.
+            </p>
+            <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              {def.colunas.map((c) => (
+                <div key={c.nome} className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium break-all text-ink">{c.nome}</span>
+                    <span
+                      className={cn(
+                        "inline-flex h-5 items-center rounded-full px-2 text-xs",
+                        c.obrigatoria ? "bg-amber-dim text-amber" : "bg-console-2 text-ink-faint",
+                      )}
+                    >
+                      {c.obrigatoria ? "Obrigatória" : "Opcional"}
+                    </span>
+                  </dt>
+                  {c.descricao && (
+                    <dd className="text-[0.8125rem] leading-snug text-ink-dim">
+                      {c.descricao.charAt(0).toUpperCase() + c.descricao.slice(1)}
+                    </dd>
+                  )}
+                </div>
+              ))}
+            </dl>
+          </div>
         </details>
       </section>
 
-      <section className="rounded-xl border border-dashed border-line bg-console/50 p-6 text-center">
-        <FileSpreadsheetIcon className="mx-auto size-8 text-ink-faint" aria-hidden="true" />
-        <label htmlFor="importar-arquivo" className="mt-3 block text-sm text-ink">
-          Selecione o CSV de {def.label.toLowerCase()}
-        </label>
-        <input
-          ref={inputRef}
-          id="importar-arquivo"
-          type="file"
-          accept=".csv,text/csv,.txt"
-          disabled={enviando || lendo}
-          onChange={(e) => handleFile(e.target.files?.[0])}
-          className="mx-auto mt-3 block w-full max-w-sm text-sm text-ink-dim file:mr-3 file:rounded-md file:border-0 file:bg-console-2 file:px-3 file:py-2 file:text-ink hover:file:bg-console-3"
-        />
-        {lendo && (
-          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-ink-dim">
-            <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden="true" />
-            Validando linhas…
-          </p>
-        )}
-      </section>
-
+      {/* 2. Conferência */}
       {preview && (
-        <section aria-label="Pré-visualização" className="flex flex-col gap-3">
-          <div className="grid grid-cols-3 gap-3">
-            <Resumo label="Linhas no arquivo" valor={preview.total} />
-            <Resumo label="Válidas" valor={preview.validas.length} tom="clear" />
-            <Resumo label="Com erro" valor={new Set(preview.erros.map((e) => e.linha)).size} tom={preview.erros.length ? "danger" : undefined} />
-          </div>
+        <section aria-labelledby="importar-passo-2" className="flex min-w-0 flex-col gap-4">
+          <h2
+            id="importar-passo-2"
+            className="font-heading text-[1.0625rem] font-medium tracking-[-0.01em] text-ink"
+          >
+            Confira antes de gravar
+          </h2>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <dl className="grid grid-cols-3 divide-x divide-line-soft rounded-[1.375rem] bg-console py-4 ring-1 ring-line md:py-5">
+            <Resumo label="No arquivo" valor={preview.total} />
+            <Resumo label="Prontas" valor={preview.validas.length} tom="clear" />
+            <Resumo
+              label="Com erro"
+              valor={linhasComErro}
+              tom={preview.erros.length ? "danger" : undefined}
+            />
+          </dl>
+
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
             {preview.erros.length > 0 && (
               <Button
                 variant="outline"
-                className="h-9 px-3 max-md:h-11"
                 onClick={() => baixar(`erros-${entidade}.csv`, relatorioErrosCsv(preview.erros))}
               >
                 <DownloadIcon aria-hidden="true" />
-                Relatório de erros
+                Baixar relatório de erros
               </Button>
             )}
             <Button
-              className="h-9 px-4 max-md:h-11"
+              size="lg"
               disabled={enviando || preview.validas.length === 0}
               aria-busy={enviando}
               onClick={() => setConfirmar(true)}
@@ -330,99 +413,119 @@ export function Importer() {
                 <UploadIcon aria-hidden="true" />
               )}
               {enviando
-                ? `Importando ${progresso.feito}/${progresso.total}…`
-                : `Importar ${preview.validas.length} linha(s) válida(s)`}
+                ? `Importando ${progresso.feito} de ${progresso.total}…`
+                : preview.validas.length === 1
+                  ? "Importar 1 linha"
+                  : `Importar ${preview.validas.length.toLocaleString("pt-BR")} linhas`}
             </Button>
           </div>
 
           {errosTela.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-line bg-console">
-              <h3 className="flex items-center gap-2 border-b border-line-soft px-4 py-3 text-sm font-medium text-ink">
+            <div className="overflow-hidden rounded-[1.375rem] bg-console ring-1 ring-line">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line-soft px-4 py-3.5 md:px-5">
                 <CircleAlertIcon className="size-4 text-danger" aria-hidden="true" />
-                Erros encontrados
+                <h3 className="text-sm font-medium text-ink">Linhas com problema</h3>
                 {preview.erros.length > MAX_ERROS_TELA && (
-                  <span className="text-xs text-ink-faint">
-                    (mostrando {MAX_ERROS_TELA} de {preview.erros.length}, baixe o relatório)
+                  <span className="text-[0.8125rem] text-ink-faint">
+                    Mostrando {MAX_ERROS_TELA} de {preview.erros.length}; baixe o relatório para ver todas.
                   </span>
                 )}
-              </h3>
-              <div className="max-h-80 overflow-y-auto">
-                <Table aria-label="Erros por linha">
-                  <TableHeader>
-                    <TableRow className="border-line-soft hover:bg-transparent">
-                      <TableHead className={cn(HEAD, "w-20 px-4")}>Linha</TableHead>
-                      <TableHead className={cn(HEAD, "w-40")}>Campo</TableHead>
-                      <TableHead className={HEAD}>Problema</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {errosTela.map((e, i) => (
-                      <TableRow key={`${e.linha}-${e.campo}-${i}`} className="border-line-soft">
-                        <TableCell className="px-4 py-2 font-mono text-ink">{e.linha || "—"}</TableCell>
-                        <TableCell className="py-2 font-mono text-xs text-ink-dim">{e.campo}</TableCell>
-                        <TableCell className="py-2 text-sm whitespace-normal text-ink-dim">{e.mensagem}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </div>
+              <ul aria-label="Erros por linha" className="scroll-contain max-h-96 divide-y divide-line-soft overflow-y-auto">
+                {errosTela.map((e, i) => (
+                  <li
+                    key={`${e.linha}-${e.campo}-${i}`}
+                    className="flex flex-col gap-1 px-4 py-3 md:flex-row md:items-baseline md:gap-4 md:px-5"
+                  >
+                    <span className="flex shrink-0 items-center gap-2 text-[0.8125rem] md:w-56">
+                      <span className="font-medium text-ink tabular-nums">
+                        {e.linha ? `Linha ${e.linha}` : "Arquivo"}
+                      </span>
+                      <span className="min-w-0 truncate text-ink-faint">{e.campo}</span>
+                    </span>
+                    <span className="text-sm leading-snug text-ink-dim">{e.mensagem}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
           {amostra.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-line bg-console">
-              <h3 className="border-b border-line-soft px-4 py-3 text-sm font-medium text-ink">
-                Amostra das linhas válidas
-              </h3>
-              <div className="overflow-x-auto">
-                <Table aria-label="Amostra das linhas válidas">
-                  <TableHeader>
-                    <TableRow className="border-line-soft hover:bg-transparent">
-                      <TableHead className={cn(HEAD, "px-4")}>Linha</TableHead>
+            <div className="min-w-0 overflow-hidden rounded-[1.375rem] bg-console ring-1 ring-line">
+              <div className="flex items-baseline justify-between gap-3 border-b border-line-soft px-4 py-3.5 md:px-5">
+                <h3 className="text-sm font-medium text-ink">Amostra das linhas prontas</h3>
+                <span className="shrink-0 text-[0.8125rem] text-ink-faint md:hidden">Deslize para o lado</span>
+              </div>
+              <Table aria-label="Amostra das linhas prontas">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Linha</TableHead>
+                    {colunasAmostra.map((c) => (
+                      <TableHead key={c.nome}>{c.nome}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {amostra.map((l) => (
+                    <TableRow key={l.linha}>
+                      <TableCell className="text-ink-faint tabular-nums">{l.linha}</TableCell>
                       {colunasAmostra.map((c) => (
-                        <TableHead key={c.nome} className={HEAD}>
-                          {c.nome}
-                        </TableHead>
+                        <TableCell key={c.nome} className="max-w-56 truncate text-ink-dim">
+                          {l.valores[c.nome] || <span className="text-ink-faint">Vazio</span>}
+                        </TableCell>
                       ))}
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {amostra.map((l) => (
-                      <TableRow key={l.linha} className="border-line-soft">
-                        <TableCell className="px-4 py-2 font-mono text-ink-faint">{l.linha}</TableCell>
-                        {colunasAmostra.map((c) => (
-                          <TableCell key={c.nome} className="max-w-48 truncate py-2 text-ink-dim">
-                            {l.valores[c.nome] || "—"}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </section>
       )}
 
+      {/* 3. Resultado */}
       {resultado && (
         <section
           aria-live="polite"
-          className="flex flex-col gap-2 rounded-xl border border-line bg-console p-4"
+          aria-labelledby="importar-passo-3"
+          className="flex flex-col gap-4 rounded-[1.375rem] bg-console p-4 ring-1 ring-line md:p-5"
         >
-          <h3 className="flex items-center gap-2 text-sm font-medium text-ink">
-            <CircleCheckIcon className="size-4 text-clear" aria-hidden="true" />
-            {resultado.demo ? "Validação concluída (modo demonstração)" : "Importação concluída"}
-          </h3>
-          <p className="text-sm text-ink-dim">
-            {resultado.demo
-              ? "O servidor revalidou as linhas; nada foi gravado porque o banco não está conectado."
-              : `${resultado.inseridos} inserido(s), ${resultado.atualizados} atualizado(s), ${resultado.erros.length} erro(s) na gravação.`}
-          </p>
+          <div className="flex items-start gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-clear-dim"
+              aria-hidden="true"
+            >
+              <CircleCheckIcon className="size-5 text-clear" />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <h2
+                id="importar-passo-3"
+                className="font-heading text-[1.0625rem] font-medium tracking-[-0.01em] text-ink"
+              >
+                {resultado.demo ? "Validação concluída" : "Importação concluída"}
+              </h2>
+              <p className="text-sm leading-relaxed text-ink-dim">
+                {resultado.demo
+                  ? "Modo demonstração: o servidor conferiu as linhas, mas nada foi gravado porque o banco não está conectado."
+                  : "Os registros já aparecem nas telas de cadastro."}
+              </p>
+            </div>
+          </div>
+          {!resultado.demo && (
+            <dl className="grid grid-cols-3 divide-x divide-line-soft rounded-2xl bg-console-2/60 py-3.5">
+              <Resumo label="Criados" valor={resultado.inseridos} />
+              <Resumo label="Atualizados" valor={resultado.atualizados} />
+              <Resumo
+                label="Não gravados"
+                valor={resultado.erros.length}
+                tom={resultado.erros.length ? "danger" : undefined}
+              />
+            </dl>
+          )}
           {resultado.erros.length > 0 && (
             <Button
               variant="outline"
-              className="h-9 w-fit px-3 max-md:h-11"
+              className="md:w-fit"
               onClick={() => baixar(`erros-importacao-${entidade}.csv`, relatorioErrosCsv(resultado.erros))}
             >
               <DownloadIcon aria-hidden="true" />
@@ -435,18 +538,18 @@ export function Importer() {
       <Dialog open={confirmar} onOpenChange={setConfirmar}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirmar importação</DialogTitle>
+            <DialogTitle>Importar {def.label.toLowerCase()}?</DialogTitle>
             <DialogDescription>
-              {preview?.validas.length ?? 0} linha(s) de {def.label.toLowerCase()} serão gravadas
-              (criadas ou atualizadas pela chave {def.chave}).
-              {preview && preview.erros.length > 0 && " Linhas com erro serão ignoradas."}
+              {(preview?.validas.length ?? 0).toLocaleString("pt-BR")} linha(s) serão
+              gravadas, criadas ou atualizadas pela chave {def.chave}.
+              {preview && preview.erros.length > 0 && " As linhas com erro ficam de fora."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmar(false)} className="max-md:h-11">
+            <Button variant="outline" onClick={() => setConfirmar(false)}>
               Cancelar
             </Button>
-            <Button onClick={importar} disabled={enviando} className="max-md:h-11">
+            <Button onClick={importar} disabled={enviando}>
               Importar agora
             </Button>
           </DialogFooter>
@@ -456,19 +559,64 @@ export function Importer() {
   )
 }
 
+const ETAPAS = ["Arquivo", "Conferir", "Importar"] as const
+
+/** Indicador de etapas: concluída (check), atual (branca), próxima (apagada). */
+function Etapas({ atual }: { atual: number }) {
+  return (
+    <ol aria-label="Etapas da importação" className="flex items-center gap-2">
+      {ETAPAS.map((nome, i) => {
+        const n = i + 1
+        const feita = n < atual
+        const ativa = n === atual
+        return (
+          <li
+            key={nome}
+            aria-current={ativa ? "step" : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2"
+          >
+            <span
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-medium tabular-nums",
+                ativa && "bg-ink text-void",
+                feita && "bg-clear-dim text-clear",
+                !ativa && !feita && "bg-console-2 text-ink-faint",
+              )}
+            >
+              {feita ? <CheckIcon className="size-3.5" aria-hidden="true" /> : n}
+              {feita ? <span className="sr-only">{n}, concluída</span> : null}
+            </span>
+            <span
+              className={cn(
+                "truncate text-[0.8125rem] md:text-sm",
+                ativa ? "font-medium text-ink" : "text-ink-dim",
+              )}
+            >
+              {nome}
+            </span>
+            {n < ETAPAS.length ? (
+              <span className="hidden h-px min-w-4 flex-1 bg-line sm:block" aria-hidden="true" />
+            ) : null}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 function Resumo({ label, valor, tom }: { label: string; valor: number; tom?: "clear" | "danger" }) {
   return (
-    <div className="rounded-xl border border-line bg-console px-4 py-3">
-      <p className="text-xs font-medium tracking-wider text-ink-faint uppercase">{label}</p>
-      <p
+    <div className="flex min-w-0 flex-col-reverse gap-2 px-4 md:px-5">
+      <dt className="truncate text-[0.8125rem] text-ink-dim">{label}</dt>
+      <dd
         className={cn(
-          "mt-1 font-mono text-2xl text-ink tabular-nums",
+          "font-display text-[1.625rem] leading-none font-medium tracking-[-0.03em] text-ink tabular-nums md:text-[2rem]",
           tom === "clear" && "text-clear",
           tom === "danger" && "text-danger",
         )}
       >
         {valor.toLocaleString("pt-BR")}
-      </p>
+      </dd>
     </div>
   )
 }

@@ -1,14 +1,21 @@
 import Link from "next/link"
 import { cn } from "cn"
-import { ArchiveIcon, ArrowLeftIcon, BotIcon, HistoryIcon, UserRoundIcon } from "lucide-react"
+import {
+  ArchiveIcon,
+  ArrowLeftIcon,
+  BotIcon,
+  HistoryIcon,
+  TicketIcon,
+  UserRoundIcon,
+} from "lucide-react"
 
 import type { ConversationWithMessages, Message } from "@/lib/types"
 import type { ConversationOsRef } from "@/server/conversations"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { buttonVariants } from "@/components/ui/button"
 import { formatMessageTime, formatTelefoneBR, initials } from "@/lib/format"
 import { CONVERSATION_STATUS_META, OS_PRIORITY_META } from "@/lib/status-meta"
-import { AiSummaryMobile, type AiStep } from "@/components/atendimento/ai-panel"
+import { AiPanelSheet, type AiStep } from "@/components/atendimento/ai-panel"
 import {
   conversationName,
   isChamadoAberto,
@@ -22,7 +29,7 @@ type ThreadProps = {
   osRefs: ConversationOsRef[]
   /** Passos do painel "O que a IA fez" (compartilhados com o AiPanel). */
   aiSteps: AiStep[]
-  /** Href de volta para a lista (mobile). */
+  /** Href de volta para a lista (celular e tablet). */
   backHref: string
   /** Href que amplia a janela de mensagens; null quando não há anteriores. */
   olderHref?: string | null
@@ -31,8 +38,9 @@ type ThreadProps = {
 }
 
 /**
- * Thread da conversa (coluna central): header com contato, resumo da IA
- * (< xl), bolhas estilo WhatsApp, eventos de sistema e input de resposta.
+ * Conversa (painel central): cabeçalho com contato e status, bolhas no estilo
+ * WhatsApp ancoradas no fim, eventos de sistema e campo de resposta. Abaixo de
+ * xl o painel da IA abre em folha inferior pelo botão do cabeçalho.
  */
 export function Thread({
   conversation,
@@ -50,16 +58,16 @@ export function Thread({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-3 border-b border-line-soft px-3 py-2.5 md:px-4">
+      <header className="flex items-center gap-2 border-b border-line-soft px-2 py-2 md:gap-3 md:px-4 md:py-3">
         <Link
           href={backHref}
           aria-label="Voltar para a lista de conversas"
-          className="flex size-11 shrink-0 items-center justify-center rounded-lg text-ink-dim transition-colors hover:bg-console-2 hover:text-ink md:hidden"
+          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "text-ink lg:hidden")}
         >
           <ArrowLeftIcon className="size-5" aria-hidden="true" />
         </Link>
-        <Avatar>
-          <AvatarFallback className="bg-console-3 font-mono text-[11px] text-ink-dim">
+        <Avatar size="lg">
+          <AvatarFallback className="bg-console-3 text-xs font-medium text-ink-dim">
             {conversation.client ? (
               initials(nome)
             ) : (
@@ -68,7 +76,7 @@ export function Thread({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-ink">
+          <h2 className="truncate font-display text-[1.0625rem] leading-snug font-medium tracking-[-0.01em] text-ink">
             {conversation.client?.id ? (
               <Link
                 href={`/clientes/${conversation.client.id}`}
@@ -79,58 +87,64 @@ export function Thread({
             ) : (
               nome
             )}
-          </p>
-          <p className="truncate font-mono text-[11px] text-ink-faint tabular-nums">
-            {telefone}
+          </h2>
+          <p className="flex min-w-0 items-center gap-2 text-[0.8125rem] text-ink-dim">
+            {conversation.client ? (
+              <span className="truncate tabular-nums">{telefone}</span>
+            ) : null}
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn("size-1.5 rounded-full", statusMeta.dotClassName)}
+              />
+              <span className="sr-only">Status:</span>
+              {statusMeta.label}
+            </span>
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={cn(
-            "shrink-0 font-mono text-[9px] tracking-wider uppercase",
-            statusMeta.badgeClassName,
-          )}
-        >
-          {statusMeta.label}
-        </Badge>
+        <AiPanelSheet
+          conversationId={conversation.id}
+          status={conversation.status}
+          steps={aiSteps}
+        />
       </header>
 
-      <AiSummaryMobile
-        conversationId={conversation.id}
-        status={conversation.status}
-        steps={aiSteps}
-      />
-
+      {/* flex-col-reverse: a rolagem começa na mensagem mais recente. */}
       <div
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4"
+        className="scroll-contain flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
         aria-label={`Mensagens da conversa com ${nome}`}
       >
-        {olderHref && (
-          <Link
-            href={olderHref}
-            scroll={false}
-            className="flex min-h-9 items-center justify-center gap-1.5 self-center rounded-full border border-line-soft px-3 text-xs text-ink-dim transition-colors outline-none hover:bg-console-2 hover:text-ink focus-visible:border-ring max-md:min-h-11"
-          >
-            <HistoryIcon className="size-3.5" aria-hidden="true" />
-            Carregar mensagens anteriores
-          </Link>
-        )}
-        {conversation.messages.map((message) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            osRef={
-              isChamadoAberto(message)
-                ? refByNumero.get(messageOsNumero(message) ?? -1) ?? null
-                : null
-            }
-          />
-        ))}
+        <div className="flex flex-col gap-2.5 px-3 py-4 md:px-5 md:py-5">
+          {olderHref && (
+            <Link
+              href={olderHref}
+              scroll={false}
+              className={cn(
+                buttonVariants({ variant: "secondary", size: "sm" }),
+                "mb-2 self-center text-ink-dim",
+              )}
+            >
+              <HistoryIcon aria-hidden="true" />
+              Carregar mensagens anteriores
+            </Link>
+          )}
+          {conversation.messages.map((message) => (
+            <MessageItem
+              key={message.id}
+              message={message}
+              osRef={
+                isChamadoAberto(message)
+                  ? refByNumero.get(messageOsNumero(message) ?? -1) ?? null
+                  : null
+              }
+            />
+          ))}
+        </div>
       </div>
 
       {encerrada ? (
-        <p className="flex items-center justify-center gap-2 border-t border-line-soft px-4 py-3.5 text-xs text-ink-faint">
-          <ArchiveIcon className="size-3.5" aria-hidden="true" />
+        <p className="flex items-center justify-center gap-2 border-t border-line-soft px-4 py-4 text-[0.8125rem] text-ink-dim">
+          <ArchiveIcon className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
           Conversa encerrada. O envio de novas mensagens está desativado.
         </p>
       ) : (
@@ -157,19 +171,30 @@ function MessageItem({
   const doCliente = message.autor === "cliente"
   const daIa = message.autor === "ia"
   const numero = messageOsNumero(message)
+  const prioridadeAlta =
+    osRef && (osRef.prioridade === "urgente" || osRef.prioridade === "alta")
+      ? ` · Prioridade ${OS_PRIORITY_META[osRef.prioridade].label.toLowerCase()}`
+      : ""
 
   return (
     <>
       <div
         className={cn(
-          "flex max-w-[85%] flex-col gap-1 rounded-2xl px-3.5 py-2.5 md:max-w-[70%]",
+          "flex max-w-[85%] flex-col gap-1 rounded-[1.25rem] px-4 py-2.5 md:max-w-[72%]",
           doCliente
             ? "self-start rounded-bl-md bg-console-2"
-            : "self-end rounded-br-md border border-signal/40 bg-signal-dim",
+            : daIa
+              ? "self-end rounded-br-md bg-signal-dim"
+              : "self-end rounded-br-md bg-console-3",
         )}
       >
         {!doCliente && (
-          <span className="flex items-center gap-1.5 text-[11px] font-medium text-signal">
+          <span
+            className={cn(
+              "flex items-center gap-1.5 text-xs font-medium",
+              daIa ? "text-signal" : "text-ink-dim",
+            )}
+          >
             {daIa ? (
               <>
                 <BotIcon className="size-3.5" aria-hidden="true" />
@@ -183,33 +208,37 @@ function MessageItem({
             )}
           </span>
         )}
-        <p className="text-sm leading-relaxed break-words text-ink">
+        <p className="text-[0.9375rem] leading-relaxed break-words text-ink md:text-sm">
           {message.texto}
         </p>
         <time
           dateTime={message.created_at}
-          className="self-end font-mono text-[10px] text-ink-faint tabular-nums"
+          className="self-end text-xs text-ink-faint tabular-nums"
         >
           {formatMessageTime(message.created_at)}
         </time>
       </div>
 
       {isChamadoAberto(message) && numero !== null && (
-        <div className="flex justify-center py-1">
+        <div className="flex justify-center py-1.5">
           {osRef ? (
             <Link
               href={`/chamados/${osRef.id}`}
               aria-label={`Abrir chamado #${numero}`}
-              className="rounded-full border border-amber/30 bg-amber-dim px-3 py-1.5 text-center font-mono text-[10px] tracking-wider text-amber uppercase transition-colors outline-none hover:border-amber/60 focus-visible:border-amber"
+              className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-amber-dim px-3.5 py-1.5 text-center text-[0.8125rem] font-medium text-amber transition-colors outline-none hover:bg-amber/20 focus-visible:ring-3 focus-visible:ring-amber/40"
             >
-              Chamado #{numero} aberto automaticamente
-              {osRef.prioridade === "urgente" || osRef.prioridade === "alta"
-                ? ` · Prioridade ${OS_PRIORITY_META[osRef.prioridade].label}`
-                : ""}
+              <TicketIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                Chamado <span className="tabular-nums">#{numero}</span> aberto automaticamente
+                {prioridadeAlta}
+              </span>
             </Link>
           ) : (
-            <span className="rounded-full border border-amber/30 bg-amber-dim px-3 py-1.5 text-center font-mono text-[10px] tracking-wider text-amber uppercase">
-              Chamado #{numero} aberto automaticamente
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-2xl bg-amber-dim px-3.5 py-1.5 text-center text-[0.8125rem] font-medium text-amber">
+              <TicketIcon className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                Chamado <span className="tabular-nums">#{numero}</span> aberto automaticamente
+              </span>
             </span>
           )}
         </div>

@@ -58,3 +58,12 @@ export function normalizeSearch(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
 }
+
+/**
+ * Altura da tela do mapa: a página cabe exatamente na área útil.
+ * Celular: 100dvh menos o cabeçalho (3.5rem + área segura), o respiro do topo
+ * (0.5rem) e a reserva da barra de abas (`.pb-tabbar`). Desktop: menos a
+ * moldura (1rem), o cabeçalho (4rem), o respiro (1rem) e o rodapé (2rem).
+ */
+export const MAPA_TELA_CLASS =
+  "flex min-h-[30rem] flex-col h-[calc(100dvh-3.5rem-env(safe-area-inset-top)-0.5rem-var(--tabbar-h)-env(safe-area-inset-bottom)-1.5rem)] md:h-[calc(100dvh-8rem)] md:min-h-[36rem]"

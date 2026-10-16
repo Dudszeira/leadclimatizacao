@@ -63,8 +63,7 @@ const HORARIOS = Array.from({ length: 12 }, (_, i) => {
 
 /**
  * Ações de escritório do ciclo da OS (admin/atendente), contextuais ao status:
- * aberto/agendado → designar, agendar/reagendar, cancelar · em campo →
- * cancelar. Check-in e conclusão ficam no painel de execução.
+ * aberto/agendado: designar, agendar/reagendar, cancelar. Em campo: cancelar. Check-in e conclusão ficam no painel de execução.
  */
 export function OrderActions({
   osId,
@@ -136,7 +135,7 @@ export function OrderActions({
   return (
     <div className="flex flex-col gap-5">
       {(status === "aberto" || status === "agendado") && (
-        <div className="grid gap-1.5">
+        <div className="grid gap-2">
           <Label htmlFor="os-tecnico">
             {technicianId ? "Trocar técnico" : "Designar técnico"}
           </Label>
@@ -149,7 +148,7 @@ export function OrderActions({
               <SelectTrigger
                 id="os-tecnico"
                 aria-label="Técnico responsável"
-                className="h-9 min-w-0 flex-1 max-md:h-11"
+                className="w-full min-w-0 flex-1"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -162,8 +161,7 @@ export function OrderActions({
               </SelectContent>
             </Select>
             <Button
-              variant="outline"
-              className="h-9 max-md:h-11"
+              variant="secondary"
               disabled={busy || !tecnico || tecnico === technicianId}
               aria-busy={pendingAction === "designar"}
               onClick={() =>
@@ -184,27 +182,29 @@ export function OrderActions({
       )}
 
       {(status === "aberto" || status === "agendado") && (
-        <div className="grid gap-1.5">
+        <div className="grid gap-2">
           <Label>{status === "agendado" ? "Reagendar visita" : "Agendar visita"}</Label>
           <Popover open={agendaOpen} onOpenChange={setAgendaOpen}>
             <PopoverTrigger
               render={
                 <Button
-                  variant="outline"
-                  className="h-9 justify-start font-normal max-md:h-11"
+                  variant="secondary"
+                  className="w-full justify-start font-normal"
                   disabled={busy}
                   aria-label="Escolher data e hora da visita"
                 />
               }
             >
               <CalendarIcon className="text-ink-faint" aria-hidden="true" />
+              <span className="truncate">
               {dataAgenda
                 ? `${dataAgenda.toLocaleDateString("pt-BR")} às ${horaAgenda.replace(":", "h")}`
                 : scheduledAt
                   ? formatDateTimeFullBR(scheduledAt)
                   : "Escolher data e hora"}
+              </span>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-3" align="start">
+            <PopoverContent className="surface-paper w-auto p-3" align="start">
               <Calendar
                 mode="single"
                 locale={ptBR}
@@ -223,20 +223,19 @@ export function OrderActions({
                 >
                   <SelectTrigger
                     aria-label="Horário da visita"
-                    className="h-9 flex-1 font-mono tabular-nums"
+                    className="flex-1 tabular-nums"
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {HORARIOS.map((h) => (
-                      <SelectItem key={h} value={h} className="font-mono tabular-nums">
+                      <SelectItem key={h} value={h} className="tabular-nums">
                         {h}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Button
-                  className="h-9"
                   disabled={!dataAgenda || busy}
                   aria-busy={pendingAction === "agendar"}
                   onClick={handleAgendar}
@@ -255,11 +254,7 @@ export function OrderActions({
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogTrigger
           render={
-            <Button
-              variant="destructive"
-              className="h-9 max-md:h-11"
-              disabled={busy}
-            />
+            <Button variant="destructive" className="w-full" disabled={busy} />
           }
         >
           <BanIcon aria-hidden="true" />
@@ -275,10 +270,9 @@ export function OrderActions({
           </DialogHeader>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setCancelOpen(false)}
               disabled={busy}
-              className="max-md:h-11"
             >
               Manter chamado
             </Button>
@@ -286,7 +280,6 @@ export function OrderActions({
               variant="destructive"
               disabled={busy}
               aria-busy={pendingAction === "cancelar"}
-              className="max-md:h-11"
               onClick={() => {
                 setCancelOpen(false)
                 run("cancelar", () => cancelServiceOrder(osId), () =>

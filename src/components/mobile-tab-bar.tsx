@@ -10,7 +10,7 @@ import type { UserRole } from "@/lib/types"
 import { useSidebar } from "@/components/ui/sidebar"
 
 const tabClass =
-  "flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-[1.125rem] text-[0.6875rem] font-medium transition-[background-color,color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/60"
+  "flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-[1.125rem] text-xs font-medium transition-[background-color,color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/60"
 
 /**
  * Barra de abas inferior (só no celular): os destinos do dia a dia do papel

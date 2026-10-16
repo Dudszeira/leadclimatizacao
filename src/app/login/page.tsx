@@ -27,16 +27,15 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (isDemoMode) {
     return (
       <AuthShell
-        eyebrow="Modo demonstração"
-        title="Console aberto para avaliação"
+        title="Ambiente de demonstração"
         description="Este ambiente roda com dados fictícios e não exige login. O acesso com e-mail e senha é ativado quando o banco da Lead Climatização for conectado."
       >
-        <div className="flex flex-col gap-4">
-          <p className="flex items-start gap-2 text-sm text-ink-dim">
+        <div className="flex flex-col gap-5">
+          <p className="flex items-start gap-2.5 rounded-xl bg-amber-dim px-3.5 py-3 text-sm leading-relaxed text-ink">
             <FlaskConicalIcon className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
             Nenhuma alteração feita aqui é gravada.
           </p>
-          <Link href={next ?? "/"} className={buttonVariants({ className: "h-11 w-full" })}>
+          <Link href={next ?? "/"} className={buttonVariants({ size: "lg", className: "w-full" })}>
             Entrar no painel
             <ArrowRightIcon aria-hidden="true" />
           </Link>
@@ -47,8 +46,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <AuthShell
-      eyebrow="Acesso restrito"
-      title="Entrar no console"
+      title="Entrar"
       description="Use o e-mail e a senha cadastrados pela administração."
       footer={
         <p>
@@ -59,7 +57,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       {erro ? (
         <p
           role="alert"
-          className="mb-5 flex items-start gap-2 rounded-lg border border-amber/30 bg-amber-dim px-3 py-2.5 text-sm text-ink"
+          className="mb-6 flex items-start gap-2.5 rounded-xl bg-amber-dim px-3.5 py-3 text-sm leading-relaxed text-ink"
         >
           <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
           {erro}

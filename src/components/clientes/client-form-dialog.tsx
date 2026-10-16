@@ -38,7 +38,7 @@ type ClientFormDialogProps = {
     | "observacoes"
   >
   triggerLabel?: string
-  triggerVariant?: "default" | "outline"
+  triggerVariant?: "default" | "outline" | "secondary"
   triggerClassName?: string
 }
 
@@ -99,15 +99,15 @@ export function ClientFormDialog({
       <DialogTrigger
         render={
           <Button
-            variant={triggerVariant ?? (isEdit ? "outline" : "default")}
-            className={triggerClassName ?? "h-9 px-3 max-md:h-11 max-md:px-4"}
+            variant={triggerVariant ?? (isEdit ? "secondary" : "default")}
+            className={triggerClassName}
           />
         }
       >
         {isEdit ? <PencilLineIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
         {label}
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar cliente" : "Cadastrar cliente"}</DialogTitle>
           <DialogDescription>
@@ -125,7 +125,6 @@ export function ClientFormDialog({
               placeholder="Ex.: Condomínio Edifício Torres do Batel"
               autoComplete="organization"
               required
-              className="max-md:h-11"
               {...invalidProps("cliente-razao-social", errors.razao_social)}
             />
           </Field>
@@ -135,7 +134,6 @@ export function ClientFormDialog({
                 id="cliente-fantasia"
                 value={form.nome_fantasia}
                 onChange={(e) => set("nome_fantasia")(e.target.value)}
-                className="max-md:h-11"
                 {...invalidProps("cliente-fantasia", errors.nome_fantasia)}
               />
             </Field>
@@ -147,7 +145,6 @@ export function ClientFormDialog({
                 placeholder="00.000.000/0000-00"
                 inputMode="numeric"
                 autoComplete="off"
-                className="font-mono max-md:h-11"
                 {...invalidProps("cliente-documento", errors.documento)}
               />
             </Field>
@@ -173,7 +170,6 @@ export function ClientFormDialog({
                 onChange={(e) => set("contato_nome")(e.target.value)}
                 placeholder="Nome do responsável"
                 autoComplete="name"
-                className="max-md:h-11"
                 {...invalidProps("cliente-contato", errors.contato_nome)}
               />
             </Field>
@@ -183,11 +179,14 @@ export function ClientFormDialog({
               <Input
                 id="cliente-email"
                 type="email"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={form.contato_email}
                 onChange={(e) => set("contato_email")(e.target.value)}
                 placeholder="contato@empresa.com.br"
                 autoComplete="email"
-                className="max-md:h-11"
                 {...invalidProps("cliente-email", errors.contato_email)}
               />
             </Field>
@@ -200,7 +199,6 @@ export function ClientFormDialog({
                 placeholder="(41) 99999-9999"
                 inputMode="tel"
                 autoComplete="tel"
-                className="font-mono max-md:h-11"
                 {...invalidProps("cliente-telefone", errors.contato_telefone)}
               />
             </Field>
@@ -220,7 +218,6 @@ export function ClientFormDialog({
               variant="outline"
               onClick={() => setOpen(false)}
               disabled={pending}
-              className="max-md:h-11"
             >
               Cancelar
             </Button>

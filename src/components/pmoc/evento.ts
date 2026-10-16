@@ -40,10 +40,10 @@ export const EVENTO_META: Record<
 > = {
   futura: {
     label: "Prevista",
-    chip: "bg-signal-dim text-signal hover:bg-signal/25",
-    dot: "bg-signal",
-    badge: "border-transparent bg-signal-dim text-signal",
-    text: "text-signal",
+    chip: "bg-console-3 text-ink-dim hover:bg-[#2e2e2e] hover:text-ink",
+    dot: "bg-ink-faint",
+    badge: "border-transparent bg-console-3 text-ink-dim",
+    text: "text-ink-dim",
   },
   vencendo: {
     label: "Vencendo",
@@ -67,6 +67,14 @@ export const EVENTO_META: Record<
     text: "text-clear",
   },
 }
+
+/** Ordem de urgência para pontos de status (mais grave primeiro). */
+export const SITUACAO_ORDEM: readonly PmocEventoSituacao[] = [
+  "atrasada",
+  "vencendo",
+  "futura",
+  "concluida",
+]
 
 export const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
   split: "Split",

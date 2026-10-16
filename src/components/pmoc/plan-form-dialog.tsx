@@ -77,11 +77,11 @@ export function PlanFormDialog({
   const titulo = plan?.ativo ? "Editar plano PMOC" : plan ? "Reabrir plano PMOC" : "Novo plano PMOC"
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
-            <span className="font-mono text-ink">{equipmentLabel}</span>
+            <span className="text-ink">{equipmentLabel}</span>
           </DialogDescription>
         </DialogHeader>
         {open && (
@@ -153,7 +153,7 @@ function PlanForm({
               value={form.periodicidade_dias}
               onChange={(e) => set("periodicidade_dias")(e.target.value.replace(/\D/g, ""))}
               inputMode="numeric"
-              className="font-mono max-md:h-11"
+              className="tabular-nums"
               {...invalidProps("plano-dias", errors.periodicidade_dias)}
             />
           </Field>
@@ -164,7 +164,7 @@ function PlanForm({
               type="date"
               value={form.proxima_data}
               onChange={(e) => set("proxima_data")(e.target.value)}
-              className="font-mono max-md:h-11"
+              className="tabular-nums"
               {...invalidProps("plano-proxima", errors.proxima_data)}
             />
           </Field>
@@ -177,7 +177,7 @@ function PlanForm({
             type="date"
             value={form.proxima_data}
             onChange={(e) => set("proxima_data")(e.target.value)}
-            className="font-mono max-md:h-11 sm:w-48"
+            className="tabular-nums sm:w-48"
             {...invalidProps("plano-proxima", errors.proxima_data)}
           />
         </Field>
@@ -193,7 +193,6 @@ function PlanForm({
           value={form.responsavel_tecnico}
           onChange={(e) => set("responsavel_tecnico")(e.target.value)}
           placeholder="Eng. Nome Sobrenome, CREA-PR 000000/D"
-          className="max-md:h-11"
           {...invalidProps("plano-rt", errors.responsavel_tecnico)}
         />
       </Field>
@@ -217,12 +216,12 @@ function PlanForm({
         />
       </Field>
       <p className="flex items-start gap-2 rounded-lg border border-line bg-console-2/40 p-3 text-xs leading-relaxed text-ink-dim">
-        <InfoIcon className="mt-0.5 size-3.5 shrink-0 text-signal" aria-hidden="true" />
+        <InfoIcon className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden="true" />
         A OS preventiva é gerada automaticamente perto da data. Quando ela é concluída, a
         próxima data avança sozinha (conclusão + periodicidade).
       </p>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose} disabled={pending} className="max-md:h-11">
+        <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
           Cancelar
         </Button>
         <SubmitButton pending={pending}>{plan?.ativo ? "Salvar plano" : "Ativar plano"}</SubmitButton>

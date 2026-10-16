@@ -38,7 +38,7 @@ Regras de cor:
 - Números: `tabular-nums` (já global em tabela/time/.font-mono). Nº de OS: `#1004` em `font-medium text-ink-dim tabular-nums`, sem mono.
 
 ## Forma
-- Raios: card 22px (`rounded-[1.375rem]`, já no `Card`), card interno/linha de lista 16px (`rounded-2xl`), campo 12px (`rounded-xl`), botão e pílula `rounded-full`, folha inferior 28px.
+- Raios (`--radius` 10px): card 22px (`rounded-[1.375rem]`, já no `Card`), bloco interno/linha de lista 18px (`rounded-2xl`), campo 14px (`rounded-xl`), botão e pílula `rounded-full`, folha inferior 28px.
 - Espaço: gutter da tela 16px celular / 32px desktop (já no layout). Entre seções 24px celular / 32px desktop. Dentro do card 16/20px.
 - Sem cards aninhados. Lista dentro de card = linhas separadas por `divide-y divide-line-soft`, não card dentro de card.
 - Sombra só em sobreposição (popover, folha, dock).

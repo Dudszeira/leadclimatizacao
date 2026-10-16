@@ -4,11 +4,22 @@ import { MapPinnedIcon } from "lucide-react"
 import { requireRole } from "@/server/auth"
 import { listMapPins } from "@/server/map"
 import { DataError } from "@/components/data-error"
+import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 import { MapaView } from "@/components/mapa/mapa-view"
-import { derivePinStatus, type MapaBuilding } from "@/components/mapa/status"
+import {
+  MAPA_TELA_CLASS,
+  derivePinStatus,
+  type MapaBuilding,
+} from "@/components/mapa/status"
 
 export const metadata: Metadata = {
   title: "Mapa de Equipamentos",
+}
+
+const HEADER = {
+  title: "Mapa de equipamentos",
+  description: "Prédios atendidos e a situação dos equipamentos de cada um.",
 }
 
 export default async function MapaPage() {
@@ -17,7 +28,12 @@ export default async function MapaPage() {
 
   const result = await listMapPins()
   if (result.error !== null) {
-    return <DataError message={result.error} />
+    return (
+      <div className="flex flex-1 flex-col">
+        <PageHeader {...HEADER} />
+        <DataError message={result.error} />
+      </div>
+    )
   }
 
   const buildings: MapaBuilding[] = result.data
@@ -26,23 +42,21 @@ export default async function MapaPage() {
 
   if (buildings.length === 0) {
     return (
-      <section className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-console/50 px-6 py-16 text-center">
-        <div
-          className="flex size-16 items-center justify-center rounded-2xl border border-line-soft bg-console-2"
-          aria-hidden="true"
-        >
-          <MapPinnedIcon className="size-8 text-ink-faint" />
-        </div>
-        <h2 className="mt-6 font-display text-lg font-bold tracking-tight text-ink">
-          Nenhum prédio no mapa
-        </h2>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-          Cadastre prédios com endereço e coordenadas para vê-los aqui, com o
-          status dos equipamentos de cada unidade.
-        </p>
-      </section>
+      <div className="flex flex-1 flex-col">
+        <PageHeader {...HEADER} />
+        <EmptyState
+          icon={MapPinnedIcon}
+          title="Nenhum prédio no mapa"
+          description="Cadastre prédios com endereço e coordenadas no cliente para vê-los aqui, com a situação dos equipamentos de cada unidade."
+        />
+      </div>
     )
   }
 
-  return <MapaView buildings={buildings} />
+  return (
+    <div className={MAPA_TELA_CLASS}>
+      <PageHeader {...HEADER} className="pb-4 md:pb-6" />
+      <MapaView buildings={buildings} />
+    </div>
+  )
 }

@@ -8,8 +8,6 @@ import {
   ArchiveIcon,
   BotIcon,
   CheckIcon,
-  ChevronDownIcon,
-  CircleDashedIcon,
   LoaderCircleIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
@@ -25,10 +23,13 @@ import {
 } from "@/server/actions/conversations"
 import { Button } from "@/components/ui/button"
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 /** Passo derivado da conversa (metadata das mensagens + relações da OS). */
 export type AiStep = {
@@ -37,7 +38,7 @@ export type AiStep = {
   detail: string | null
   /** Link interno (CRM, chamado), quando existir. */
   href: string | null
-  /** true → detalhe em fonte mono (códigos e números). */
+  /** true → detalhe com números tabulares (códigos e números de OS). */
   mono: boolean
   done: boolean
 }
@@ -49,15 +50,19 @@ type AiPanelProps = {
 }
 
 // ---------------------------------------------------------------------------
-// Conteúdo compartilhado (desktop e mobile)
+// Conteúdo compartilhado (painel lateral e folha inferior)
 // ---------------------------------------------------------------------------
+
+const PANEL_DESCRIPTION = "Resumo automático do que a IA resolveu nesta conversa."
 
 function StepDetail({ step }: { step: AiStep }) {
   if (!step.detail) return null
   const className = cn(
-    "max-w-32 truncate text-right text-xs",
-    step.mono ? "font-mono tabular-nums" : "",
-    step.href ? "text-signal hover:underline" : "text-ink-dim",
+    "block w-fit max-w-full truncate text-[0.8125rem]",
+    step.mono && "tabular-nums",
+    step.href
+      ? "rounded-sm text-signal outline-none hover:underline focus-visible:ring-3 focus-visible:ring-signal/50"
+      : "text-ink-dim",
   )
   if (step.href) {
     return (
@@ -75,31 +80,31 @@ function StepDetail({ step }: { step: AiStep }) {
 
 function AiSteps({ steps }: { steps: AiStep[] }) {
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul className="flex flex-col divide-y divide-line-soft">
       {steps.map((step) => (
-        <li key={step.label} className="flex items-center justify-between gap-3">
-          <span className="flex min-w-0 items-center gap-2">
-            {step.done ? (
-              <CheckIcon className="size-3.5 shrink-0 text-clear" aria-hidden="true" />
-            ) : (
-              <CircleDashedIcon
-                className="size-3.5 shrink-0 text-ink-faint"
-                aria-hidden="true"
-              />
-            )}
+        <li key={step.label} className="flex min-h-12 items-center gap-3 py-2.5">
+          {step.done ? (
             <span
-              className={cn(
-                "truncate text-xs",
-                step.done ? "text-ink" : "text-ink-faint",
-              )}
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-clear-dim text-clear"
             >
+              <CheckIcon className="size-3.5" strokeWidth={2.5} />
+            </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="size-6 shrink-0 rounded-full border border-dashed border-ink-faint/60"
+            />
+          )}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className={cn("text-sm", step.done ? "text-ink" : "text-ink-faint")}>
               {step.label}
+              <span className="sr-only">
+                {step.done ? ", concluído" : ", pendente"}
+              </span>
             </span>
-            <span className="sr-only">
-              {step.done ? "· concluído" : "· pendente"}
-            </span>
+            <StepDetail step={step} />
           </span>
-          <StepDetail step={step} />
         </li>
       ))}
     </ul>
@@ -137,7 +142,8 @@ function ConversationActionButtons({
 
   if (status === "encerrado") {
     return (
-      <p className="text-xs leading-relaxed text-ink-faint">
+      <p className="flex items-center gap-2 rounded-2xl bg-console-2 px-4 py-3 text-[0.8125rem] leading-relaxed text-ink-dim">
+        <ArchiveIcon className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
         Conversa encerrada. Sem ações disponíveis.
       </p>
     )
@@ -147,8 +153,7 @@ function ConversationActionButtons({
     <div className="flex flex-col gap-2">
       {status === "ia" && (
         <Button
-          variant="outline"
-          className="h-9 justify-start max-md:h-11"
+          className="w-full"
           disabled={busy}
           aria-busy={pendingAction === "transferir"}
           onClick={() => run("transferir", () => transferConversation(conversationId))}
@@ -162,8 +167,8 @@ function ConversationActionButtons({
         </Button>
       )}
       <Button
-        variant="outline"
-        className="h-9 justify-start text-ink-dim max-md:h-11"
+        variant={status === "ia" ? "secondary" : "default"}
+        className="w-full"
         disabled={busy}
         aria-busy={pendingAction === "encerrar"}
         onClick={() => run("encerrar", () => closeConversation(conversationId))}
@@ -179,8 +184,19 @@ function ConversationActionButtons({
   )
 }
 
+function PanelBadge() {
+  return (
+    <span
+      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-signal-dim"
+      aria-hidden="true"
+    >
+      <BotIcon className="size-[1.125rem] text-signal" />
+    </span>
+  )
+}
+
 // ---------------------------------------------------------------------------
-// Painel lateral (desktop ≥ xl, colapsável)
+// Painel lateral (desktop a partir de xl, recolhível)
 // ---------------------------------------------------------------------------
 
 export function AiPanel({ conversationId, status, steps }: AiPanelProps) {
@@ -188,36 +204,37 @@ export function AiPanel({ conversationId, status, steps }: AiPanelProps) {
 
   if (collapsed) {
     return (
-      <aside className="hidden shrink-0 flex-col items-center rounded-xl border border-line bg-console p-2 xl:flex">
+      <aside
+        className="hidden shrink-0 flex-col items-center gap-3 rounded-[1.375rem] bg-console p-2.5 ring-1 ring-line xl:flex"
+        aria-label="Painel da IA recolhido"
+      >
         <Button
-          variant="ghost"
-          size="icon-lg"
+          variant="secondary"
+          size="icon"
           aria-label="Expandir painel da IA"
           onClick={() => setCollapsed(false)}
         >
-          <PanelRightOpenIcon className="text-ink-dim" aria-hidden="true" />
+          <PanelRightOpenIcon aria-hidden="true" />
         </Button>
-        <BotIcon className="mt-2 size-4 text-ink-faint" aria-hidden="true" />
+        <PanelBadge />
       </aside>
     )
   }
 
   return (
     <aside
-      className="hidden w-72 shrink-0 flex-col gap-5 overflow-y-auto rounded-xl border border-line bg-console p-4 xl:flex"
-      aria-label="O que a IA fez nessa conversa"
+      className="hidden w-80 shrink-0 flex-col gap-4 overflow-y-auto rounded-[1.375rem] bg-console p-5 ring-1 ring-line xl:flex"
+      aria-labelledby="ai-panel-title"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-signal-dim"
-            aria-hidden="true"
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <PanelBadge />
+          <h2
+            id="ai-panel-title"
+            className="font-display text-[1.0625rem] leading-snug font-medium tracking-[-0.01em] text-ink"
           >
-            <BotIcon className="size-4 text-signal" />
-          </span>
-          <h3 className="text-xs font-medium tracking-wider text-ink-faint uppercase">
             O que a IA fez
-          </h3>
+          </h2>
         </div>
         <Button
           variant="ghost"
@@ -225,11 +242,12 @@ export function AiPanel({ conversationId, status, steps }: AiPanelProps) {
           aria-label="Recolher painel da IA"
           onClick={() => setCollapsed(true)}
         >
-          <PanelRightCloseIcon className="text-ink-faint" aria-hidden="true" />
+          <PanelRightCloseIcon aria-hidden="true" />
         </Button>
       </div>
+      <p className="text-[0.8125rem] leading-relaxed text-ink-dim">{PANEL_DESCRIPTION}</p>
       <AiSteps steps={steps} />
-      <div className="mt-auto border-t border-line-soft pt-4">
+      <div className="mt-auto pt-2">
         <ConversationActionButtons conversationId={conversationId} status={status} />
       </div>
     </aside>
@@ -237,28 +255,38 @@ export function AiPanel({ conversationId, status, steps }: AiPanelProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Resumo compacto (< xl): colapsável dentro da coluna da thread
+// Abaixo de xl: botão no cabeçalho da conversa abre o painel em folha inferior
 // ---------------------------------------------------------------------------
 
-export function AiSummaryMobile({ conversationId, status, steps }: AiPanelProps) {
+export function AiPanelSheet({ conversationId, status, steps }: AiPanelProps) {
+  const done = steps.filter((s) => s.done).length
   return (
-    <Collapsible className="border-b border-line-soft xl:hidden">
-      <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between gap-2 px-4 py-2 text-left">
-        <span className="flex items-center gap-2">
-          <BotIcon className="size-4 text-signal" aria-hidden="true" />
-          <span className="text-xs font-medium tracking-wider text-ink-dim uppercase">
-            O que a IA fez
-          </span>
-        </span>
-        <ChevronDownIcon
-          className="size-4 text-ink-faint transition-transform group-data-[panel-open]:rotate-180"
-          aria-hidden="true"
-        />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-4 px-4 pb-4">
-        <AiSteps steps={steps} />
-        <ConversationActionButtons conversationId={conversationId} status={status} />
-      </CollapsibleContent>
-    </Collapsible>
+    <Sheet>
+      <SheetTrigger
+        render={
+          <Button
+            variant="secondary"
+            size="icon"
+            className="relative xl:hidden"
+            aria-label={`O que a IA fez: ${done} de ${steps.length} passos concluídos`}
+          />
+        }
+      >
+        <BotIcon className="text-signal" aria-hidden="true" />
+      </SheetTrigger>
+      <SheetContent side="bottom" className="gap-0 sm:mx-auto sm:max-w-xl">
+        <SheetHeader className="flex-row items-center gap-3">
+          <PanelBadge />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <SheetTitle>O que a IA fez</SheetTitle>
+            <SheetDescription>{PANEL_DESCRIPTION}</SheetDescription>
+          </div>
+        </SheetHeader>
+        <div className="scroll-contain flex flex-col gap-5 overflow-y-auto px-5 pb-5">
+          <AiSteps steps={steps} />
+          <ConversationActionButtons conversationId={conversationId} status={status} />
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }

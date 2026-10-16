@@ -56,16 +56,16 @@ export function Field({
     control = React.cloneElement(children, { "aria-describedby": [...ids].join(" ") })
   }
   return (
-    <div className={className ? `grid gap-1.5 ${className}` : "grid gap-1.5"}>
-      <Label htmlFor={id}>{label}</Label>
+    <div className={className ? `grid min-w-0 gap-1.5 ${className}` : "grid min-w-0 gap-1.5"}>
+      <Label htmlFor={id} className="text-ink-dim">{label}</Label>
       {control}
       {hint ? (
-        <p id={`${id}-dica`} className="text-xs text-ink-faint">
+        <p id={`${id}-dica`} className="text-[0.8125rem] leading-snug text-ink-faint">
           {hint}
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-erro`} className="text-xs text-danger">
+        <p id={`${id}-erro`} role="alert" className="text-[0.8125rem] leading-snug text-danger">
           {error}
         </p>
       ) : null}
@@ -110,7 +110,7 @@ export function SelectField({
         id={id}
         aria-label={ariaLabel}
         aria-invalid={error ? true : undefined}
-        className={className ?? "h-9 w-full max-md:h-11"}
+        className={className ?? "w-full"}
       >
         <SelectValue />
       </SelectTrigger>
@@ -177,7 +177,6 @@ export function SubmitButton({
       variant={variant}
       disabled={pending}
       aria-busy={pending}
-      className="max-md:h-11"
     >
       {pending ? (
         <>
@@ -229,7 +228,6 @@ export function ConfirmDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={pending}
-            className="max-md:h-11"
           >
             Cancelar
           </Button>
@@ -238,7 +236,6 @@ export function ConfirmDialog({
             variant={destructive ? "destructive" : "default"}
             disabled={pending}
             aria-busy={pending}
-            className="max-md:h-11"
             onClick={() => run(action, () => onOpenChange(false))}
           >
             {pending && <LoaderCircleIcon className="animate-spin" aria-hidden="true" />}

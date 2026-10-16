@@ -6,7 +6,6 @@ import {
   BotMessageSquareIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  InfoIcon,
   MessageSquareTextIcon,
   SearchXIcon,
 } from "lucide-react"
@@ -26,6 +25,7 @@ import {
 import { OS_PRIORITY_META } from "@/lib/status-meta"
 import { buttonVariants } from "@/components/ui/button"
 import { DataError } from "@/components/data-error"
+import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { AiPanel, type AiStep } from "@/components/atendimento/ai-panel"
 import { ConversationList } from "@/components/atendimento/conversation-list"
@@ -99,34 +99,33 @@ export default async function AtendimentoPage({
   const messagingEnabled = isMessagingConfigured()
 
   return (
-    <div className="flex h-[calc(100svh-5.5rem)] min-h-0 flex-1 flex-col gap-4 md:h-[calc(100svh-6.5rem)]">
-      <header>
-        <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-          Atendimento
-        </h2>
-        <p className="mt-1 text-sm text-ink-dim">
-          Histórico das conversas com clientes: consulte, transfira para a
-          equipe ou encerre.
-        </p>
-      </header>
-
-      {(!messagingEnabled || isDemoMode) && (
-        <p
-          role="status"
-          className="flex items-start gap-2.5 rounded-lg border border-amber/20 bg-amber-dim px-3 py-2.5 text-sm leading-relaxed text-amber"
-        >
-          <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>
-            {!messagingEnabled && (
-              <>
-                {MESSAGING_NOT_CONFIGURED} As conversas registradas continuam
-                disponíveis para consulta.
-              </>
-            )}
-            {isDemoMode && " As conversas abaixo são do ambiente de demonstração."}
-          </span>
-        </p>
-      )}
+    <div className="flex flex-1 flex-col md:h-[calc(100svh-8rem)] md:min-h-[34rem] md:flex-none">
+      <PageHeader
+        title="Atendimento"
+        description="Conversas dos clientes com a IA: consulte, transfira para a equipe ou encerre."
+        className={cn("md:pb-6", filters.c && "max-md:hidden")}
+      >
+        {(!messagingEnabled || isDemoMode) && (
+          <p
+            role="status"
+            className="flex w-fit max-w-full items-start gap-2.5 rounded-2xl bg-console-2 px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-ink-dim"
+          >
+            <span
+              aria-hidden="true"
+              className="mt-[0.4375rem] size-1.5 shrink-0 rounded-full bg-amber"
+            />
+            <span>
+              {!messagingEnabled && (
+                <>
+                  {MESSAGING_NOT_CONFIGURED} As conversas registradas continuam
+                  disponíveis para consulta.
+                </>
+              )}
+              {isDemoMode && " As conversas abaixo são do ambiente de demonstração."}
+            </span>
+          </p>
+        )}
+      </PageHeader>
 
       <Suspense key={suspenseKey} fallback={<AtendimentoSkeleton />}>
         <AtendimentoSection filters={filters} messagingEnabled={messagingEnabled} />
@@ -136,7 +135,9 @@ export default async function AtendimentoPage({
 }
 
 // ---------------------------------------------------------------------------
-// Seção assíncrona: consulta o data layer e monta lista + thread + painel IA
+// Seção assíncrona: consulta o data layer e monta lista + thread + painel IA.
+// Celular e tablet: mestre-detalhe (lista OU conversa). lg: lista + conversa.
+// xl: três painéis (lista, conversa, painel da IA).
 // ---------------------------------------------------------------------------
 
 async function AtendimentoSection({
@@ -185,7 +186,7 @@ async function AtendimentoSection({
   if (!selected) {
     return hasFilters ? <EmptyFiltered /> : <EmptyNoConversations />
   }
-  // Mobile: a thread só cobre a lista quando o usuário escolheu uma conversa.
+  // Celular/tablet: a conversa só cobre a lista quando o usuário escolheu uma.
   const threadOpen = filters.c !== "" && selected.id === filters.c
 
   // OS citadas pelas mensagens carregadas (metadata) → painel + chips.
@@ -213,17 +214,16 @@ async function AtendimentoSection({
       <section
         aria-label="Lista de conversas"
         className={cn(
-          "flex w-full min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-console md:w-80 md:shrink-0",
-          threadOpen && "max-md:hidden",
+          "flex w-full min-w-0 flex-col gap-3 md:min-h-0 md:rounded-[1.375rem] md:bg-console md:p-3 md:ring-1 md:ring-line lg:w-80 lg:shrink-0 xl:w-[22.5rem]",
+          threadOpen && "max-lg:hidden",
         )}
       >
-        <div className="flex flex-col gap-2 border-b border-line-soft p-3">
-          <ConversationsSearch q={filters.q} status={filters.status} c={filters.c} />
-          <StatusTabs filters={filters} />
-        </div>
+        <ConversationsSearch q={filters.q} status={filters.status} c={filters.c} />
+        <StatusTabs filters={filters} />
         <ConversationList
           conversations={conversations}
           selectedId={selected.id}
+          selectionOnMobile={threadOpen}
           hrefFor={(id) => buildHref({ ...filters, c: id, m: THREAD_MESSAGES_STEP })}
         />
         <ListPagination page={page} filters={filters} />
@@ -232,8 +232,11 @@ async function AtendimentoSection({
       <section
         aria-label="Conversa selecionada"
         className={cn(
-          "min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-console",
-          threadOpen ? "flex" : "hidden md:flex",
+          "min-w-0 flex-1 flex-col overflow-hidden md:min-h-0 md:rounded-[1.375rem] md:bg-console md:ring-1 md:ring-line",
+          threadOpen
+            ? // Celular: conversa em tela cheia entre a barra superior e a barra de abas.
+              "flex max-md:fixed max-md:inset-x-0 max-md:top-[calc(3.5rem+env(safe-area-inset-top))] max-md:bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+0.75rem)] max-md:z-20 max-md:bg-void"
+            : "hidden lg:flex",
         )}
       >
         <Thread
@@ -269,14 +272,11 @@ function ListPagination({
   if (page.pageCount <= 1) return null
   const first = (page.page - 1) * page.pageSize + 1
   const last = Math.min(page.total, first + page.items.length - 1)
-  const linkClass = cn(
-    buttonVariants({ variant: "ghost", size: "sm" }),
-    "h-8 gap-1 px-2 text-xs max-md:h-11",
-  )
+  const linkClass = buttonVariants({ variant: "ghost", size: "sm" })
   return (
     <nav
       aria-label="Paginação das conversas"
-      className="flex items-center justify-between gap-2 border-t border-line-soft px-2 py-1.5"
+      className="flex items-center justify-between gap-2"
     >
       {page.page > 1 ? (
         <Link href={buildHref({ ...filters, p: page.page - 1 })} className={linkClass}>
@@ -286,8 +286,8 @@ function ListPagination({
       ) : (
         <span aria-hidden="true" className="w-16" />
       )}
-      <span className="font-mono text-[11px] text-ink-faint tabular-nums">
-        {first}–{last} de {page.total}
+      <span className="text-xs text-ink-faint tabular-nums">
+        {first} a {last} de {page.total}
       </span>
       {page.page < page.pageCount ? (
         <Link href={buildHref({ ...filters, p: page.page + 1 })} className={linkClass}>
@@ -324,21 +324,21 @@ function buildAiSteps(
     {
       label: "Localizou o equipamento",
       done: ref?.equipment_codigo != null,
-      detail: ref?.equipment_codigo ?? "—",
+      detail: ref?.equipment_codigo ?? null,
       href: null,
       mono: true,
     },
     {
       label: "Abriu chamado no sistema",
       done: ref !== null,
-      detail: ref ? `#${ref.numero}` : "—",
+      detail: ref ? `#${ref.numero}` : null,
       href: ref ? `/chamados/${ref.id}` : null,
       mono: true,
     },
     {
       label: "Definiu prioridade",
       done: ref !== null,
-      detail: ref ? OS_PRIORITY_META[ref.prioridade].label : "—",
+      detail: ref ? OS_PRIORITY_META[ref.prioridade].label : null,
       href: null,
       mono: false,
     },
@@ -346,7 +346,8 @@ function buildAiSteps(
 }
 
 // ---------------------------------------------------------------------------
-// Filtro por status (links por URL, mesmo padrão das QuickTabs de /chamados)
+// Filtro por status (links por URL, mesmo padrão das QuickTabs de /chamados).
+// Visual do Tabs variant="default": segmentado em pílula com ativo branco.
 // ---------------------------------------------------------------------------
 
 const STATUS_TABS: Array<{ label: string; value: ConversationStatusParam }> = [
@@ -358,20 +359,21 @@ const STATUS_TABS: Array<{ label: string; value: ConversationStatusParam }> = [
 
 function StatusTabs({ filters }: { filters: Filters }) {
   return (
-    <nav aria-label="Filtrar conversas por status">
-      <ul className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-line bg-console-2/40 p-1">
+    <nav
+      aria-label="Filtrar conversas por status"
+      className="no-scrollbar -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0"
+    >
+      <ul className="flex h-11 w-max min-w-full items-center gap-1 rounded-full bg-console-2 p-1 md:h-10">
         {STATUS_TABS.map((tab) => {
           const active = filters.status === tab.value
           return (
-            <li key={tab.value}>
+            <li key={tab.value} className="h-full flex-1">
               <Link
                 href={buildHref({ ...filters, status: tab.value, p: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-8 items-center rounded-md px-2.5 text-xs font-medium whitespace-nowrap transition-colors max-md:min-h-10",
-                  active
-                    ? "bg-signal-dim text-signal"
-                    : "text-ink-dim hover:bg-console-2 hover:text-ink",
+                  "inline-flex h-full w-full items-center justify-center rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-[color,background-color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50 lg:px-2.5 lg:text-[0.8125rem]",
+                  active ? "bg-ink text-void" : "text-ink-dim hover:text-ink",
                 )}
               >
                 {tab.label}
@@ -397,7 +399,7 @@ function EmptyFiltered() {
     >
       <Link
         href="/atendimento"
-        className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
+        className={cn(buttonVariants({ variant: "outline" }), "mt-6")}
       >
         Limpar filtros
       </Link>
@@ -414,7 +416,7 @@ function EmptyPage({ href }: { href: string }) {
     >
       <Link
         href={href}
-        className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
+        className={cn(buttonVariants({ variant: "outline" }), "mt-6")}
       >
         Ir para a primeira página
       </Link>
@@ -429,7 +431,7 @@ function EmptyNoConversations() {
       title="Nenhuma conversa ainda"
       description="Quando o WhatsApp for conectado, as conversas dos clientes aparecem aqui."
     >
-      <p className="mt-4 flex items-center gap-2 text-xs text-ink-faint">
+      <p className="mt-4 flex items-center gap-2 text-[0.8125rem] text-ink-faint">
         <MessageSquareTextIcon className="size-4" aria-hidden="true" />
         Integração com WhatsApp prevista para a próxima fase.
       </p>

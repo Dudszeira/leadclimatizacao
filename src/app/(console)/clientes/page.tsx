@@ -1,8 +1,14 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense } from "react"
-import { cn } from "cn"
-import { FileUpIcon, KanbanSquareIcon, SearchXIcon, UsersIcon } from "lucide-react"
+import {
+  AirVentIcon,
+  ChevronRightIcon,
+  FileUpIcon,
+  KanbanSquareIcon,
+  SearchXIcon,
+  UsersIcon,
+} from "lucide-react"
 
 import { formatBRL } from "@/lib/format"
 import {
@@ -23,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { ClientAvatar } from "@/components/clientes/client-avatar"
 import { ClientFormDialog } from "@/components/clientes/client-form-dialog"
 import {
   ClientsToolbar,
@@ -31,6 +38,7 @@ import {
 import { ClientsTableSkeleton } from "@/components/clientes/skeletons"
 import { DataError } from "@/components/data-error"
 import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 import { TablePagination } from "@/components/table-pagination"
 
 export const metadata: Metadata = {
@@ -76,37 +84,34 @@ export default async function ClientesPage({
   const suspenseKey = `${filters.q}|${filters.status}|${filters.tipo}|${filters.page}`
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-            Base de clientes
-          </h2>
-          <p className="mt-1 text-sm text-ink-dim">
-            Clientes com contratos, prédios e equipamentos sob gestão.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/clientes/funil"
-            className={cn(buttonVariants({ variant: "outline" }), "h-9 px-3 max-md:h-11")}
-          >
-            <KanbanSquareIcon aria-hidden="true" />
-            Funil de leads
-          </Link>
-          {profile.role === "admin" && (
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        title="Clientes"
+        description="Empresas atendidas, com prédios, equipamentos e contratos."
+        actions={
+          <>
             <Link
-              href="/importar"
-              className={cn(buttonVariants({ variant: "outline" }), "h-9 px-3 max-md:h-11")}
+              href="/clientes/funil"
+              className={buttonVariants({ variant: "secondary" })}
             >
-              <FileUpIcon aria-hidden="true" />
-              Importar planilha
+              <KanbanSquareIcon aria-hidden="true" />
+              Funil
             </Link>
-          )}
-          <ClientFormDialog />
-        </div>
-      </header>
-      <ClientsToolbar q={filters.q} status={filters.status} tipo={filters.tipo} />
+            {profile.role === "admin" && (
+              <Link
+                href="/importar"
+                className={buttonVariants({ variant: "secondary", className: "max-md:hidden" })}
+              >
+                <FileUpIcon aria-hidden="true" />
+                Importar
+              </Link>
+            )}
+            <ClientFormDialog />
+          </>
+        }
+      >
+        <ClientsToolbar q={filters.q} status={filters.status} tipo={filters.tipo} />
+      </PageHeader>
       <Suspense key={suspenseKey} fallback={<ClientsTableSkeleton />}>
         <ClientsSection filters={filters} />
       </Suspense>
@@ -150,7 +155,7 @@ async function ClientsSection({ filters }: { filters: Filters }) {
         >
           <Link
             href="/clientes"
-            className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
+            className={buttonVariants({ variant: "secondary", className: "mt-6" })}
           >
             Limpar filtros
           </Link>
@@ -164,10 +169,7 @@ async function ClientsSection({ filters }: { filters: Filters }) {
         description="Comece cadastrando a primeira empresa atendida: os prédios, equipamentos e contratos ficam vinculados a ela."
       >
         <div className="mt-6">
-          <ClientFormDialog
-            triggerLabel="Cadastrar primeiro cliente"
-            triggerClassName="h-11 px-5"
-          />
+          <ClientFormDialog triggerLabel="Cadastrar primeiro cliente" />
         </div>
       </EmptyState>
     )
@@ -178,100 +180,131 @@ async function ClientsSection({ filters }: { filters: Filters }) {
   const from = (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
+  const rows = items.map((client) => {
+    const summary = summaries?.[client.id]
+    return {
+      client,
+      nome: client.nome_fantasia ?? client.razao_social,
+      tipo: client.segmento ? segmentoLabel(client.segmento) : null,
+      regioes: (summary?.regioes ?? []).map(regiaoLabel),
+      plano: summary?.contrato ? CONTRACT_TYPE_LABELS[summary.contrato.tipo] : null,
+      planoValor: summary?.contrato?.valor_mensal ?? null,
+      equipCount: summary ? summary.equip_count : null,
+      status: client.ativo ? CLIENT_STATUS_META.ativo : CLIENT_STATUS_META.inativo,
+    }
+  })
+
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-console">
-      <Table aria-label="Clientes cadastrados">
+    <div className="overflow-hidden rounded-[1.375rem] bg-console ring-1 ring-line">
+      {/* Celular: linhas tocáveis (avatar, nome, tipo/região, equipamentos). */}
+      <ul aria-label="Clientes cadastrados" className="divide-y divide-line-soft md:hidden">
+        {rows.map(({ client, nome, tipo, regioes, equipCount, status }) => {
+          const secundario = [tipo, regioes.join(", ")].filter(Boolean).join(" · ")
+          return (
+            <li key={client.id}>
+              <Link
+                href={`/clientes/${client.id}`}
+                className="flex min-h-[4.5rem] items-center gap-3 px-4 py-3 transition-colors duration-150 outline-none active:bg-console-2 focus-visible:bg-console-2"
+              >
+                <ClientAvatar name={nome} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.9375rem] font-medium text-ink">
+                    {nome}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-dim">
+                    {secundario || client.razao_social}
+                  </span>
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  {client.ativo ? (
+                    <span className="inline-flex items-center gap-1.5 text-[0.9375rem] font-medium text-ink tabular-nums">
+                      <AirVentIcon className="size-4 text-ink-faint" aria-hidden="true" />
+                      {equipCount ?? 0}
+                      <span className="sr-only">
+                        {equipCount === 1 ? "equipamento" : "equipamentos"}
+                      </span>
+                    </span>
+                  ) : (
+                    <Badge variant="outline" className={status.badgeClassName}>
+                      {status.label}
+                    </Badge>
+                  )}
+                </span>
+                <ChevronRightIcon className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Desktop: tabela limpa. */}
+      <Table aria-label="Clientes cadastrados" className="max-md:hidden">
         <TableHeader>
-          <TableRow className="border-line-soft hover:bg-transparent">
-            <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Cliente
-            </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Tipo
-            </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Região
-            </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Plano
-            </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Status
-            </TableHead>
-            <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Equip.
-            </TableHead>
+          <TableRow>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Região</TableHead>
+            <TableHead>Plano</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Equipamentos</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((client) => {
-            const summary = summaries?.[client.id]
-            const regioes = summary?.regioes ?? []
-            const planoLabel = summary?.contrato
-              ? CONTRACT_TYPE_LABELS[summary.contrato.tipo]
-              : null
-            const planoValor = summary?.contrato?.valor_mensal ?? null
-            const equipCount = summary ? summary.equip_count : null
-            const statusMeta = client.ativo
-              ? CLIENT_STATUS_META.ativo
-              : CLIENT_STATUS_META.inativo
-            return (
-              <TableRow
-                key={client.id}
-                className="relative border-line-soft hover:bg-console-2/60"
-              >
-                <TableCell className="max-w-72 px-4 py-3">
-                  <Link
-                    href={`/clientes/${client.id}`}
-                    aria-label={`Abrir cliente ${client.razao_social}`}
-                    className="font-medium text-ink outline-none after:absolute after:inset-0 hover:text-signal focus-visible:text-signal"
-                  >
-                    <span className="block truncate">{client.razao_social}</span>
-                  </Link>
-                  {client.nome_fantasia && (
-                    <span className="mt-0.5 block truncate text-xs text-ink-faint">
-                      {client.nome_fantasia}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="py-3 text-ink-dim">
-                  {segmentoLabel(client.segmento)}
-                </TableCell>
-                <TableCell className="py-3">
-                  <span className="font-mono text-xs tracking-wider text-ink-dim uppercase">
-                    {regioes.length > 0
-                      ? regioes.map(regiaoLabel).join(" · ")
-                      : "—"}
+          {rows.map(({ client, nome, tipo, regioes, plano, planoValor, equipCount, status }) => (
+            <TableRow key={client.id} className="relative">
+              <TableCell className="max-w-80">
+                <span className="flex items-center gap-3">
+                  <ClientAvatar name={nome} className="size-9" />
+                  <span className="min-w-0">
+                    <Link
+                      href={`/clientes/${client.id}`}
+                      aria-label={`Abrir cliente ${nome}`}
+                      className="block truncate font-medium text-ink outline-none after:absolute after:inset-0 hover:text-signal focus-visible:text-signal"
+                    >
+                      {nome}
+                    </Link>
+                    {client.nome_fantasia && (
+                      <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-faint">
+                        {client.razao_social}
+                      </span>
+                    )}
                   </span>
-                </TableCell>
-                <TableCell className="py-3">
-                  {planoLabel ? (
-                    <>
-                      <span className="block text-ink">{planoLabel}</span>
-                      {planoValor !== null && (
-                        <span className="mt-0.5 block font-mono text-xs text-ink-faint">
-                          {formatBRL(planoValor)}/mês
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-ink-faint">Sem contrato</span>
-                  )}
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge
-                    variant="outline"
-                    className={cn("font-medium", statusMeta.badgeClassName)}
-                  >
-                    {statusMeta.label}
-                  </Badge>
-                </TableCell>
-                <TableCell className="px-4 py-3 text-right font-mono text-ink tabular-nums">
-                  {equipCount ?? "—"}
-                </TableCell>
-              </TableRow>
-            )
-          })}
+                </span>
+              </TableCell>
+              <TableCell className="text-ink-dim">
+                {tipo ?? <span className="text-ink-faint">Sem tipo</span>}
+              </TableCell>
+              <TableCell className="max-w-48 truncate text-ink-dim">
+                {regioes.length > 0 ? (
+                  regioes.join(", ")
+                ) : (
+                  <span className="text-ink-faint">Sem região</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {plano ? (
+                  <>
+                    <span className="block text-ink">{plano}</span>
+                    {planoValor !== null && (
+                      <span className="mt-0.5 block text-[0.8125rem] text-ink-faint tabular-nums">
+                        {formatBRL(planoValor)}/mês
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-ink-faint">Sem contrato</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className={status.badgeClassName}>
+                  {status.label}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right text-[0.9375rem] font-medium text-ink tabular-nums">
+                {equipCount ?? 0}
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
       <TablePagination

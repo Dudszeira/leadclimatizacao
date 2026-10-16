@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { ArchiveXIcon, LoaderCircleIcon } from "lucide-react"
+import { ArchiveXIcon, EllipsisVerticalIcon, LoaderCircleIcon, PencilLineIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Contract } from "@/lib/types"
@@ -15,8 +15,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   ContractFormDialog,
   type ContractClientOption,
@@ -44,6 +49,7 @@ type ContractActionsProps = {
 export function ContractActions({ contract, clienteNome, clients, hoje }: ContractActionsProps) {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
+  const [editOpen, setEditOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const encerrado = contract.status === "encerrado"
   // Cliente inativo não vem nas opções; garante o rótulo no select da edição.
@@ -69,24 +75,52 @@ export function ContractActions({ contract, clienteNome, clients, hoje }: Contra
   }
 
   return (
-    <div className="flex items-center justify-end gap-1">
-      <ContractFormDialog clients={options} contract={contract} hoje={hoje} />
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pending}
+              aria-label={`Ações do contrato de ${clienteNome}`}
+              className="text-ink-dim hover:text-ink"
+            />
+          }
+        >
+          {pending ? (
+            <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+          ) : (
+            <EllipsisVerticalIcon aria-hidden="true" />
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="min-w-56 [&_[data-slot=dropdown-menu-item]]:min-h-11 md:[&_[data-slot=dropdown-menu-item]]:min-h-9"
+        >
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+            <PencilLineIcon aria-hidden="true" />
+            Editar contrato
+          </DropdownMenuItem>
+          {!encerrado ? (
+            <DropdownMenuItem variant="destructive" onClick={() => setOpen(true)}>
+              <ArchiveXIcon aria-hidden="true" />
+              Encerrar contrato
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ContractFormDialog
+        clients={options}
+        contract={contract}
+        hoje={hoje}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
+
       {!encerrado ? (
         <Dialog open={open} onOpenChange={(next) => !pending && setOpen(next)}>
-          <DialogTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                aria-label={`Encerrar contrato de ${clienteNome}`}
-                className="h-8 px-2 text-ink-dim hover:text-danger max-md:h-11"
-              />
-            }
-          >
-            <ArchiveXIcon aria-hidden="true" />
-            Encerrar
-          </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Encerrar o contrato de {clienteNome}?</DialogTitle>
@@ -97,12 +131,7 @@ export function ContractActions({ contract, clienteNome, clients, hoje }: Contra
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={pending}
-                className="max-md:h-11"
-              >
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
                 Manter contrato
               </Button>
               <Button
@@ -110,7 +139,6 @@ export function ContractActions({ contract, clienteNome, clients, hoje }: Contra
                 onClick={handleClose}
                 disabled={pending}
                 aria-busy={pending}
-                className="max-md:h-11"
               >
                 {pending ? (
                   <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
@@ -123,6 +151,6 @@ export function ContractActions({ contract, clienteNome, clients, hoje }: Contra
           </DialogContent>
         </Dialog>
       ) : null}
-    </div>
+    </>
   )
 }

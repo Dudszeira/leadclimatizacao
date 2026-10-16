@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-16T22:40:39.449607+00:00",
+  "title": "Design System: Control Lead",
+  "extensions": {
+    "colorMeta": {
+      "shell": {
+        "role": "neutral",
+        "displayName": "Grafite de Moldura",
+        "canonical": "#171717",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "void": {
+        "role": "neutral",
+        "displayName": "Painel Fundo",
+        "canonical": "#0D0D0D",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "console": {
+        "role": "neutral",
+        "displayName": "Card",
+        "canonical": "#131313",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "console-2": {
+        "role": "neutral",
+        "displayName": "Grafite Elevado",
+        "canonical": "#1B1B1B",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "console-3": {
+        "role": "neutral",
+        "displayName": "Grafite Selecionado",
+        "canonical": "#252525",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fio",
+        "canonical": "#262626",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Fio Suave",
+        "canonical": "#1D1D1D",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#F5F5F4",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "ink-dim": {
+        "role": "neutral",
+        "displayName": "Tinta Média",
+        "canonical": "#A8A8AD",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Tinta Fraca",
+        "canonical": "#8A8A91",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "signal": {
+        "role": "primary",
+        "displayName": "Azul Lead",
+        "canonical": "#5B9BFF",
+        "tonalRamp": [
+          "#0E2350",
+          "#173A7D",
+          "#2052AE",
+          "#2F6FE0",
+          "#5B9BFF",
+          "#86B6FF",
+          "#B3D1FF",
+          "#E3EEFF"
+        ]
+      },
+      "signal-solid": {
+        "role": "primary",
+        "displayName": "Azul Lead Sólido",
+        "canonical": "#2F6FE0",
+        "tonalRamp": [
+          "#0E2350",
+          "#173A7D",
+          "#2052AE",
+          "#2F6FE0",
+          "#5B9BFF",
+          "#86B6FF",
+          "#B3D1FF",
+          "#E3EEFF"
+        ]
+      },
+      "signal-dim": {
+        "role": "primary",
+        "displayName": "Véu Azul",
+        "canonical": "rgba(91, 155, 255, 0.14)",
+        "tonalRamp": []
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Âmbar de Atenção",
+        "canonical": "#F5A623",
+        "tonalRamp": [
+          "#3D2803",
+          "#674408",
+          "#94620C",
+          "#C78414",
+          "#F5A623",
+          "#F8BE5E",
+          "#FBD798",
+          "#FEF1D9"
+        ]
+      },
+      "amber-dim": {
+        "role": "secondary",
+        "displayName": "Véu Âmbar",
+        "canonical": "rgba(245, 166, 35, 0.14)",
+        "tonalRamp": []
+      },
+      "clear": {
+        "role": "secondary",
+        "displayName": "Verde Liberado",
+        "canonical": "#3DD68C",
+        "tonalRamp": [
+          "#0B3320",
+          "#125535",
+          "#1A7B4C",
+          "#25A566",
+          "#3DD68C",
+          "#70E2AA",
+          "#A6EDCA",
+          "#DEF9EB"
+        ]
+      },
+      "clear-dim": {
+        "role": "secondary",
+        "displayName": "Véu Verde",
+        "canonical": "rgba(61, 214, 140, 0.13)",
+        "tonalRamp": []
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Rosa Alarme",
+        "canonical": "#FF6B7F",
+        "tonalRamp": [
+          "#4A0D17",
+          "#7A1626",
+          "#AB2238",
+          "#DE3550",
+          "#FF6B7F",
+          "#FF96A4",
+          "#FFC0C8",
+          "#FFE8EB"
+        ]
+      },
+      "danger-dim": {
+        "role": "secondary",
+        "displayName": "Véu Rosa",
+        "canonical": "rgba(255, 107, 127, 0.14)",
+        "tonalRamp": []
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#F1F1EF",
+        "tonalRamp": [
+          "#2A2A28",
+          "#4A4A47",
+          "#6B6B68",
+          "#A3A39F",
+          "#D0D0CA",
+          "#DCDCD8",
+          "#E6E6E2",
+          "#F1F1EF"
+        ]
+      },
+      "paper-ink": {
+        "role": "neutral",
+        "displayName": "Tinta do Papel",
+        "canonical": "#0D0D0D",
+        "tonalRamp": [
+          "#0D0D0D",
+          "#131313",
+          "#171717",
+          "#1B1B1B",
+          "#252525",
+          "#4A4A4F",
+          "#A8A8AD",
+          "#F5F5F4"
+        ]
+      },
+      "paper-line": {
+        "role": "neutral",
+        "displayName": "Fio do Papel",
+        "canonical": "#DCDCD8",
+        "tonalRamp": [
+          "#2A2A28",
+          "#4A4A47",
+          "#6B6B68",
+          "#A3A39F",
+          "#D0D0CA",
+          "#DCDCD8",
+          "#E6E6E2",
+          "#F1F1EF"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título de página (h1) no desktop, via PageHeader."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Título de página no celular; base dos KPIs em font-display (28 a 40px)."
+      },
+      "title": {
+        "displayName": "Título de card",
+        "purpose": "CardTitle; título compacto da barra superior em 16px."
+      },
+      "body": {
+        "displayName": "Corpo",
+        "purpose": "Texto corrido, células de tabela, botões."
+      },
+      "body-lead": {
+        "displayName": "Descrição",
+        "purpose": "Descrição do PageHeader, até 60ch."
+      },
+      "label": {
+        "displayName": "Rótulo",
+        "purpose": "Metadados, rótulos de KPI, secundários; sempre em caixa de frase."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 18px 48px -12px rgba(0,0,0,0.7)",
+        "purpose": "Popover, select, menus, popup do mapa."
+      },
+      {
+        "name": "overlay-high",
+        "value": "0 24px 64px -12px rgba(0,0,0,0.85)",
+        "purpose": "Papel do seletor de mês do PMOC."
+      },
+      {
+        "name": "dock",
+        "value": "0 -8px 32px rgba(0,0,0,0.55)",
+        "purpose": "Dock de abas no celular e barra de ação fixa da execução de OS."
+      },
+      {
+        "name": "status-halo",
+        "value": "0 0 0 4px var(--<status>-dim)",
+        "purpose": "Anel chapado dos pinos de status do mapa."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px rgba(91,155,255,0.6)",
+        "purpose": "Foco visível em botões, abas e links."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Easing padrão; título compacto da barra superior e entrada do dashboard."
+      },
+      {
+        "name": "interaction",
+        "value": "150ms ease-out",
+        "purpose": "Hover, foco e toque em botões, campos e abas."
+      },
+      {
+        "name": "console-enter",
+        "value": "550ms cubic-bezier(0.22, 1, 0.36, 1), translateY(10px)→0 + fade, delay --enter-delay",
+        "purpose": "Único momento orquestrado: entrada escalonada dos cards do dashboard; desligado com prefers-reduced-motion."
+      },
+      {
+        "name": "press",
+        "value": "scale(0.98)",
+        "purpose": "Toque em botão."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "content-max",
+        "value": "1520px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal, uma por área: branco com texto preto, em pílula.",
+      "html": "<button class=\"ds-btn-primary\">Novo chamado</button>",
+      "css": ".ds-btn-primary{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 20px;border:1px solid transparent;border-radius:9999px;background:var(--ink,#F5F5F4);color:var(--void,#0D0D0D);font-size:14px;font-weight:500;cursor:pointer;transition:background-color 150ms ease-out,box-shadow 150ms ease-out,transform 150ms ease-out}.ds-btn-primary:hover{background:color-mix(in srgb,var(--ink,#F5F5F4) 88%,transparent)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.6)}.ds-btn-primary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Botão secundário",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ações de apoio em grafite elevado.",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polygon points=\"3 11 22 2 13 21 11 13 3 11\"/></svg>Abrir no mapa</button>",
+      "css": ".ds-btn-secondary{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 20px;border:1px solid transparent;border-radius:9999px;background:var(--console-2,#1B1B1B);color:var(--ink,#F5F5F4);font-size:14px;font-weight:500;cursor:pointer;transition:background-color 150ms ease-out,transform 150ms ease-out}.ds-btn-secondary:hover{background:var(--console-3,#252525)}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.6)}.ds-btn-secondary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Botão fantasma",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Ação terciária discreta que acende no hover.",
+      "html": "<button class=\"ds-btn-ghost\">Ver todos</button>",
+      "css": ".ds-btn-ghost{font-family: Inter, ui-sans-serif, system-ui, sans-serif;height:44px;padding:0 20px;border:none;border-radius:9999px;background:transparent;color:var(--ink-dim,#A8A8AD);font-size:14px;font-weight:500;cursor:pointer;transition:background-color 150ms ease-out,color 150ms ease-out}.ds-btn-ghost:hover{background:var(--console-2,#1B1B1B);color:var(--ink,#F5F5F4)}.ds-btn-ghost:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.6)}"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo preenchido em grafite elevado, foco em azul Lead.",
+      "html": "<input class=\"ds-input\" placeholder=\"Buscar cliente\" />",
+      "css": ".ds-input{font-family: Inter, ui-sans-serif, system-ui, sans-serif;width:280px;height:44px;padding:0 14px;border:1px solid var(--line,#262626);border-radius:14px;background:var(--console-2,#1B1B1B);color:var(--ink,#F5F5F4);font-size:16px;caret-color:var(--signal,#5B9BFF);outline:none;transition:border-color 150ms,box-shadow 150ms}.ds-input::placeholder{color:var(--ink-faint,#8A8A91)}.ds-input:hover{border-color:#333}.ds-input:focus-visible{border-color:rgba(91,155,255,.7);box-shadow:0 0 0 3px rgba(91,155,255,.2)}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Card suave de 22px com fio de 1px, sem sombra.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-label\">Chamados abertos</div><div class=\"ds-card-kpi\">11 <span class=\"ds-pill-signal\">2 em campo</span></div><div class=\"ds-card-meta\">5 aguardam despacho</div></div>",
+      "css": ".ds-card{font-family: Inter, ui-sans-serif, system-ui, sans-serif;width:260px;padding:20px;border-radius:22px;background:var(--console,#131313);box-shadow:0 0 0 1px var(--line,#262626);color:var(--ink,#F5F5F4)}.ds-card-label{font-size:14px;color:var(--ink-dim,#A8A8AD)}.ds-card-kpi{display:flex;align-items:center;gap:8px;margin-top:16px;font-family:Onest,ui-sans-serif,sans-serif;font-size:36px;font-weight:500;letter-spacing:-.03em;line-height:1;font-variant-numeric:proportional-nums}.ds-pill-signal{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:9999px;background:rgba(91,155,255,.14);color:#5B9BFF;font-family:Inter,sans-serif;font-size:12px;font-weight:500;letter-spacing:0}.ds-card-meta{margin-top:8px;font-size:13px;color:var(--ink-faint,#8A8A91)}"
+    },
+    {
+      "name": "Pílulas de status",
+      "kind": "chip",
+      "refersTo": "status-pill-em-campo",
+      "description": "Estado em pílula de fundo translúcido; tipo neutro contornado.",
+      "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-signal\">Em campo</span><span class=\"ds-pill ds-amber\">Aberto</span><span class=\"ds-pill ds-clear\">Concluído</span><span class=\"ds-pill ds-danger\">Atrasado</span><span class=\"ds-pill ds-neutral\">Corretiva</span><span class=\"ds-pill ds-cancel\">Cancelado</span></div>",
+      "css": ".ds-pills{display:flex;flex-wrap:wrap;gap:8px}.ds-pill{font-family:Inter,ui-sans-serif,sans-serif;display:inline-flex;align-items:center;height:24px;padding:0 10px;border:1px solid transparent;border-radius:9999px;font-size:12px;font-weight:500}.ds-signal{background:rgba(91,155,255,.14);color:#5B9BFF}.ds-amber{background:rgba(245,166,35,.14);color:#F5A623}.ds-clear{background:rgba(61,214,140,.13);color:#3DD68C}.ds-danger{background:rgba(255,107,127,.14);color:#FF6B7F}.ds-neutral{border-color:#262626;color:#A8A8AD}.ds-cancel{border-color:#262626;background:#1B1B1B;color:#8A8A91}"
+    },
+    {
+      "name": "Abas segmentadas",
+      "kind": "nav",
+      "refersTo": "tabs-segmented",
+      "description": "Filtros rápidos: trilho grafite, ativo em pílula branca.",
+      "html": "<div class=\"ds-seg\" role=\"tablist\"><button class=\"ds-seg-tab is-active\">Todos</button><button class=\"ds-seg-tab\">Abertos</button><button class=\"ds-seg-tab\">Em campo</button></div>",
+      "css": ".ds-seg{display:inline-flex;gap:4px;height:44px;padding:4px;border-radius:9999px;background:var(--console-2,#1B1B1B)}.ds-seg-tab{font-family:Inter,ui-sans-serif,sans-serif;padding:0 16px;border:none;border-radius:9999px;background:transparent;color:var(--ink-dim,#A8A8AD);font-size:14px;font-weight:500;cursor:pointer;transition:background-color 150ms,color 150ms}.ds-seg-tab:hover{color:var(--ink,#F5F5F4)}.ds-seg-tab:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.5)}.ds-seg-tab.is-active{background:var(--ink,#F5F5F4);color:var(--void,#0D0D0D)}"
+    },
+    {
+      "name": "Abas sublinhadas",
+      "kind": "nav",
+      "refersTo": "tabs-line",
+      "description": "Seções de página: sublinhado de 2px em tinta sob fio suave.",
+      "html": "<div class=\"ds-line\"><button class=\"ds-line-tab is-active\">Visão geral</button><button class=\"ds-line-tab\">Equipamentos</button><button class=\"ds-line-tab\">Histórico</button></div>",
+      "css": ".ds-line{display:flex;gap:24px;height:44px;border-bottom:1px solid var(--line-soft,#1D1D1D)}.ds-line-tab{font-family:Inter,ui-sans-serif,sans-serif;position:relative;padding:0 2px;border:none;background:transparent;color:var(--ink-dim,#A8A8AD);font-size:14px;font-weight:500;cursor:pointer;transition:color 150ms}.ds-line-tab:hover{color:var(--ink,#F5F5F4)}.ds-line-tab:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.5)}.ds-line-tab.is-active{color:var(--ink,#F5F5F4)}.ds-line-tab.is-active::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:9999px;background:var(--ink,#F5F5F4)}"
+    },
+    {
+      "name": "Dock de abas (celular)",
+      "kind": "nav",
+      "refersTo": "mobile-dock",
+      "description": "Navegação flutuante no rodapé do celular; ativo em pílula branca.",
+      "html": "<nav class=\"ds-dock\"><a class=\"ds-dock-tab is-active\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg><span>Início</span></a><a class=\"ds-dock-tab\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z\"/></svg><span>Chamados</span></a><a class=\"ds-dock-tab\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"5\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/></svg><span>Mais</span></a></nav>",
+      "css": ".ds-dock{display:flex;gap:4px;width:340px;height:68px;padding:6px;border-radius:24px;background:rgba(27,27,27,.92);box-shadow:0 0 0 1px var(--line,#262626),0 -8px 32px rgba(0,0,0,.55);backdrop-filter:blur(24px)}.ds-dock-tab{font-family:Inter,ui-sans-serif,sans-serif;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:18px;color:var(--ink-dim,#A8A8AD);font-size:12px;font-weight:500;text-decoration:none;transition:background-color 150ms,color 150ms}.ds-dock-tab:active{background:var(--console-3,#252525)}.ds-dock-tab:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.6)}.ds-dock-tab.is-active{background:var(--ink,#F5F5F4);color:var(--void,#0D0D0D)}"
+    },
+    {
+      "name": "Seletor de período (papel)",
+      "kind": "custom",
+      "refersTo": "surface-paper",
+      "description": "Única sobreposição clara: papel com grão nos seletores de data e período.",
+      "html": "<div class=\"ds-paper\"><div class=\"ds-paper-range\">Mar 2026 <span>&rarr;</span> Jul 2026</div><div class=\"ds-paper-actions\"><button class=\"ds-paper-sec\">Fechar</button><button class=\"ds-paper-pri\">Aplicar</button></div><div class=\"ds-paper-grid\"><button>Fev</button><button class=\"on\">Mar</button><button class=\"in\">Abr</button><button class=\"in\">Mai</button></div></div>",
+      "css": ".ds-paper{font-family:Inter,ui-sans-serif,sans-serif;width:340px;padding:16px;border-radius:28px;background-color:#F1F1EF;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .17 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\");color:#0D0D0D;box-shadow:0 18px 48px -12px rgba(0,0,0,.7)}.ds-paper-range{font-family:Onest,ui-sans-serif,sans-serif;font-size:20px;font-weight:500;letter-spacing:-.02em}.ds-paper-range span{color:#6B6B70}.ds-paper-actions{display:flex;gap:8px;margin:12px 0}.ds-paper-actions button{flex:1;height:44px;border:none;border-radius:9999px;font-size:14px;font-weight:500;cursor:pointer}.ds-paper-sec{background:#E0E0DB;color:#0D0D0D}.ds-paper-sec:hover{background:#D0D0CA}.ds-paper-pri{background:#0D0D0D;color:#FFFFFF}.ds-paper-pri:hover{background:#2a2a2a}.ds-paper-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.ds-paper-grid button{height:44px;border:none;border-radius:14px;background:#FFFFFF;color:#0D0D0D;font-size:14px;cursor:pointer}.ds-paper-grid button.in{background:#D0D0CA}.ds-paper-grid button.on{background:#0D0D0D;color:#FFFFFF}.ds-paper-grid button:focus-visible,.ds-paper-actions button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(91,155,255,.6)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "O Estojo Grafite",
+    "overview": "A operação inteira cabe no polegar dentro de um estojo escuro. Uma moldura grafite (`shell`) segura a barra lateral; dentro dela, no desktop, um painel mais escuro (`void`) de cantos largos é onde a tela vive. Os cards são suaves e grandes, separados do painel por um fio quase invisível, nunca por sombra. O branco é a cor de ação; o azul Lead aparece só como marca, foco e \"em campo\". Todo o resto é grafite em degraus de poucos pontos de luminância.\n\nA densidade é de ferramenta de trabalho: muita informação por tela, mas com respiro de 16 a 20px dentro dos cards e títulos em Onest médio que ancoram cada bloco. A cor só aparece para estado (urgente, vencendo, ok, em campo), sempre em pílula de fundo translúcido; o olho acha o problema antes de ler. Uma única exceção clara quebra o grafite de propósito: o papel com grão dos seletores de período, que lê como um cartão físico pousado sobre o estojo.\n\nO mundo recusa o \"console de operações\" padrão do nicho: azul-marinho, rótulos monoespaçados em caixa alta, brilho de status. Tema escuro único nesta fase.",
+    "keyCharacteristics": [
+      "Moldura `shell` + painel `void` de 28px no desktop; no celular o painel ocupa a tela e a navegação vira dock flutuante.",
+      "Cards `console` de 22px com fio `line` de 1px, sem sombra em repouso.",
+      "Botões e pílulas totalmente arredondados; primário branco com texto preto.",
+      "Onest 500 com tracking negativo para títulos e números; Inter para todo o resto.",
+      "Cor apenas para estado e marca; tipos e categorias são neutros.",
+      "Alvos de 44px no celular, 36 a 40px no desktop."
+    ],
+    "rules": [
+      {
+        "name": "A Regra do Branco que Age",
+        "body": "A ação principal é `ink` sobre `void`, uma por área. O azul nunca é o botão primário; a variante `brand` existe para casos raros.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Status que Salta",
+        "body": "Cor só para estado e marca. Estado é pílula `rounded-full` com fundo `-dim` e texto na cor, ou ponto colorido de 6px com texto `ink-dim`. Tipo de OS, tipo de contrato e cancelado são neutros.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Papel Único",
+        "body": "`.surface-paper` reescreve os tokens por dentro (tinta, fio, cards, primário) e só aparece em seletores de data e período (dashboard e mês do PMOC).",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Medium",
+        "body": "Títulos e números são Onest 500 com tracking negativo; nunca negrito pesado. A única exceção registrada é o nome \"Control Lead\" na barra lateral (600).",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra dos Números Certos",
+        "body": "Tabelas, horários e `font-mono` usam `tabular-nums`; números de exibição em `font-display` usam algarismos proporcionais, porque o \"1\" tabular do Onest separa \"11\" em \"1 1\". Nº de OS é `#1004` em Inter medium `ink-dim` tabular.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Fio, não da Sombra",
+        "body": "Nada em repouso projeta sombra. Se algo precisa se separar do painel, é degrau tonal ou fio de 1px.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** use `PageHeader` em toda tela: título 28px celular / 36px desktop em Onest 500, uma frase curta de descrição, ação principal branca.",
+      "**Do** mantenha uma ação principal `ink` por área; as demais em secundário, contorno ou fantasma.",
+      "**Do** expresse estado como pílula de fundo `-dim` com texto na cor, ou ponto de 6px com texto `ink-dim`.",
+      "**Do** separe superfícies por degrau tonal e fio de 1px; reserve sombra para popover, folha e dock.",
+      "**Do** garanta 44px de alvo no celular, 8px entre alvos, campos em 16px e foco visível em `signal`.",
+      "**Do** use `ease-out-expo` (`cubic-bezier(0.22, 1, 0.36, 1)`) em 150 a 250ms; o único momento orquestrado é a entrada dos cards do dashboard (`.console-enter`), desligada em `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "**Don't** use o azul Lead como fundo de botão primário nem como cor de tipo ou categoria.",
+      "**Don't** use rótulo em caixa alta com espaçamento, eyebrow acima de título ou monoespaçada decorativa.",
+      "**Don't** use gradiente decorativo, brilho, borda lateral colorida ou sombra colorida.",
+      "**Don't** aninhe cards; lista dentro de card é linha com fio `line-soft`.",
+      "**Don't** aplique `.surface-paper` fora de seletores de data e período.",
+      "**Don't** pinte \"Cancelado\" de `danger`; é neutro em `ink-faint`.",
+      "**Don't** use texto abaixo de 12px."
+    ]
+  }
+}

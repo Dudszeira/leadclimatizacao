@@ -18,7 +18,8 @@ import {
   type SignaturePadHandle,
 } from "@/components/chamados/execucao/signature-pad"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { StepHeading } from "@/components/chamados/execucao/section-heading"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -35,10 +36,11 @@ type SignatureSectionProps = {
   editable: boolean
   value: SignatureState
   onSaved: (v: SignatureState) => void
+  step?: number
 }
 
 /** Assinatura do responsável no local + nome de quem assinou. */
-export function SignatureSection({ osId, demo, editable, value, onSaved }: SignatureSectionProps) {
+export function SignatureSection({ osId, demo, editable, value, onSaved, step }: SignatureSectionProps) {
   const padRef = React.useRef<SignaturePadHandle>(null)
   const objectUrl = React.useRef<string | null>(null)
   const [nome, setNome] = React.useState(value.nome ?? "")
@@ -103,15 +105,13 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
   }
 
   return (
-    <Card size="sm" className="border border-line bg-console ring-0">
-      <CardHeader>
-        <CardTitle className="text-ink">Assinatura do responsável</CardTitle>
-      </CardHeader>
+    <Card>
+      <StepHeading step={step} title="Assinatura" done={signed && Boolean(value.nome)} />
       <CardContent className="flex flex-col gap-4">
         {signed && !redo && (
           <div className="flex flex-col gap-3">
             {value.url ? (
-              <div className="max-w-sm overflow-hidden rounded-lg border border-line bg-white">
+              <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={value.url}
@@ -120,9 +120,9 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
                 />
               </div>
             ) : (
-              <div className="flex h-20 max-w-xs flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-line bg-console-2/60 px-3 text-center">
+              <div className="flex h-24 max-w-xs flex-col items-center justify-center gap-1.5 rounded-2xl bg-console-2 px-3 text-center">
                 <PenLineIcon className="size-4 text-ink-faint" aria-hidden="true" />
-                <span className="max-w-full truncate font-mono text-[11px] text-ink-faint">
+                <span className="max-w-full truncate text-xs text-ink-faint">
                   {value.path ? fileBasename(value.path) : ""}
                 </span>
               </div>
@@ -136,17 +136,16 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
                 "Assinatura registrada"
               )}
               {value.em ? (
-                <span className="font-mono text-xs text-ink-faint tabular-nums">
-                  {" "}
-                  · {formatDateTimeFullBR(value.em)}
+                <span className="mt-0.5 block text-[0.8125rem] text-ink-faint tabular-nums">
+                  {formatDateTimeFullBR(value.em)}
                 </span>
               ) : null}
             </p>
             {editable && (
               <Button
                 type="button"
-                variant="outline"
-                className="h-11 w-fit md:h-8"
+                variant="secondary"
+                className="w-full sm:w-fit"
                 onClick={() => setRedo(true)}
               >
                 <RotateCcwIcon aria-hidden="true" />
@@ -162,7 +161,7 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
 
         {showPad && (
           <>
-            <div className="grid gap-1.5">
+            <div className="grid gap-2">
               <Label htmlFor="os-assinante">Nome de quem assina</Label>
               <Input
                 id="os-assinante"
@@ -177,7 +176,6 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
                 aria-invalid={nomeErro ? true : undefined}
                 aria-describedby={nomeErro ? "os-assinante-erro" : undefined}
                 placeholder="Ex.: Mariana Souza, síndica"
-                className="h-11 md:h-9"
               />
               {nomeErro && (
                 <p id="os-assinante-erro" className="text-xs text-danger">
@@ -186,12 +184,12 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
               )}
             </div>
             <SignaturePad ref={padRef} disabled={pending} onInkChange={setHasInk} />
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>*]:max-sm:w-full">
               {redo && (
                 <Button
                   type="button"
-                  variant="outline"
-                  className="h-11 md:h-9"
+                  variant="secondary"
+                  size="lg"
                   disabled={pending}
                   onClick={() => setRedo(false)}
                 >
@@ -200,7 +198,7 @@ export function SignatureSection({ osId, demo, editable, value, onSaved }: Signa
               )}
               <Button
                 type="button"
-                className="h-11 md:h-9"
+                size="lg"
                 onClick={handleSave}
                 disabled={pending || !hasInk || nome.trim().length < 3}
                 aria-busy={pending}

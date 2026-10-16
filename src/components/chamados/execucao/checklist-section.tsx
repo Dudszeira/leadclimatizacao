@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cn } from "cn"
-import { CheckIcon, XIcon } from "lucide-react"
+import { CheckIcon, CircleCheckIcon, XIcon } from "lucide-react"
 
 import type { ChecklistItem, ChecklistRespostas } from "@/lib/types"
 import { saveChecklist } from "@/server/actions/service-orders"
@@ -20,7 +20,8 @@ import {
   type SectionSync,
 } from "@/components/chamados/execucao/autosave"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { StepHeading } from "@/components/chamados/execucao/section-heading"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -33,6 +34,8 @@ type ChecklistSectionProps = {
   editable: boolean
   onSaved: (respostas: ChecklistRespostas) => void
   sync?: SectionSync
+  /** Número da etapa no fluxo de execução. */
+  step?: number
 }
 
 type Draft = Record<string, string | boolean | null>
@@ -82,6 +85,7 @@ export function ChecklistSection({
   editable,
   onSaved,
   sync,
+  step,
 }: ChecklistSectionProps) {
   const [draft, setDraft] = React.useState<Draft>(() => toDraft(itens, saved))
   const [invalid, setInvalid] = React.useState<Set<string>>(new Set())
@@ -156,43 +160,71 @@ export function ChecklistSection({
     }
   }
 
+  const progresso = itens.length > 0 ? Math.round((respondidos / itens.length) * 100) : 0
+
   return (
-    <Card size="sm" className="border border-line bg-console ring-0">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-2 text-ink">
-          <span className="min-w-0 truncate">Checklist · {nome}</span>
-          <span className="shrink-0 font-mono text-xs font-normal text-ink-faint tabular-nums">
-            {respondidos}/{itens.length}
+    <Card>
+      <StepHeading
+        step={step}
+        title="Checklist"
+        done={faltando === 0}
+        aside={
+          <span className="shrink-0 text-[0.8125rem] text-ink-dim tabular-nums">
+            {respondidos} de {itens.length}
           </span>
-        </CardTitle>
-      </CardHeader>
+        }
+      />
       <CardContent className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2 pb-2">
+          <p className="truncate text-[0.8125rem] text-ink-faint">{nome}</p>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-console-2"
+            role="progressbar"
+            aria-label="Itens respondidos"
+            aria-valuemin={0}
+            aria-valuemax={itens.length}
+            aria-valuenow={respondidos}
+          >
+            <div
+              className="h-full rounded-full bg-ink transition-[width] duration-300 ease-(--ease-out-expo) motion-reduce:transition-none"
+              style={{ width: `${progresso}%` }}
+            />
+          </div>
+        </div>
         <ul className="flex flex-col divide-y divide-line-soft">
           {itens.map((item) => {
             const required = isChecklistItemRequired(item)
             const value = draft[item.id]
+            const answered = isChecklistItemAnswered(item, current[item.id])
             const fieldId = `chk-${item.id}`
             return (
-              <li key={item.id} className="flex flex-col gap-2 py-3">
-                <div className="flex items-start justify-between gap-3">
+              <li key={item.id} className="flex flex-col gap-3 py-4">
+                <div className="flex min-h-6 items-start justify-between gap-3">
                   <label
                     htmlFor={item.tipo === "checkbox" ? undefined : fieldId}
                     id={`${fieldId}-label`}
-                    className="text-sm text-ink"
+                    className="text-[0.9375rem] leading-snug text-ink"
                   >
                     {item.label}
                     {item.unidade ? (
                       <span className="text-ink-faint"> ({item.unidade})</span>
                     ) : null}
                   </label>
-                  <span
-                    className={cn(
-                      "shrink-0 text-[11px] tracking-wider uppercase",
-                      required ? "text-amber" : "text-ink-faint",
-                    )}
-                  >
-                    {required ? "Obrigatório" : "Opcional"}
-                  </span>
+                  {answered ? (
+                    <CircleCheckIcon
+                      className="mt-0.5 size-4 shrink-0 text-clear"
+                      aria-label="Respondido"
+                    />
+                  ) : (
+                    <span
+                      className={cn(
+                        "shrink-0 text-xs",
+                        required ? "text-amber" : "text-ink-faint",
+                      )}
+                    >
+                      {required ? "Obrigatório" : "Opcional"}
+                    </span>
+                  )}
                 </div>
 
                 {item.tipo === "checkbox" && (
@@ -203,14 +235,15 @@ export function ChecklistSection({
                   >
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="secondary"
+                      size="lg"
                       aria-pressed={value === true}
                       disabled={!editable}
                       onClick={() => set(item.id, true)}
                       className={cn(
-                        "h-11 justify-center",
+                        "w-full px-3",
                         value === true &&
-                          "border-clear/40 bg-clear-dim text-clear hover:bg-clear-dim hover:text-clear",
+                          "bg-clear-dim text-clear hover:bg-clear-dim hover:text-clear disabled:opacity-100",
                       )}
                     >
                       <CheckIcon aria-hidden="true" />
@@ -218,14 +251,15 @@ export function ChecklistSection({
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="secondary"
+                      size="lg"
                       aria-pressed={value === false}
                       disabled={!editable}
                       onClick={() => set(item.id, false)}
                       className={cn(
-                        "h-11 justify-center",
+                        "w-full px-3",
                         value === false &&
-                          "border-danger/40 bg-danger-dim text-danger hover:bg-danger-dim hover:text-danger",
+                          "bg-danger-dim text-danger hover:bg-danger-dim hover:text-danger disabled:opacity-100",
                       )}
                     >
                       <XIcon aria-hidden="true" />
@@ -244,7 +278,7 @@ export function ChecklistSection({
                     onChange={(e) => set(item.id, e.target.value)}
                     disabled={!editable}
                     aria-invalid={invalid.has(item.id) || undefined}
-                    className="h-11 font-mono tabular-nums md:h-9"
+                    className="h-12 tabular-nums md:h-11"
                   />
                 )}
 
@@ -271,10 +305,10 @@ export function ChecklistSection({
               error={autosave.error}
               onRetry={() => void autosave.flush()}
             />
-            <p className="text-xs text-ink-dim">
+            <p className="text-[0.8125rem] text-ink-dim">
               {faltando > 0
-                ? `${faltando} ${faltando === 1 ? "item obrigatório pendente" : "itens obrigatórios pendentes"}.`
-                : "Checklist completo."}
+                ? `${faltando} ${faltando === 1 ? "item obrigatório pendente" : "itens obrigatórios pendentes"}`
+                : "Checklist completo"}
             </p>
           </div>
         )}

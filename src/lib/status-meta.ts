@@ -20,6 +20,8 @@ import type {
  * - "Cancelado" é NEUTRO (ink-faint) em OS e faturas — danger fica reservado
  *   pra atrasado/urgente/risco.
  * - "Em campo / técnico em campo" é SIGNAL (azul) em todas as telas.
+ * - Tipo de OS e de contrato são NEUTROS (pílula contornada): no mundo
+ *   grafite a cor fica só para estado, prioridade e marca.
  */
 
 // ---------------------------------------------------------------------------
@@ -70,15 +72,15 @@ export const CONTRACT_TYPE_META: Record<
 > = {
   pmoc_recorrente: {
     label: "PMOC recorrente",
-    badgeClassName: "border-transparent bg-signal-dim text-signal",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
   corretiva_avulsa: {
     label: "Corretiva avulsa",
-    badgeClassName: "border-transparent bg-amber-dim text-amber",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
   instalacao: {
     label: "Instalação",
-    badgeClassName: "border-transparent bg-clear-dim text-clear",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
 }
 
@@ -136,19 +138,19 @@ export const OS_TYPE_META: Record<
 > = {
   preventiva_pmoc: {
     label: "Preventiva PMOC",
-    badgeClassName: "border-transparent bg-clear-dim text-clear",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
   corretiva: {
     label: "Corretiva",
-    badgeClassName: "border-transparent bg-amber-dim text-amber",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
   instalacao: {
     label: "Instalação",
-    badgeClassName: "border-transparent bg-signal-dim text-signal",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
   orcamento: {
     label: "Orçamento",
-    badgeClassName: "border-line bg-console-2 text-ink-dim",
+    badgeClassName: "border-line bg-transparent text-ink-dim",
   },
 }
 
@@ -158,7 +160,7 @@ export const OS_PRIORITY_META: Record<
 > = {
   urgente: { label: "Urgente", dotClassName: "bg-danger" },
   alta: { label: "Alta", dotClassName: "bg-amber" },
-  media: { label: "Média", dotClassName: "bg-signal" },
+  media: { label: "Média", dotClassName: "bg-ink-dim" },
   baixa: { label: "Baixa", dotClassName: "bg-ink-faint" },
 }
 
@@ -172,7 +174,7 @@ export const OS_STATUS_META: Record<
   },
   agendado: {
     label: "Agendado",
-    badgeClassName: "border-transparent bg-signal-dim text-signal",
+    badgeClassName: "border-transparent bg-console-3 text-ink",
   },
   em_campo: {
     label: "Em campo",
@@ -180,7 +182,7 @@ export const OS_STATUS_META: Record<
   },
   concluido: {
     label: "Concluído",
-    badgeClassName: "border-line bg-console-2 text-ink-dim",
+    badgeClassName: "border-transparent bg-clear-dim text-clear",
   },
   cancelado: {
     label: "Cancelado",

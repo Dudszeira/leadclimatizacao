@@ -5,17 +5,14 @@ import { cn } from "cn"
 import {
   BarcodeIcon,
   ExternalLinkIcon,
-  FileTextIcon,
-  FileWarningIcon,
+  PlugZapIcon,
   QrCodeIcon,
   ReceiptTextIcon,
   RepeatIcon,
   SearchXIcon,
-  TrendingUpIcon,
-  WalletIcon,
 } from "lucide-react"
 
-import type { InvoiceStatus } from "@/lib/types"
+import type { ContractStatus, InvoiceStatus } from "@/lib/types"
 import {
   formatBRL,
   formatBRLInteiro,
@@ -32,6 +29,7 @@ import {
 } from "@/lib/status-meta"
 import { competenciaBRT, todayBRT } from "@/lib/asaas/dates"
 import { isLock } from "@/lib/asaas/lock"
+import { isAsaasConfigured } from "@/lib/asaas/client"
 import { httpsUrl } from "@/lib/safe-url"
 import { requireRole } from "@/server/auth"
 import {
@@ -40,7 +38,6 @@ import {
   listContracts,
 } from "@/server/contracts"
 import { getFinanceiroKpis, listInvoices } from "@/server/invoices"
-import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Table,
@@ -50,7 +47,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { StatCard } from "@/components/dashboard/stat-card"
+import { PageHeader } from "@/components/page-header"
+import { FinKpi } from "@/components/financeiro/fin-kpi"
 import { DataError } from "@/components/data-error"
 import { EmptyState } from "@/components/empty-state"
 import {
@@ -141,49 +139,80 @@ export default async function FinanceiroPage({
   const faturasKey = `${filters.q}|${filters.status}|${filters.competencia}|${filters.page}`
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-bold tracking-tight text-ink">
-            Financeiro &amp; fiscal
-          </h2>
-          <p className="mt-1 text-sm text-ink-dim">
-            Faturas dos contratos, cobranças via Asaas (Pix/boleto) e NFS-e em
-            um só painel.
-          </p>
-        </div>
-        <BillingRunActions competencias={competenciaOptions(3)} />
-      </header>
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        title="Financeiro"
+        description="Faturas dos contratos, cobranças por Pix e boleto e notas fiscais."
+        actions={<BillingRunActions competencias={competenciaOptions(3)} />}
+      />
 
-      <Suspense fallback={<FinanceiroKpisSkeleton />}>
-        <KpisSection />
-      </Suspense>
-
-      <AbaTabs filters={filters} />
-
-      {filters.aba === "faturas" ? (
-        <>
-          <FaturasToolbar
-            q={filters.q}
-            status={filters.status}
-            competencia={filters.competencia}
-            competencias={competenciaOptions()}
-          />
-          <Suspense key={faturasKey} fallback={<FaturasTableSkeleton />}>
-            <FaturasSection filters={filters} />
-          </Suspense>
-        </>
-      ) : (
-        <Suspense key={`contratos|${filters.page}`} fallback={<ContratosSkeleton />}>
-          <ContratosSection filters={filters} />
+      <div className="flex flex-1 flex-col gap-6 md:gap-8">
+        <Suspense fallback={<FinanceiroKpisSkeleton />}>
+          <KpisSection />
         </Suspense>
-      )}
+
+        {isAsaasConfigured() ? null : <AsaasPendente />}
+
+        <div className="flex flex-col gap-5">
+          <AbaTabs filters={filters} />
+
+          {filters.aba === "faturas" ? (
+            <div className="flex flex-col gap-4">
+              <FaturasToolbar
+                q={filters.q}
+                status={filters.status}
+                competencia={filters.competencia}
+                competencias={competenciaOptions()}
+              />
+              <Suspense key={faturasKey} fallback={<FaturasTableSkeleton />}>
+                <FaturasSection filters={filters} />
+              </Suspense>
+            </div>
+          ) : (
+            <Suspense key={`contratos|${filters.page}`} fallback={<ContratosSkeleton />}>
+              <ContratosSection filters={filters} />
+            </Suspense>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// KPIs do topo
+// Aviso calmo quando a conta Asaas ainda não foi conectada (não é erro)
+// ---------------------------------------------------------------------------
+
+function AsaasPendente() {
+  return (
+    <section
+      aria-labelledby="asaas-pendente-titulo"
+      className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 rounded-[1.375rem] bg-console p-4 ring-1 ring-line md:gap-x-4 md:gap-y-1 md:p-5"
+    >
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-console-2 md:row-span-2 md:size-10 md:self-start"
+        aria-hidden="true"
+      >
+        <PlugZapIcon className="size-4 text-ink-dim md:size-[1.125rem]" />
+      </span>
+      <h2
+        id="asaas-pendente-titulo"
+        className="font-heading text-[0.9375rem] leading-snug font-medium tracking-[-0.01em] text-ink md:text-[1.0625rem]"
+      >
+        Cobrança automática ainda não conectada
+      </h2>
+      <p className="col-span-2 max-w-[72ch] text-[0.8125rem] leading-relaxed text-ink-dim md:col-span-1 md:col-start-2 md:text-sm">
+        As faturas continuam sendo geradas todo mês e você pode marcar
+        pagamentos à mão. Para enviar Pix, boleto e nota fiscal
+        automaticamente, crie a conta da Lead no Asaas e peça a quem cuida do
+        sistema para conectá-la.
+      </p>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// KPIs do topo: 2x2 no celular, 4 colunas no desktop
 // ---------------------------------------------------------------------------
 
 async function KpisSection() {
@@ -192,52 +221,54 @@ async function KpisSection() {
     return <DataError message={result.error} compact className="min-h-28" />
   }
   const kpis = result.data
-  const recebidoConciliado = kpis.recebido_pix_mes + kpis.recebido_boleto_mes
+  const recebido = kpis.recebido_pix_mes + kpis.recebido_boleto_mes
+  const recebidoPct =
+    kpis.recebido_conciliado_pct === null ? null : formatPct(kpis.recebido_conciliado_pct)
+  const emAtraso = kpis.valor_em_atraso > 0
+  const enter = (ms: number) => ({ "--enter-delay": `${ms}ms` }) as React.CSSProperties
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard
-        label="Faturamento previsto no mês"
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <FinKpi
+        label="Previsto no mês"
         value={formatBRLInteiro(kpis.faturamento_previsto_mes)}
-        icon={WalletIcon}
-        sub={`${formatBRLInteiro(recebidoConciliado)} já recebidos`}
-        tone={recebidoConciliado > 0 ? "clear" : "neutral"}
-        style={{ "--enter-delay": "0ms" } as React.CSSProperties}
+        sub="Faturas do mês, sem as canceladas"
+        style={enter(0)}
       />
-      <StatCard
-        label="Inadimplência"
-        value={formatPct(kpis.inadimplencia_pct)}
-        icon={FileWarningIcon}
-        sub={
-          kpis.valor_em_atraso > 0
-            ? `${formatBRLInteiro(kpis.valor_em_atraso)} em atraso`
-            : "Nenhuma fatura em atraso"
+      <FinKpi
+        label="Recebido no mês"
+        value={formatBRLInteiro(recebido)}
+        pill={recebidoPct}
+        tone={recebido > 0 ? "clear" : "neutral"}
+        sub={`Pix ${formatBRLInteiro(kpis.recebido_pix_mes)}, boleto ${formatBRLInteiro(kpis.recebido_boleto_mes)}`}
+        style={enter(60)}
+      />
+      <FinKpi
+        label="Em atraso"
+        value={formatBRLInteiro(kpis.valor_em_atraso)}
+        pill={
+          emAtraso
+            ? kpis.inadimplencia_pct === null
+              ? "Atrasado"
+              : formatPct(kpis.inadimplencia_pct)
+            : "Em dia"
         }
-        tone={kpis.valor_em_atraso > 0 ? "danger" : "clear"}
-        style={{ "--enter-delay": "60ms" } as React.CSSProperties}
+        tone={emAtraso ? "danger" : "clear"}
+        sub={emAtraso ? "Inadimplência dos últimos 7 meses" : "Nenhuma fatura atrasada"}
+        style={enter(120)}
       />
-      <StatCard
-        label="Notas fiscais no mês"
+      <FinKpi
+        label="Notas fiscais emitidas"
         value={String(kpis.notas_emitidas_mes)}
-        icon={FileTextIcon}
-        sub="NFS-e emitidas na competência"
-        tone="signal"
-        style={{ "--enter-delay": "120ms" } as React.CSSProperties}
-      />
-      <StatCard
-        label="Recebido via Pix/boleto"
-        value={formatPct(kpis.recebido_conciliado_pct)}
-        icon={QrCodeIcon}
-        sub={`Pix ${formatBRLInteiro(kpis.recebido_pix_mes)} · boleto ${formatBRLInteiro(kpis.recebido_boleto_mes)}`}
-        tone="signal"
-        style={{ "--enter-delay": "180ms" } as React.CSSProperties}
+        sub="NFS-e da competência atual"
+        style={enter(180)}
       />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Tabs Faturas · Contratos (links por URL, padrão QuickTabs de /chamados)
+// Seções Faturas · Contratos: abas sublinhadas (links por URL)
 // ---------------------------------------------------------------------------
 
 function AbaTabs({ filters }: { filters: Filters }) {
@@ -247,11 +278,11 @@ function AbaTabs({ filters }: { filters: Filters }) {
   ]
   return (
     <nav aria-label="Seções do financeiro">
-      <ul className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-line bg-console p-1">
+      <ul className="flex h-11 items-stretch gap-6 border-b border-line-soft">
         {tabs.map((tab) => {
           const active = filters.aba === tab.aba
           return (
-            <li key={tab.aba}>
+            <li key={tab.aba} className="flex">
               <Link
                 href={buildHref({
                   aba: tab.aba,
@@ -262,10 +293,9 @@ function AbaTabs({ filters }: { filters: Filters }) {
                 })}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-8 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors max-md:min-h-10",
-                  active
-                    ? "bg-signal-dim text-signal"
-                    : "text-ink-dim hover:bg-console-2 hover:text-ink",
+                  "relative inline-flex items-center px-0.5 text-[0.9375rem] font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:text-ink focus-visible:ring-3 focus-visible:ring-signal/50",
+                  "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-ink after:transition-opacity",
+                  active ? "text-ink after:opacity-100" : "text-ink-dim after:opacity-0 hover:text-ink",
                 )}
               >
                 {tab.label}
@@ -279,8 +309,33 @@ function AbaTabs({ filters }: { filters: Filters }) {
 }
 
 // ---------------------------------------------------------------------------
-// Aba Faturas: tabela paginada com filtros por URL (4 estados)
+// Pílulas de status
 // ---------------------------------------------------------------------------
+
+function StatusPill({ label, className }: { label: string; className: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 w-fit shrink-0 items-center rounded-full border px-2.5 text-xs font-medium whitespace-nowrap",
+        className,
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+const CONTRACT_PILL: Record<ContractStatus, string> = {
+  ativo: CONTRACT_STATUS_META.ativo.badgeClassName,
+  suspenso: CONTRACT_STATUS_META.suspenso.badgeClassName,
+  encerrado: "border-transparent bg-console-2 text-ink-faint",
+}
+
+// ---------------------------------------------------------------------------
+// Aba Faturas: tabela no desktop, linhas no celular (4 estados)
+// ---------------------------------------------------------------------------
+
+const LIST_FRAME = "overflow-hidden rounded-[1.375rem] bg-console ring-1 ring-line"
 
 async function FaturasSection({ filters }: { filters: Filters }) {
   const result = await listInvoices({
@@ -305,12 +360,9 @@ async function FaturasSection({ filters }: { filters: Filters }) {
         <EmptyState
           icon={SearchXIcon}
           title="Nenhuma fatura encontrada"
-          description="Nenhum resultado para a busca e os filtros atuais. Ajuste os termos ou limpe os filtros."
+          description="Nada bate com a busca e os filtros atuais. Ajuste os termos ou limpe os filtros."
         >
-          <Link
-            href="/financeiro"
-            className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
-          >
+          <Link href="/financeiro" className={cn(buttonVariants({ variant: "outline" }), "mt-6")}>
             Limpar filtros
           </Link>
         </EmptyState>
@@ -319,12 +371,12 @@ async function FaturasSection({ filters }: { filters: Filters }) {
     return (
       <EmptyState
         icon={ReceiptTextIcon}
-        title="Nenhuma fatura registrada"
-        description="As faturas nascem dos contratos ativos: cadastre um contrato na aba Contratos e as competências mensais aparecem aqui."
+        title="Nenhuma fatura ainda"
+        description="As faturas nascem dos contratos ativos. Cadastre um contrato e as cobranças mensais aparecem aqui."
       >
         <Link
           href={buildHref({ aba: "contratos", q: "", status: "todos", competencia: "", page: 1 })}
-          className={cn(buttonVariants({ variant: "outline" }), "mt-6 h-11 px-5")}
+          className={cn(buttonVariants({ variant: "outline" }), "mt-6")}
         >
           Ver contratos
         </Link>
@@ -335,113 +387,109 @@ async function FaturasSection({ filters }: { filters: Filters }) {
   const from = (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
+  const linhas = items.map((fatura) => {
+    const clienteNome =
+      fatura.contract.client.nome_fantasia ?? fatura.contract.client.razao_social
+    return {
+      fatura,
+      clienteNome,
+      statusMeta: INVOICE_STATUS_META[fatura.status],
+      tipoLabel: CONTRACT_TYPE_META[fatura.contract.tipo].label,
+      nfUrl: httpsUrl(fatura.nf_url),
+      actions: (
+        <InvoiceActions
+          invoiceId={fatura.id}
+          status={fatura.status}
+          clienteNome={clienteNome}
+          asaasId={fatura.asaas_id}
+          asaasUrl={fatura.asaas_url}
+          asaasInvoiceId={fatura.asaas_invoice_id ?? null}
+          nfNumero={fatura.nf_numero}
+        />
+      ),
+    }
+  })
+
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-console">
-      <Table aria-label="Faturas dos contratos">
+    <div className={LIST_FRAME}>
+      {/* Celular: linhas com cliente à esquerda e valor + status à direita. */}
+      <ul aria-label="Faturas" className="divide-y divide-line-soft md:hidden">
+        {linhas.map(({ fatura, clienteNome, statusMeta, actions }) => (
+          <li key={fatura.id} className="flex items-center gap-2 py-3 pr-1.5 pl-4">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[0.9375rem] font-medium text-ink">{clienteNome}</p>
+              <p className="mt-0.5 truncate text-[0.8125rem] text-ink-faint tabular-nums">
+                Vence {formatDateBR(fatura.vencimento)}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <span className="font-display text-base leading-none font-medium tracking-[-0.01em] text-ink tabular-nums">
+                {formatBRL(fatura.valor)}
+              </span>
+              <StatusPill label={statusMeta.label} className={statusMeta.badgeClassName} />
+            </div>
+            {actions}
+          </li>
+        ))}
+      </ul>
+
+      <Table aria-label="Faturas dos contratos" className="max-md:hidden">
         <TableHeader>
-          <TableRow className="border-line-soft hover:bg-transparent">
-            <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Cliente / plano
-            </TableHead>
-            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Competência
-            </TableHead>
-            <TableHead className="text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Valor
-            </TableHead>
-            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Vencimento
-            </TableHead>
-            <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Status
-            </TableHead>
-            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Cobrança
-            </TableHead>
-            <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-              Nota fiscal
-            </TableHead>
-            <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
+          <TableRow>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Competência</TableHead>
+            <TableHead>Vencimento</TableHead>
+            <TableHead className="max-lg:hidden">Cobrança</TableHead>
+            <TableHead className="max-lg:hidden">Nota fiscal</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Valor</TableHead>
+            <TableHead className="w-14">
               <span className="sr-only">Ações</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((fatura) => {
-            const statusMeta = INVOICE_STATUS_META[fatura.status]
-            const tipoMeta = CONTRACT_TYPE_META[fatura.contract.tipo]
-            const nfUrl = httpsUrl(fatura.nf_url)
-            const clienteNome =
-              fatura.contract.client.nome_fantasia ??
-              fatura.contract.client.razao_social
+          {linhas.map(({ fatura, clienteNome, statusMeta, tipoLabel, nfUrl, actions }) => {
             const MetodoIcon = fatura.metodo === "pix" ? QrCodeIcon : BarcodeIcon
-            const atrasada = fatura.status === "atrasado"
             return (
-              <TableRow
-                key={fatura.id}
-                className={cn(
-                  "border-line-soft",
-                  atrasada
-                    ? "bg-danger-dim/60 hover:bg-danger-dim"
-                    : "hover:bg-console-2/60",
-                )}
-              >
-                <TableCell className="max-w-56 px-4 py-3">
-                  <span className="block truncate font-medium text-ink">
-                    {clienteNome}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-ink-faint">
-                    {tipoMeta.label}
-                  </span>
-                  <span className="mt-0.5 block truncate font-mono text-xs text-ink-dim tabular-nums md:hidden">
-                    {formatCompetencia(fatura.competencia)} · vence {formatDateBR(fatura.vencimento)}
+              <TableRow key={fatura.id}>
+                <TableCell className="max-w-64">
+                  <span className="block truncate font-medium text-ink">{clienteNome}</span>
+                  <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-faint">
+                    {tipoLabel}
                   </span>
                 </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
+                <TableCell className="text-ink-dim tabular-nums">
                   {formatCompetencia(fatura.competencia)}
                 </TableCell>
-                <TableCell className="py-3 text-right font-mono font-medium text-ink tabular-nums">
-                  {formatBRL(fatura.valor)}
-                </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
+                <TableCell className="text-ink-dim tabular-nums">
                   {formatDateBR(fatura.vencimento)}
                 </TableCell>
-                <TableCell className="py-3">
-                  <Badge
-                    variant="outline"
-                    className={cn("font-medium", statusMeta.badgeClassName)}
-                  >
-                    {statusMeta.label}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-3 max-md:hidden">
+                <TableCell className="max-lg:hidden">
                   {isLock(fatura.asaas_id) ? (
                     <span className="text-ink-faint">Gerando…</span>
                   ) : fatura.metodo ? (
                     <span className="flex items-center gap-1.5 text-ink-dim">
-                      <MetodoIcon
-                        className="size-3.5 shrink-0 text-ink-faint"
-                        aria-hidden="true"
-                      />
+                      <MetodoIcon className="size-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
                       {PAYMENT_METHOD_META[fatura.metodo].label}
                     </span>
                   ) : (
-                    <span className="text-ink-faint">—</span>
+                    <span className="text-ink-faint">Não gerada</span>
                   )}
                 </TableCell>
-                <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
+                <TableCell className="text-ink-dim tabular-nums max-lg:hidden">
                   {fatura.nf_numero ??
                     (fatura.asaas_invoice_id ? (
-                      <span className="font-sans text-ink-faint">Em emissão</span>
+                      <span className="text-ink-faint">Em emissão</span>
                     ) : (
-                      <span className="text-ink-faint">—</span>
+                      <span className="text-ink-faint">Não emitida</span>
                     ))}
                   {nfUrl ? (
                     <a
                       href={nfUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-0.5 flex w-fit items-center gap-1 font-sans text-xs text-primary underline-offset-4 hover:underline"
+                      className="mt-0.5 flex w-fit items-center gap-1 text-[0.8125rem] text-signal underline-offset-4 hover:underline"
                     >
                       Ver NFS-e
                       <ExternalLinkIcon className="size-3" aria-hidden="true" />
@@ -449,17 +497,13 @@ async function FaturasSection({ filters }: { filters: Filters }) {
                     </a>
                   ) : null}
                 </TableCell>
-                <TableCell className="px-4 py-3 text-right">
-                  <InvoiceActions
-                    invoiceId={fatura.id}
-                    status={fatura.status}
-                    clienteNome={clienteNome}
-                    asaasId={fatura.asaas_id}
-                    asaasUrl={fatura.asaas_url}
-                    asaasInvoiceId={fatura.asaas_invoice_id ?? null}
-                    nfNumero={fatura.nf_numero}
-                  />
+                <TableCell>
+                  <StatusPill label={statusMeta.label} className={statusMeta.badgeClassName} />
                 </TableCell>
+                <TableCell className="text-right font-display text-[0.9375rem] font-medium text-ink tabular-nums">
+                  {formatBRL(fatura.valor)}
+                </TableCell>
+                <TableCell className="pr-3 text-right">{actions}</TableCell>
               </TableRow>
             )
           })}
@@ -482,7 +526,7 @@ async function FaturasSection({ filters }: { filters: Filters }) {
 }
 
 // ---------------------------------------------------------------------------
-// Aba Contratos: resumo (ativos, MRR) + tabela
+// Aba Contratos: resumo (ativos, receita recorrente) + lista
 // ---------------------------------------------------------------------------
 
 const CONTRATOS_PAGE_SIZE = 20
@@ -499,7 +543,6 @@ async function ContratosSection({ filters }: { filters: Filters }) {
   }
   const clients = clientsResult.data ?? []
   const hoje = todayBRT()
-  const novoContrato = <ContractFormDialog clients={clients} hoje={hoje} />
 
   const { items: contratos, total, page, pageCount } = listResult.data
   if (total === 0) {
@@ -507,9 +550,11 @@ async function ContratosSection({ filters }: { filters: Filters }) {
       <EmptyState
         icon={RepeatIcon}
         title="Nenhum contrato cadastrado"
-        description="Cadastre os contratos PMOC recorrentes, corretivas avulsas e instalações para gerar as faturas mensais automaticamente."
+        description="Cadastre os contratos PMOC recorrentes, as corretivas avulsas e as instalações para gerar as faturas mensais sozinhas."
       >
-        <div className="mt-6">{novoContrato}</div>
+        <div className="mt-6">
+          <ContractFormDialog clients={clients} hoje={hoje} />
+        </div>
       </EmptyState>
     )
   }
@@ -517,130 +562,121 @@ async function ContratosSection({ filters }: { filters: Filters }) {
   const from = (page - 1) * CONTRATOS_PAGE_SIZE + 1
   const to = Math.min(page * CONTRATOS_PAGE_SIZE, total)
 
+  const linhas = contratos.map((contrato) => {
+    const clienteNome = contrato.client.nome_fantasia ?? contrato.client.razao_social
+    return {
+      contrato,
+      clienteNome,
+      tipoLabel: CONTRACT_TYPE_META[contrato.tipo].label,
+      statusLabel: CONTRACT_STATUS_META[contrato.status].label,
+      statusClass: CONTRACT_PILL[contrato.status],
+      actions: (
+        <ContractActions
+          contract={contrato}
+          clienteNome={clienteNome}
+          clients={clients}
+          hoje={hoje}
+        />
+      ),
+    }
+  })
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       {resumoResult.error !== null ? (
         <DataError message={resumoResult.error} compact className="min-h-28" />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <StatCard
+        <div className="grid grid-cols-2 gap-3 md:max-w-2xl">
+          <FinKpi
             label="Contratos ativos"
             value={String(resumoResult.data.ativos)}
-            icon={RepeatIcon}
-            sub={`${resumoResult.data.total} contratos no total`}
-            tone="neutral"
+            sub={`De ${resumoResult.data.total} no total`}
           />
-          <StatCard
-            label="MRR · receita recorrente"
+          <FinKpi
+            label="Receita recorrente"
             value={formatBRLInteiro(resumoResult.data.mrr)}
-            icon={TrendingUpIcon}
-            sub="Soma dos PMOC recorrentes ativos"
-            tone="clear"
+            sub="PMOC recorrentes ativos, por mês"
           />
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-ink-dim">
-          Contratos ativos geram as faturas mensais (dia 1, 06:00). Encerre
-          o contrato para parar a cobrança.
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-dim">
+          Contratos ativos geram as faturas no dia 1, às 6h. Para parar a
+          cobrança, encerre o contrato.
         </p>
-        {novoContrato}
+        <ContractFormDialog clients={clients} hoje={hoje} />
       </div>
       {clientsResult.error !== null ? (
-        <p role="status" className="text-xs text-danger">
+        <p role="status" className="text-[0.8125rem] text-danger">
           {clientsResult.error}
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-line bg-console">
-        <Table aria-label="Contratos por cliente">
+      <div className={LIST_FRAME}>
+        <ul aria-label="Contratos" className="divide-y divide-line-soft md:hidden">
+          {linhas.map(({ contrato, clienteNome, tipoLabel, statusLabel, statusClass, actions }) => (
+            <li key={contrato.id} className="flex items-center gap-2 py-3 pr-1.5 pl-4">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[0.9375rem] font-medium text-ink">{clienteNome}</p>
+                <p className="mt-0.5 truncate text-[0.8125rem] text-ink-faint">
+                  {tipoLabel}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <span className="font-display text-base leading-none font-medium tracking-[-0.01em] text-ink tabular-nums">
+                  {formatBRL(contrato.valor_mensal)}
+                </span>
+                <StatusPill label={statusLabel} className={statusClass} />
+              </div>
+              {actions}
+            </li>
+          ))}
+        </ul>
+
+        <Table aria-label="Contratos por cliente" className="max-md:hidden">
           <TableHeader>
-            <TableRow className="border-line-soft hover:bg-transparent">
-              <TableHead className="px-4 text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Cliente
-              </TableHead>
-              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Tipo
-              </TableHead>
-              <TableHead className="text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Valor mensal
-              </TableHead>
-              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Vencimento
-              </TableHead>
-              <TableHead className="text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Status
-              </TableHead>
-              <TableHead className="max-md:hidden text-xs font-medium tracking-wider text-ink-faint uppercase">
-                Vigência
-              </TableHead>
-              <TableHead className="px-4 text-right text-xs font-medium tracking-wider text-ink-faint uppercase">
+            <TableRow>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead className="max-lg:hidden">Vigência</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Valor mensal</TableHead>
+              <TableHead className="w-14">
                 <span className="sr-only">Ações</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {contratos.map((contrato) => {
-              const tipoMeta = CONTRACT_TYPE_META[contrato.tipo]
-              const statusMeta = CONTRACT_STATUS_META[contrato.status]
-              const clienteNome =
-                contrato.client.nome_fantasia ?? contrato.client.razao_social
-              return (
-                <TableRow
-                  key={contrato.id}
-                  className="border-line-soft hover:bg-console-2/60"
-                >
-                  <TableCell className="max-w-56 px-4 py-3">
-                    <span className="block truncate font-medium text-ink">
-                      {clienteNome}
+            {linhas.map(({ contrato, clienteNome, tipoLabel, statusLabel, statusClass, actions }) => (
+              <TableRow key={contrato.id}>
+                <TableCell className="max-w-64">
+                  <span className="block truncate font-medium text-ink">{clienteNome}</span>
+                  {contrato.client.cnpj ? (
+                    <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-faint tabular-nums">
+                      {contrato.client.cnpj}
                     </span>
-                    {contrato.client.cnpj ? (
-                      <span className="mt-0.5 block truncate font-mono text-xs text-ink-faint tabular-nums">
-                        {contrato.client.cnpj}
-                      </span>
-                    ) : null}
-                    <span className="mt-0.5 block truncate text-xs text-ink-dim md:hidden">
-                      {tipoMeta.label} · vence dia {contrato.dia_vencimento}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-3 max-md:hidden">
-                    <Badge
-                      variant="outline"
-                      className={cn("font-medium", tipoMeta.badgeClassName)}
-                    >
-                      {tipoMeta.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-right font-mono font-medium text-ink tabular-nums">
-                    {formatBRL(contrato.valor_mensal)}
-                  </TableCell>
-                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
-                    dia {contrato.dia_vencimento}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge
-                      variant="outline"
-                      className={cn("font-medium", statusMeta.badgeClassName)}
-                    >
-                      {statusMeta.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 font-mono text-ink-dim tabular-nums max-md:hidden">
-                    {formatDateBR(contrato.inicio)}
-                    {contrato.fim ? ` → ${formatDateBR(contrato.fim)}` : ""}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-right">
-                    <ContractActions
-                      contract={contrato}
-                      clienteNome={clienteNome}
-                      clients={clients}
-                      hoje={hoje}
-                    />
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+                  ) : null}
+                </TableCell>
+                <TableCell className="text-ink-dim">{tipoLabel}</TableCell>
+                <TableCell className="text-ink-dim tabular-nums">
+                  Dia {contrato.dia_vencimento}
+                </TableCell>
+                <TableCell className="text-ink-dim tabular-nums max-lg:hidden">
+                  {contrato.fim
+                    ? `${formatDateBR(contrato.inicio)} até ${formatDateBR(contrato.fim)}`
+                    : `Desde ${formatDateBR(contrato.inicio)}`}
+                </TableCell>
+                <TableCell>
+                  <StatusPill label={statusLabel} className={statusClass} />
+                </TableCell>
+                <TableCell className="text-right font-display text-[0.9375rem] font-medium text-ink tabular-nums">
+                  {formatBRL(contrato.valor_mensal)}
+                </TableCell>
+                <TableCell className="pr-3 text-right">{actions}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
         <TablePagination

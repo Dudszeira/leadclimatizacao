@@ -26,7 +26,9 @@ import {
 } from "@/components/chamados/execution-rules"
 import { compressPhoto, uploadToBucket } from "@/components/chamados/execucao/upload"
 import { useSectionSync, type SectionSync } from "@/components/chamados/execucao/autosave"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { StepHeading } from "@/components/chamados/execucao/section-heading"
 import { Input } from "@/components/ui/input"
 
 type PhotosSectionProps = {
@@ -36,11 +38,12 @@ type PhotosSectionProps = {
   photos: ServiceOrderPhotoView[]
   onAdded: (photo: ServiceOrderPhotoView) => void
   sync?: SectionSync
+  step?: number
 }
 
 const ETAPAS: Array<{ etapa: FotoEtapa; titulo: string; dica: string }> = [
   { etapa: "antes", titulo: "Antes", dica: "Estado encontrado ao chegar" },
-  { etapa: "depois", titulo: "Depois", dica: "Obrigatória para concluir (mín. 1)" },
+  { etapa: "depois", titulo: "Depois", dica: "Pelo menos 1 para concluir" },
 ]
 
 type Stage = "comprimindo" | "enviando" | "registrando" | "falhou" | "enviada"
@@ -70,7 +73,7 @@ const STAGE_LABEL: Record<Stage, string> = {
 }
 
 /** Fotos antes/depois: compressão no aparelho + upload direto ao Storage, com fila visível. */
-export function PhotosSection({ osId, demo, editable, photos, onAdded, sync }: PhotosSectionProps) {
+export function PhotosSection({ osId, demo, editable, photos, onAdded, sync, step }: PhotosSectionProps) {
   const [queue, setQueue] = React.useState<QueueItem[]>([])
   // Legenda opcional aplicada às fotos do próximo envio da etapa (validada no servidor).
   const [legendas, setLegendas] = React.useState<Record<FotoEtapa, string>>({ antes: "", depois: "" })
@@ -217,30 +220,60 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded, sync }: P
     void processItem(item)
   }
 
+  const depois = photos.filter((p) => p.etapa === "depois").length
+
   return (
-    <Card size="sm" className="border border-line bg-console ring-0">
-      <CardHeader>
-        <CardTitle className="text-ink">Fotos do serviço</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+    <Card>
+      <StepHeading
+        step={step}
+        title="Fotos do serviço"
+        done={depois > 0}
+        aside={
+          <span className="shrink-0 text-[0.8125rem] text-ink-dim tabular-nums">
+            {photos.length} {photos.length === 1 ? "foto" : "fotos"}
+          </span>
+        }
+      />
+      <CardContent className="flex flex-col divide-y divide-line-soft">
         {ETAPAS.map(({ etapa, titulo, dica }) => {
           const items = photos.filter((p) => p.etapa === etapa)
           const pendentes = queue.filter((q) => q.etapa === etapa)
           const inputId = `foto-${etapa}`
           return (
-            <section key={etapa} aria-labelledby={`${inputId}-titulo`}>
-              <div className="flex items-baseline justify-between gap-2">
+            <section
+              key={etapa}
+              aria-labelledby={`${inputId}-titulo`}
+              className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0"
+            >
+              <div className="flex items-baseline justify-between gap-3">
                 <h3
                   id={`${inputId}-titulo`}
-                  className="text-xs font-medium tracking-wider text-ink-faint uppercase"
+                  className="text-[0.9375rem] font-medium text-ink"
                 >
                   {titulo}{" "}
-                  <span className="font-mono tabular-nums">({items.length})</span>
+                  <span className="font-normal text-ink-faint tabular-nums">{items.length}</span>
                 </h3>
-                <span className="text-xs text-ink-faint">{dica}</span>
+                <span className="min-w-0 text-right text-[0.8125rem] text-ink-faint">{dica}</span>
               </div>
               {editable && (
-                <div className="mt-2 flex flex-col gap-2">
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <PickButton
+                      id={`${inputId}-camera`}
+                      icon={<CameraIcon className="size-5" aria-hidden="true" />}
+                      label="Tirar foto"
+                      srLabel={`Tirar foto ${titulo.toLowerCase()}`}
+                      capture
+                      onFiles={(files) => handleFiles(etapa, files)}
+                    />
+                    <PickButton
+                      id={`${inputId}-galeria`}
+                      icon={<ImagesIcon className="size-5" aria-hidden="true" />}
+                      label="Galeria"
+                      srLabel={`Escolher fotos ${titulo.toLowerCase()} da galeria`}
+                      onFiles={(files) => handleFiles(etapa, files)}
+                    />
+                  </div>
                   <label htmlFor={`${inputId}-legenda`} className="sr-only">
                     Legenda das próximas fotos {titulo.toLowerCase()} (opcional)
                   </label>
@@ -248,34 +281,17 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded, sync }: P
                     id={`${inputId}-legenda`}
                     value={legendas[etapa]}
                     maxLength={LEGENDA_MAX}
-                    placeholder="Legenda (opcional), ex.: dreno obstruído"
+                    placeholder="Legenda opcional, ex.: dreno obstruído"
                     onChange={(e) => {
                       const value = e.currentTarget.value
                       setLegendas((prev) => ({ ...prev, [etapa]: value }))
                     }}
-                    className="h-9 max-md:h-11"
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <PickButton
-                      id={`${inputId}-camera`}
-                      icon={<CameraIcon className="size-5" aria-hidden="true" />}
-                      label={`Tirar foto ${titulo.toLowerCase()}`}
-                      capture
-                      onFiles={(files) => handleFiles(etapa, files)}
-                      primary
-                    />
-                    <PickButton
-                      id={`${inputId}-galeria`}
-                      icon={<ImagesIcon className="size-5" aria-hidden="true" />}
-                      label="Escolher da galeria"
-                      onFiles={(files) => handleFiles(etapa, files)}
-                    />
-                  </div>
-                </div>
+                </>
               )}
 
               {pendentes.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-2" aria-label={`Envio das fotos ${titulo.toLowerCase()}`}>
+                <ul className="flex flex-col gap-2" aria-label={`Envio das fotos ${titulo.toLowerCase()}`}>
                   {pendentes.map((q) => (
                     <QueueRow
                       key={q.id}
@@ -288,7 +304,7 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded, sync }: P
               )}
 
               {(items.length > 0 || !editable) && (
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-2">
                   {items.map((photo) => (
                     <PhotoTile key={photo.id} photo={photo} />
                   ))}
@@ -301,9 +317,9 @@ export function PhotosSection({ osId, demo, editable, photos, onAdded, sync }: P
           )
         })}
         {editable && (
-          <p className="text-xs text-ink-faint">
-            JPEG, PNG ou WebP. As fotos são reduzidas no aparelho (até 1600 px) antes do envio.
-            Fotos já enviadas não podem ser apagadas por aqui; peça ao escritório se precisar.
+          <p className="pt-4 text-[0.8125rem] leading-relaxed text-ink-faint">
+            As fotos são reduzidas no aparelho antes do envio. Para apagar uma foto já enviada,
+            fale com o escritório.
           </p>
         )}
       </CardContent>
@@ -315,29 +331,25 @@ function PickButton({
   id,
   icon,
   label,
+  srLabel,
   capture,
-  primary,
   onFiles,
 }: {
   id: string
   icon: React.ReactNode
   label: string
+  srLabel: string
   capture?: boolean
-  primary?: boolean
   onFiles: (files: File[]) => Promise<void>
 }) {
   return (
     <label
       htmlFor={id}
-      className={cn(
-        "flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors focus-within:ring-3 focus-within:ring-ring/50",
-        primary
-          ? "border-signal/40 bg-signal-dim/60 text-signal hover:bg-signal-dim"
-          : "border-line bg-console-2 text-ink hover:bg-console-3",
-      )}
+      className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-console-2 px-3 py-2.5 text-center text-sm font-medium text-ink ring-1 ring-line transition-[background-color,transform] duration-150 select-none hover:bg-console-3 focus-within:ring-3 focus-within:ring-signal/60 active:scale-[0.98] motion-reduce:transition-none"
     >
       {icon}
-      <span>{label}</span>
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">{srLabel}</span>
       <input
         id={id}
         type="file"
@@ -370,22 +382,22 @@ function QueueRow({
   return (
     <li
       className={cn(
-        "flex items-center gap-3 rounded-lg border p-2",
+        "flex flex-wrap items-center gap-3 rounded-2xl p-2.5",
         item.stage === "falhou"
-          ? "border-danger/40 bg-danger-dim"
+          ? "bg-danger-dim"
           : item.stage === "enviada"
-            ? "border-clear/30 bg-clear-dim"
-            : "border-line bg-console-2",
+            ? "bg-clear-dim"
+            : "bg-console-2",
       )}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={item.preview}
         alt=""
-        className="size-14 shrink-0 rounded-md border border-line object-cover"
+        className="size-14 shrink-0 rounded-xl object-cover"
       />
       <div className="min-w-0 flex-1" aria-live="polite">
-        <p className="truncate text-xs text-ink-dim">{item.legenda || item.nome}</p>
+        <p className="truncate text-[0.8125rem] text-ink-dim">{item.legenda || item.nome}</p>
         <p
           className={cn(
             "mt-0.5 flex items-center gap-1.5 text-sm font-medium",
@@ -400,7 +412,7 @@ function QueueRow({
             <CircleCheckIcon className="size-4 shrink-0" aria-hidden="true" />
           )}
           {STAGE_LABEL[item.stage]}
-          {busy && <span className="font-mono text-xs font-normal text-ink-dim tabular-nums">{step}/3</span>}
+          {busy && <span className="text-xs font-normal text-ink-dim tabular-nums">{step} de 3</span>}
         </p>
         {busy && (
           <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-console-3" aria-hidden="true">
@@ -415,23 +427,15 @@ function QueueRow({
         )}
       </div>
       {item.stage === "falhou" && (
-        <div className="flex shrink-0 flex-col gap-1">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-danger/40 px-3 text-sm font-medium text-ink hover:bg-console-3 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <RotateCwIcon className="size-4" aria-hidden="true" />
+        <div className="flex w-full gap-2 *:flex-1">
+          <Button type="button" variant="secondary" onClick={onRetry}>
+            <RotateCwIcon aria-hidden="true" />
             Tentar de novo
-          </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-3 text-xs text-ink-dim hover:text-ink focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <XIcon className="size-3.5" aria-hidden="true" />
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDismiss}>
+            <XIcon aria-hidden="true" />
             Descartar
-          </button>
+          </Button>
         </div>
       )}
     </li>
@@ -441,9 +445,9 @@ function QueueRow({
 function PhotoTile({ photo }: { photo: ServiceOrderPhotoView }) {
   if (!photo.url) {
     return (
-      <figure className="flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-console-2/60 px-2 text-center">
+      <figure className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl bg-console-2 px-2 text-center">
         <ImageOffIcon className="size-5 text-ink-faint" aria-hidden="true" />
-        <figcaption className="max-w-full truncate font-mono text-[11px] text-ink-faint">
+        <figcaption className="max-w-full truncate text-xs text-ink-faint">
           {fileBasename(photo.storage_path)}
         </figcaption>
       </figure>
@@ -454,7 +458,7 @@ function PhotoTile({ photo }: { photo: ServiceOrderPhotoView }) {
       href={photo.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group relative block aspect-square overflow-hidden rounded-lg border border-line bg-console-2 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="group relative block aspect-square overflow-hidden rounded-2xl bg-console-2 focus-visible:ring-3 focus-visible:ring-signal/60 focus-visible:outline-none"
       aria-label={`Abrir foto ${photo.etapa}${photo.legenda ? `: ${photo.legenda}` : ""}`}
     >
       {/* URL assinada de curta duração: next/image não se aplica */}
@@ -467,7 +471,7 @@ function PhotoTile({ photo }: { photo: ServiceOrderPhotoView }) {
         className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
       />
       {photo.legenda && (
-        <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1 text-[11px] text-white">
+        <span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-2 py-1 text-xs text-white">
           {photo.legenda}
         </span>
       )}

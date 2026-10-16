@@ -186,7 +186,7 @@ export function SaveIndicator({
 }) {
   return (
     <div
-      className={cn("flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 text-xs", className)}
+      className={cn("flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem]", className)}
     >
       <p
         className={cn(
@@ -212,7 +212,7 @@ export function SaveIndicator({
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 font-medium text-signal underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-medium text-signal underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-signal/50 focus-visible:outline-none"
         >
           <RotateCwIcon className="size-3.5" aria-hidden="true" />
           Tentar de novo

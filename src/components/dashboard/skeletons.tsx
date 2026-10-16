@@ -1,23 +1,24 @@
+import { cn } from "cn"
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
+/** Esqueletos com a mesma geometria das seções reais (sem salto de layout). */
+
 function StatCardSkeleton() {
   return (
-    <Card size="sm" className="gap-0">
-      <div className="flex items-start justify-between gap-2 px-(--card-spacing)">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="size-8 rounded-lg" />
-      </div>
-      <Skeleton className="mt-3 ml-(--card-spacing) h-7 w-16" />
-      <Skeleton className="mt-3 ml-(--card-spacing) h-3 w-36" />
-    </Card>
+    <div className="flex flex-col rounded-[1.375rem] bg-card p-3.5 ring-1 ring-line md:p-5">
+      <Skeleton className="h-3.5 w-3/4" />
+      <Skeleton className="mt-4 h-7 w-16 md:mt-5 md:h-9" />
+      <Skeleton className="mt-2.5 h-3 w-2/3" />
+    </div>
   )
 }
 
 export function KpisSkeleton() {
   return (
     <div
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-4"
       aria-label="Carregando indicadores"
       aria-busy="true"
     >
@@ -29,80 +30,120 @@ export function KpisSkeleton() {
   )
 }
 
-export function ChartSkeleton() {
+function HeaderSkeleton() {
   return (
-    <Card aria-label="Carregando gráfico de chamados" aria-busy="true">
-      <CardHeader>
-        <Skeleton className="h-4 w-56" />
-        <Skeleton className="h-3 w-40" />
-      </CardHeader>
-      <CardContent>
-        <div className="flex h-56 items-end gap-4 px-2">
-          <Skeleton className="h-[70%] flex-1" />
-          <Skeleton className="h-[85%] flex-1" />
-          <Skeleton className="h-[60%] flex-1" />
-          <Skeleton className="h-[75%] flex-1" />
-          <Skeleton className="h-[45%] flex-1" />
-          <Skeleton className="h-[55%] flex-1" />
+    <CardHeader>
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="h-3.5 w-56 max-w-full" />
+    </CardHeader>
+  )
+}
+
+const BARRAS = [55, 70, 48, 62, 38, 80]
+
+export function ChartSkeleton({ className }: { className?: string }) {
+  return (
+    <Card className={className} aria-label="Carregando gráfico de chamados" aria-busy="true">
+      <HeaderSkeleton />
+      <CardContent className="flex flex-1 flex-col justify-end">
+        <div className="flex h-52 items-end gap-3 pb-7 pl-8 sm:h-64 sm:gap-5 lg:h-72">
+          {BARRAS.map((h, i) => (
+            <Skeleton key={i} className="flex-1 rounded-t-md rounded-b-sm" style={{ height: `${h}%` }} />
+          ))}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-line-soft pt-4">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-6 w-12" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-6 w-16" />
+          </div>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-export function ListaSkeleton({ linhas = 5 }: { linhas?: number }) {
+/** Lista de linhas com ícone/data à esquerda e texto em duas linhas. */
+export function ListaSkeleton({
+  linhas = 5,
+  className,
+  colunas = 1,
+}: {
+  linhas?: number
+  className?: string
+  colunas?: 1 | 2
+}) {
   return (
-    <Card aria-label="Carregando lista" aria-busy="true">
-      <CardHeader>
-        <Skeleton className="h-4 w-44" />
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {Array.from({ length: linhas }, (_, i) => (
-          <div key={i} className="flex items-center justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-3.5 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-            <Skeleton className="h-5 w-16 rounded-4xl" />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
-export function FunilSkeleton() {
-  return (
-    <Card aria-label="Carregando funil comercial" aria-busy="true">
-      <CardHeader>
-        <Skeleton className="h-4 w-64" />
-      </CardHeader>
+    <Card className={className} aria-label="Carregando lista" aria-busy="true">
+      <HeaderSkeleton />
       <CardContent>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="space-y-3 rounded-lg border border-line-soft p-4">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-7 w-12" />
-              <Skeleton className="h-3 w-28" />
+        <div className={cn("grid grid-cols-1", colunas === 2 && "md:grid-cols-2 md:gap-x-6")}>
+          {Array.from({ length: linhas }, (_, i) => (
+            <div key={i} className="flex min-h-14 items-center gap-3 border-b border-line-soft py-2.5 last:border-b-0">
+              <Skeleton className="size-9 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
             </div>
           ))}
         </div>
-        <Skeleton className="mt-4 h-10 w-full" />
       </CardContent>
     </Card>
   )
 }
 
-export function PmocSkeleton() {
+export function FunilSkeleton({ className }: { className?: string }) {
   return (
-    <div
-      className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-      aria-label="Carregando situação PMOC"
-      aria-busy="true"
-    >
-      <StatCardSkeleton />
-      <StatCardSkeleton />
-      <StatCardSkeleton />
-    </div>
+    <Card className={className} aria-label="Carregando funil comercial" aria-busy="true">
+      <HeaderSkeleton />
+      <CardContent>
+        <div className="divide-y divide-line-soft">
+          {[100, 60, 35, 15].map((w, i) => (
+            <div key={i} className="space-y-2 py-3 first:pt-0">
+              <div className="flex justify-between">
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="h-4 w-8" />
+              </div>
+              <Skeleton className="h-2 rounded-full" style={{ width: `${w}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line-soft pt-4">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-5 w-20 max-w-full" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function PmocSkeleton({ className }: { className?: string }) {
+  return (
+    <Card className={className} aria-label="Carregando situação PMOC" aria-busy="true">
+      <HeaderSkeleton />
+      <CardContent>
+        <Skeleton className="h-2 w-full rounded-full" />
+        <div className="mt-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="flex min-h-14 items-center gap-3 border-b border-line-soft py-2.5 last:border-b-0">
+              <Skeleton className="size-2 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-44 max-w-full" />
+              </div>
+              <Skeleton className="h-6 w-6" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

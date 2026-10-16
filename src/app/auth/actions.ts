@@ -87,7 +87,7 @@ export async function updatePassword(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Senha inválida." }
   }
   if (isDemoMode) {
-    return { status: "error", message: "Modo demonstração — não há senha para alterar." }
+    return { status: "error", message: "Modo demonstração: não há senha para alterar." }
   }
 
   try {

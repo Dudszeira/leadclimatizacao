@@ -53,6 +53,9 @@ type ContractFormDialogProps = {
   /** Data de hoje (BRT) calculada no servidor — default do início. */
   hoje: string
   triggerClassName?: string
+  /** Modo controlado (ex. aberto a partir de um menu): sem botão próprio. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const INITIAL_STATE: ContractActionState = { status: "idle" }
@@ -85,13 +88,35 @@ export function ContractFormDialog({
   contract,
   hoje,
   triggerClassName,
+  open: openProp,
+  onOpenChange,
 }: ContractFormDialogProps) {
   const router = useRouter()
   const isEdit = Boolean(contract)
-  const [open, setOpen] = React.useState(false)
+  const controlled = openProp !== undefined
+  const [openState, setOpenState] = React.useState(false)
+  const open = controlled ? openProp : openState
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!controlled) setOpenState(next)
+      onOpenChange?.(next)
+    },
+    [controlled, onOpenChange],
+  )
+
   const [clientId, setClientId] = React.useState(contract?.client_id ?? "")
   const [tipo, setTipo] = React.useState<ContractType>(contract?.tipo ?? "pmoc_recorrente")
   const [status, setStatus] = React.useState<ContractStatus>(contract?.status ?? "ativo")
+  // Ao abrir (inclusive pelo menu, em modo controlado), restaura os valores do contrato.
+  const [prevOpen, setPrevOpen] = React.useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setClientId(contract?.client_id ?? "")
+      setTipo(contract?.tipo ?? "pmoc_recorrente")
+      setStatus(contract?.status ?? "ativo")
+    }
+  }
   const [state, formAction, pending] = React.useActionState(
     async (prev: ContractActionState, formData: FormData) => {
       const result = await saveContract(prev, formData)
@@ -118,33 +143,26 @@ export function ContractFormDialog({
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (next) {
-      setClientId(contract?.client_id ?? "")
-      setTipo(contract?.tipo ?? "pmoc_recorrente")
-      setStatus(contract?.status ?? "ativo")
-    }
   }
 
   const prefix = contract ? `contrato-${contract.id.slice(0, 8)}` : "contrato-novo"
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          isEdit ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className={triggerClassName ?? "h-8 px-2 text-ink-dim hover:text-ink max-md:h-11"}
-            />
-          ) : (
-            <Button className={triggerClassName ?? "h-9 px-3 max-md:h-11 max-md:px-4"} />
-          )
-        }
-      >
-        {isEdit ? <PencilLineIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
-        {isEdit ? "Editar" : "Novo contrato"}
-      </DialogTrigger>
+      {controlled ? null : (
+        <DialogTrigger
+          render={
+            isEdit ? (
+              <Button variant="ghost" className={triggerClassName} />
+            ) : (
+              <Button className={triggerClassName} />
+            )
+          }
+        >
+          {isEdit ? <PencilLineIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
+          {isEdit ? "Editar" : "Novo contrato"}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar contrato" : "Cadastrar contrato"}</DialogTitle>
@@ -167,8 +185,8 @@ export function ContractFormDialog({
           <input type="hidden" name="client_id" value={clientId} />
           <input type="hidden" name="tipo" value={tipo} />
           <input type="hidden" name="status" value={status} />
-          <div className="grid gap-4">
-            <div className="grid gap-1.5">
+          <div className="grid gap-5">
+            <div className="grid gap-2">
               <Label htmlFor={`${prefix}-cliente`}>Cliente</Label>
               <Select
                 items={clientItems}
@@ -181,7 +199,7 @@ export function ContractFormDialog({
                   aria-label="Cliente"
                   aria-invalid={err("client_id") ? true : undefined}
                   aria-describedby={describedBy("client_id")}
-                  className="w-full max-md:h-11"
+                  className="w-full"
                 >
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
@@ -197,14 +215,14 @@ export function ContractFormDialog({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-tipo`}>Tipo</Label>
                 <Select
                   items={TIPO_ITEMS}
                   value={tipo}
                   onValueChange={(value: string | null) => value && setTipo(value as ContractType)}
                 >
-                  <SelectTrigger id={`${prefix}-tipo`} aria-label="Tipo" className="w-full max-md:h-11">
+                  <SelectTrigger id={`${prefix}-tipo`} aria-label="Tipo" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -217,14 +235,14 @@ export function ContractFormDialog({
                 </Select>
                 <FieldError id="contrato-tipo-erro" message={err("tipo")} />
               </div>
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-status`}>Status</Label>
                 <Select
                   items={STATUS_ITEMS}
                   value={status}
                   onValueChange={(value: string | null) => value && setStatus(value as ContractStatus)}
                 >
-                  <SelectTrigger id={`${prefix}-status`} aria-label="Status" className="w-full max-md:h-11">
+                  <SelectTrigger id={`${prefix}-status`} aria-label="Status" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -240,7 +258,7 @@ export function ContractFormDialog({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-valor`}>Valor mensal (R$)</Label>
                 <Input
                   id={`${prefix}-valor`}
@@ -250,11 +268,11 @@ export function ContractFormDialog({
                   placeholder="0,00"
                   aria-invalid={err("valor_mensal") ? true : undefined}
                   aria-describedby={describedBy("valor_mensal")}
-                  className="font-mono tabular-nums max-md:h-11"
+                  className="tabular-nums"
                 />
                 <FieldError id="contrato-valor_mensal-erro" message={err("valor_mensal")} />
               </div>
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-dia`}>Dia de vencimento</Label>
                 <Input
                   id={`${prefix}-dia`}
@@ -266,14 +284,14 @@ export function ContractFormDialog({
                   defaultValue={contract?.dia_vencimento ?? 10}
                   aria-invalid={err("dia_vencimento") ? true : undefined}
                   aria-describedby={describedBy("dia_vencimento")}
-                  className="font-mono tabular-nums max-md:h-11"
+                  className="tabular-nums"
                 />
                 <FieldError id="contrato-dia_vencimento-erro" message={err("dia_vencimento")} />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-inicio`}>Início da vigência</Label>
                 <Input
                   id={`${prefix}-inicio`}
@@ -282,11 +300,11 @@ export function ContractFormDialog({
                   defaultValue={contract?.inicio ?? hoje}
                   aria-invalid={err("inicio") ? true : undefined}
                   aria-describedby={describedBy("inicio")}
-                  className="font-mono max-md:h-11"
+                  
                 />
                 <FieldError id="contrato-inicio-erro" message={err("inicio")} />
               </div>
-              <div className="grid gap-1.5">
+              <div className="grid gap-2">
                 <Label htmlFor={`${prefix}-fim`}>Fim (opcional)</Label>
                 <Input
                   id={`${prefix}-fim`}
@@ -295,13 +313,13 @@ export function ContractFormDialog({
                   defaultValue={contract?.fim ?? ""}
                   aria-invalid={err("fim") ? true : undefined}
                   aria-describedby={describedBy("fim")}
-                  className="font-mono max-md:h-11"
+                  
                 />
                 <FieldError id="contrato-fim-erro" message={err("fim")} />
               </div>
             </div>
 
-            <div className="grid gap-1.5">
+            <div className="grid gap-2">
               <Label htmlFor={`${prefix}-obs`}>Observações</Label>
               <Textarea
                 id={`${prefix}-obs`}
@@ -314,17 +332,16 @@ export function ContractFormDialog({
               <FieldError id="contrato-observacoes-erro" message={err("observacoes")} />
             </div>
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
               disabled={pending}
-              className="max-md:h-11"
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending} aria-busy={pending} className="max-md:h-11">
+            <Button type="submit" disabled={pending} aria-busy={pending}>
               {pending ? (
                 <>
                   <LoaderCircleIcon className="animate-spin" aria-hidden="true" />

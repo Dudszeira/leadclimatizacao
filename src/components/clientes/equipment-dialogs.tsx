@@ -72,7 +72,7 @@ export function EquipmentFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{equipment ? "Editar equipamento" : "Novo equipamento"}</DialogTitle>
           <DialogDescription>
@@ -143,7 +143,6 @@ function EquipmentForm({
             id="eq-codigo"
             value={form.codigo_interno}
             onChange={(e) => set("codigo_interno")(e.target.value)}
-            className="font-mono max-md:h-11"
             {...invalidProps("eq-codigo", errors.codigo_interno)}
           />
         </Field>
@@ -152,7 +151,6 @@ function EquipmentForm({
             id="eq-serie"
             value={form.numero_serie}
             onChange={(e) => set("numero_serie")(e.target.value)}
-            className="font-mono max-md:h-11"
             {...invalidProps("eq-serie", errors.numero_serie)}
           />
         </Field>
@@ -163,7 +161,6 @@ function EquipmentForm({
             onChange={(e) => set("capacidade_btu")(e.target.value.replace(/[^\d.]/g, ""))}
             inputMode="numeric"
             placeholder="18000"
-            className="font-mono max-md:h-11"
             {...invalidProps("eq-btu", errors.capacidade_btu)}
           />
         </Field>
@@ -174,7 +171,6 @@ function EquipmentForm({
             id="eq-marca"
             value={form.marca}
             onChange={(e) => set("marca")(e.target.value)}
-            className="max-md:h-11"
             {...invalidProps("eq-marca", errors.marca)}
           />
         </Field>
@@ -183,7 +179,6 @@ function EquipmentForm({
             id="eq-modelo"
             value={form.modelo}
             onChange={(e) => set("modelo")(e.target.value)}
-            className="max-md:h-11"
             {...invalidProps("eq-modelo", errors.modelo)}
           />
         </Field>
@@ -195,7 +190,6 @@ function EquipmentForm({
             value={form.ambiente}
             onChange={(e) => set("ambiente")(e.target.value)}
             placeholder="Ex.: Recepção, CTI ala leste"
-            className="max-md:h-11"
             {...invalidProps("eq-ambiente", errors.ambiente)}
           />
         </Field>
@@ -205,7 +199,6 @@ function EquipmentForm({
             type="date"
             value={form.data_instalacao}
             onChange={(e) => set("data_instalacao")(e.target.value)}
-            className="font-mono max-md:h-11"
             {...invalidProps("eq-instalacao", errors.data_instalacao)}
           />
         </Field>
@@ -220,7 +213,7 @@ function EquipmentForm({
         />
       </Field>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose} disabled={pending} className="max-md:h-11">
+        <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
           Cancelar
         </Button>
         <SubmitButton pending={pending}>{equipment ? "Salvar alterações" : "Cadastrar equipamento"}</SubmitButton>
@@ -235,7 +228,6 @@ export function NewEquipmentButton({ buildings }: { buildings: BuildingOption[] 
   return (
     <>
       <Button
-        className="h-9 px-3 max-md:h-11"
         onClick={() => setOpen(true)}
         disabled={buildings.length === 0}
         title={buildings.length === 0 ? "Cadastre um prédio primeiro" : undefined}
@@ -272,7 +264,7 @@ export function EquipmentRowActions({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 max-md:size-11"
+              className="shrink-0"
               aria-label={`Ações do equipamento ${equipment.codigo_interno}`}
             />
           }

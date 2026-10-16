@@ -11,13 +11,13 @@ import { Button } from "@/components/ui/button"
  * Dispara a geração de OS preventivas para os planos devidos (atrasados e
  * vencendo em até 7 dias) via RPC generate_pmoc_service_orders.
  */
-export function GerarOsButton() {
+export function GerarOsButton({ className }: { className?: string }) {
   const [isPending, startTransition] = React.useTransition()
 
   return (
     <Button
       disabled={isPending}
-      className="h-9 px-4 max-md:h-11"
+      className={className}
       onClick={() =>
         startTransition(async () => {
           const result = await gerarOsPmoc()
@@ -31,7 +31,7 @@ export function GerarOsButton() {
       ) : (
         <ZapIcon aria-hidden="true" />
       )}
-      Gerar OS agora
+      {isPending ? "Gerando OS…" : "Gerar OS agora"}
     </Button>
   )
 }

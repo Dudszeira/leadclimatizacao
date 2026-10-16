@@ -37,7 +37,6 @@ export function PlanRowActions({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 max-md:size-11"
               aria-label={`Ações do plano de ${equipmentLabel}`}
             />
           }
