@@ -8,12 +8,15 @@ import {
   FileTextIcon,
   MapPinOffIcon,
   PhoneIcon,
+  PlusIcon,
 } from "lucide-react"
+import Link from "next/link"
 
 import type { BuildingWithEquipment, Equipment, PmocPlanListItem } from "@/lib/types"
 import { requireRole } from "@/server/auth"
 import { getClient } from "@/server/clients"
 import { listPmocChecklistOptions, listPmocPlans } from "@/server/pmoc"
+import { listQuotes } from "@/server/quotes"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,13 +29,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatBRL, formatBtu, formatDateBR } from "@/lib/format"
+import { formatBRL, formatBtu, formatDateBR, todayBRT } from "@/lib/format"
 import {
   CLIENT_STATUS_META,
   CONTRACT_STATUS_META,
   CONTRACT_TYPE_LABELS,
   EQUIPMENT_STATUS_META,
   EQUIPMENT_TYPE_LABELS,
+  quoteNumeroLabel,
   regiaoLabel,
   segmentoLabel,
 } from "@/lib/status-meta"
@@ -45,13 +49,15 @@ import { maskDocumento } from "@/components/clientes/validators"
 import { PlanoSituacaoBadge } from "@/components/pmoc/plano-situacao-badge"
 import { DataError } from "@/components/data-error"
 import { PageHeader } from "@/components/page-header"
+import { QuoteStatusPill, VencidoPill, isQuoteVencido } from "@/components/orcamentos/quote-pills"
 
 type PageParams = {
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-const ABAS = ["dados", "predios", "equipamentos", "contratos"] as const
+const ABAS = ["dados", "predios", "equipamentos", "contratos", "orcamentos"] as const
+const QUOTES_LIMIT = 10
 
 const getClientCached = cache(getClient)
 
@@ -88,10 +94,12 @@ export default async function ClienteDetalhePage({ params, searchParams }: PageP
   if (!result.data) notFound()
 
   const client = result.data
-  const [plansResult, checklistResult] = await Promise.all([
+  const [plansResult, checklistResult, quotesResult] = await Promise.all([
     listPmocPlans({ clientId: client.id }),
     listPmocChecklistOptions(),
+    listQuotes({ clientId: client.id, pageSize: QUOTES_LIMIT }),
   ])
+  const hoje = todayBRT()
   const planByEquipment = new Map<string, PmocPlanListItem>(
     (plansResult.data ?? []).map((p) => [p.equipment_id, p]),
   )
@@ -186,6 +194,10 @@ export default async function ClienteDetalhePage({ params, searchParams }: PageP
             <TabsTrigger value="contratos">
               Contratos
               <TabCount value={contracts.length} />
+            </TabsTrigger>
+            <TabsTrigger value="orcamentos">
+              Orçamentos
+              {quotesResult.data && <TabCount value={quotesResult.data.total} />}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -460,6 +472,71 @@ export default async function ClienteDetalhePage({ params, searchParams }: PageP
                         </Badge>
                       </div>
                     </div>
+                  </li>
+                )
+              })}
+            </ListCard>
+          )}
+        </TabsContent>
+
+        <TabsContent value="orcamentos" className="flex flex-col gap-4">
+          <SectionBar
+            text={
+              quotesResult.data
+                ? quotesResult.data.total > QUOTES_LIMIT
+                  ? `Últimos ${QUOTES_LIMIT} de ${quotesResult.data.total} orçamentos`
+                  : countLabel(quotesResult.data.total, "orçamento", "orçamentos")
+                : "Orçamentos"
+            }
+            action={
+              <Link
+                href={`/orcamentos/novo?client=${client.id}`}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                <PlusIcon aria-hidden="true" />
+                Novo orçamento
+              </Link>
+            }
+          />
+          {quotesResult.error !== null ? (
+            <DataError message={quotesResult.error} compact />
+          ) : quotesResult.data.items.length === 0 ? (
+            <TabEmpty message="Nenhum orçamento para este cliente. Use Novo orçamento para montar o primeiro." />
+          ) : (
+            <ListCard label={`Orçamentos de ${nome}`}>
+              {quotesResult.data.items.map((q) => {
+                const vencido = isQuoteVencido(q, hoje)
+                return (
+                  <li key={q.id}>
+                    <Link
+                      href={`/orcamentos/${q.id}`}
+                      className="flex items-center gap-3 px-4 py-3.5 outline-none hover:bg-console-2/60 focus-visible:bg-console-2 md:px-5"
+                    >
+                      <IconTile icon={FileTextIcon} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="min-w-0 truncate text-[0.9375rem] text-ink">
+                            <span className="font-medium text-ink-dim tabular-nums">{quoteNumeroLabel(q.numero)}</span>
+                            <span>{` · ${q.titulo}`}</span>
+                          </p>
+                          <p className="shrink-0 font-display text-base font-medium text-ink tabular-nums">
+                            {formatBRL(q.total)}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                          <p className="truncate text-[0.8125rem] text-ink-dim">
+                            {q.building.nome}, válido até{" "}
+                            <span className={vencido ? "text-danger tabular-nums" : "tabular-nums"}>
+                              {formatDateBR(q.validade)}
+                            </span>
+                          </p>
+                          <span className="flex items-center gap-1.5">
+                            {vencido && <VencidoPill />}
+                            <QuoteStatusPill status={q.status} />
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
                   </li>
                 )
               })}

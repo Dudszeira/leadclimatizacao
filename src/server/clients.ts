@@ -103,7 +103,8 @@ export async function listClientsSummary(
     if (clientIds.length === 0) return ok(summaries);
     const idSet = new Set(clientIds);
 
-    // Contratos ordenados por valor desc: primeiro ativo do cliente, senão o 1º.
+    // Contratos ordenados por valor desc: primeiro ativo do cliente, senão o 1º
+    // (só contratos de plano — os gerados por orçamento ficam fora).
     const pickContract = (
       rows: Array<{ client_id: string; tipo: ContractType; valor_mensal: number; status: string }>,
     ) => {
@@ -130,7 +131,7 @@ export async function listClientsSummary(
           summaries[b.client_id].regioes.push(b.regiao);
         }
       }
-      pickContract(contractsFixture.filter((c) => idSet.has(c.client_id)));
+      pickContract(contractsFixture.filter((c) => idSet.has(c.client_id) && c.quote_id === null));
       for (const e of equipmentFixture) {
         const clientId = buildingClient.get(e.building_id);
         if (clientId) summaries[clientId].equip_count += 1;
@@ -148,7 +149,9 @@ export async function listClientsSummary(
       supabase
         .from("contracts")
         .select("client_id, tipo, valor_mensal, status")
-        .in("client_id", clientIds),
+        .in("client_id", clientIds)
+        // Contrato gerado por orçamento aprovado não é o "plano" do cliente.
+        .is("quote_id", null),
       supabase
         .from("equipment")
         .select("id, building:buildings!inner(client_id)")

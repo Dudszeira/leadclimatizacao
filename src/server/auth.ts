@@ -116,6 +116,27 @@ export async function authorizeAction(...roles: UserRole[]): Promise<Result<Sess
   return ok(state.profile);
 }
 
+/**
+ * Variante para Route Handlers: não redireciona nem encerra a sessão; devolve
+ * o status HTTP a responder. Anônimo -> 401; inativo/sem papel ou papel fora
+ * da lista -> 403.
+ */
+export async function authorizeRoute(
+  ...roles: UserRole[]
+): Promise<{ status: 200; profile: SessionProfile } | { status: 401 | 403 }> {
+  let state: SessionState;
+  try {
+    state = await loadSession();
+  } catch (error) {
+    console.error("[auth] authorizeRoute:", safeErrorLog(error));
+    return { status: 401 };
+  }
+  if (state.status === "anon") return { status: 401 };
+  if (state.status === "inactive") return { status: 403 };
+  if (roles.length > 0 && !roles.includes(state.profile.role)) return { status: 403 };
+  return { status: 200, profile: state.profile };
+}
+
 const uuid = z.uuid();
 
 /**

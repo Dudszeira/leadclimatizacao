@@ -26,7 +26,7 @@ interface QuoteSeed {
 
 const cat = (n: number) => `ca000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
 
-const CONDICOES = "50% na aprovação e 50% na conclusão — Pix ou boleto";
+const CONDICOES = "50% na aprovação e 50% na conclusão, via Pix ou boleto";
 const GARANTIA = "90 dias de mão de obra; equipamentos conforme fabricante";
 
 /** 9 orçamentos de climatização nos 3 status (R$ 800 a R$ 48.000). */
@@ -34,7 +34,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000001", numero: 1000,
     client_id: "c0000000-0000-4000-8000-000000000012", building_id: "b0000000-0000-4000-8000-000000000014",
-    tipo_servico: "instalacao", titulo: "Climatização de 12 apartamentos — 4º andar", status: "aprovado",
+    tipo_servico: "instalacao", titulo: "Climatização de 12 apartamentos: 4º andar", status: "aprovado",
     criadoHaDias: 40, validadeDias: 15, desconto: 1500, decididoHaDias: 34, created_by: ADMIN,
     items: [
       [null, "Split inverter 12.000 BTU (equipamento)", "un", 12, 2490],
@@ -45,7 +45,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000002", numero: 1001,
     client_id: "c0000000-0000-4000-8000-000000000009", building_id: "b0000000-0000-4000-8000-000000000010",
-    tipo_servico: "corretiva", titulo: "Recarga de gás e troca de capacitor — loja Portão", status: "aprovado",
+    tipo_servico: "corretiva", titulo: "Recarga de gás e troca de capacitor: loja Portão", status: "aprovado",
     criadoHaDias: 22, validadeDias: 7, desconto: 0, decididoHaDias: 20, created_by: ATENDENTE,
     items: [
       [cat(9), "Visita técnica / diagnóstico", "un", 1, 180],
@@ -64,7 +64,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000004", numero: 1003,
     client_id: "c0000000-0000-4000-8000-000000000010", building_id: "b0000000-0000-4000-8000-000000000011",
-    tipo_servico: "instalacao", titulo: "Laboratórios do bloco C — 8 splits 24.000 BTU", status: "aguardando",
+    tipo_servico: "instalacao", titulo: "Laboratórios do bloco C: 8 splits 24.000 BTU", status: "aguardando",
     criadoHaDias: 6, validadeDias: 20, desconto: 1000, created_by: ADMIN,
     items: [
       [null, "Split inverter 24.000 BTU (equipamento)", "un", 8, 4290],
@@ -75,7 +75,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000005", numero: 1004,
     client_id: "c0000000-0000-4000-8000-000000000011", building_id: "b0000000-0000-4000-8000-000000000013",
-    tipo_servico: "corretiva", titulo: "Visita e diagnóstico — câmara de frios", status: "aguardando",
+    tipo_servico: "corretiva", titulo: "Visita e diagnóstico: câmara de frios", status: "aguardando",
     criadoHaDias: 3, validadeDias: 7, desconto: 0, created_by: ATENDENTE,
     items: [
       [cat(9), "Visita técnica / diagnóstico", "un", 1, 180],
@@ -85,7 +85,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000006", numero: 1005,
     client_id: "c0000000-0000-4000-8000-000000000007", building_id: "b0000000-0000-4000-8000-000000000007",
-    tipo_servico: "instalacao", titulo: "Salão de festas e academia — 3 splits 18.000 BTU", status: "aguardando",
+    tipo_servico: "instalacao", titulo: "Salão de festas e academia: 3 splits 18.000 BTU", status: "aguardando",
     criadoHaDias: 1, validadeDias: 15, desconto: 0, created_by: ADMIN,
     items: [
       [null, "Split inverter 18.000 BTU (equipamento)", "un", 3, 3390],
@@ -96,7 +96,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000007", numero: 1006,
     client_id: "c0000000-0000-4000-8000-000000000004", building_id: "b0000000-0000-4000-8000-000000000004",
-    tipo_servico: "corretiva", titulo: "Substituição de compressor — UTI adulto", status: "aprovado",
+    tipo_servico: "corretiva", titulo: "Substituição de compressor: UTI adulto", status: "aprovado",
     criadoHaDias: 12, validadeDias: 5, desconto: 0, decididoHaDias: 11, created_by: ADMIN,
     items: [
       [null, "Compressor scroll 5 TR (equipamento)", "un", 1, 7850],
@@ -107,7 +107,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000008", numero: 1007,
     client_id: "c0000000-0000-4000-8000-000000000006", building_id: "b0000000-0000-4000-8000-000000000006",
-    tipo_servico: "instalacao", titulo: "Escritório administrativo — 4 splits 9.000 BTU", status: "declinado",
+    tipo_servico: "instalacao", titulo: "Escritório administrativo: 4 splits 9.000 BTU", status: "declinado",
     criadoHaDias: 50, validadeDias: 15, desconto: 0, decididoHaDias: 33, created_by: ATENDENTE,
     motivo: "Projeto adiado para o próximo ano",
     items: [
@@ -118,7 +118,7 @@ const seeds: QuoteSeed[] = [
   {
     id: "d1000000-0000-4000-8000-000000000009", numero: 1008,
     client_id: "c0000000-0000-4000-8000-000000000002", building_id: "b0000000-0000-4000-8000-000000000002",
-    tipo_servico: "instalacao", titulo: "Expansão praça de alimentação — VRF e cassetes", status: "aguardando",
+    tipo_servico: "instalacao", titulo: "Expansão praça de alimentação: VRF e cassetes", status: "aguardando",
     criadoHaDias: 9, validadeDias: 30, desconto: 2400, created_by: ADMIN,
     items: [
       [null, "Condensadora VRF 20 HP (equipamento)", "un", 1, 29900],

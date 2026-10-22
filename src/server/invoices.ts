@@ -37,7 +37,7 @@ export interface ListInvoicesParams extends PageParams {
 }
 
 const CONTRACT_EMBED =
-  "contract:contracts!inner(id,tipo,valor_mensal,dia_vencimento, client:clients!inner(id,razao_social,nome_fantasia))";
+  "contract:contracts!inner(id,tipo,valor_mensal,dia_vencimento,quote_id, client:clients!inner(id,razao_social,nome_fantasia), quote:quotes(numero,titulo))";
 
 function demoInvoiceWithContract(invoiceId: string): InvoiceWithContract {
   const invoice = invoicesFixture.find((i) => i.id === invoiceId);
@@ -55,6 +55,8 @@ function demoInvoiceWithContract(invoiceId: string): InvoiceWithContract {
       tipo: contract.tipo,
       valor_mensal: contract.valor_mensal,
       dia_vencimento: contract.dia_vencimento,
+      quote_id: contract.quote_id,
+      quote: null,
       client: {
         id: client.id,
         razao_social: client.razao_social,

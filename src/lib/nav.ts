@@ -1,6 +1,7 @@
 import {
   BotIcon,
   CalendarCheckIcon,
+  FileTextIcon,
   FileUpIcon,
   LayoutDashboardIcon,
   MapPinnedIcon,
@@ -41,6 +42,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ALL,
     titleFor: { tecnico: "Minhas OS" },
   },
+  { title: "Orçamentos", href: "/orcamentos", icon: FileTextIcon, roles: ALL },
   { title: "Campo", href: "/campo", icon: SmartphoneIcon, roles: ["tecnico", "admin"] },
   { title: "Calendário PMOC", short: "PMOC", href: "/pmoc", icon: CalendarCheckIcon, roles: OFFICE },
   { title: "Mapa de Equipamentos", short: "Mapa", href: "/mapa", icon: MapPinnedIcon, roles: OFFICE },
@@ -54,7 +56,7 @@ export const NAV_ITEMS: NavItem[] = [
 export const MOBILE_TABS: Record<UserRole, readonly string[]> = {
   admin: ["/", "/chamados", "/clientes", "/financeiro"],
   atendente: ["/", "/chamados", "/clientes", "/pmoc"],
-  tecnico: ["/chamados", "/campo"],
+  tecnico: ["/chamados", "/campo", "/orcamentos"],
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {

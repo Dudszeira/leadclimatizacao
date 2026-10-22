@@ -244,6 +244,11 @@ export interface Contract {
   inicio: string;
   fim: string | null;
   observacoes: string | null;
+  /**
+   * Orçamento que gerou o contrato (0010). Não nulo = contrato avulso criado
+   * na aprovação do orçamento: não conta como plano/MRR do cliente.
+   */
+  quote_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -346,8 +351,10 @@ export interface ContractWithRelations extends ContractWithClient {
 }
 
 export interface InvoiceWithContract extends Invoice {
-  contract: Pick<Contract, "id" | "tipo" | "valor_mensal" | "dia_vencimento"> & {
+  contract: Pick<Contract, "id" | "tipo" | "valor_mensal" | "dia_vencimento" | "quote_id"> & {
     client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+    /** Orçamento de origem (contrato gerado na aprovação); null nos demais. */
+    quote?: Pick<Quote, "numero" | "titulo"> | null;
   };
 }
 
