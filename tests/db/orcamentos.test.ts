@@ -3,7 +3,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asService, asUser, createDb, migrationFiles, stripCron } from "./supabase-stub";
 
-/** Módulo de Orçamentos (0010): RLS só admin, totais, imutabilidade e RPCs. */
+/** Módulo de Orçamentos (0010): leitura por RLS, escrita só por RPC, totais, imutabilidade. */
 
 const ADMIN = "11111111-1111-4111-8111-0000000000a1";
 const ATEND = "11111111-1111-4111-8111-0000000000a2";
@@ -50,6 +50,28 @@ async function salvar(
   ]);
   return r.id;
 }
+
+/** aprovar_orcamento; updatedAt nulo = o updated_at atual do orçamento. */
+async function aprovar(
+  uid: string,
+  id: string,
+  opts: { venc?: string; updatedAt?: string; aceitarVencido?: boolean } = {},
+) {
+  const [r] = await asUser<{ r: { service_order_id: string; invoice_id: string; contract_id: string } }>(
+    db,
+    uid,
+    `select public.aprovar_orcamento(
+       $1,
+       coalesce($2::date, public.hoje_brt()),
+       coalesce($3::timestamptz, (select q.updated_at from public.quotes q where q.id = $1)),
+       $4
+     ) as r`,
+    [id, opts.venc ?? null, opts.updatedAt ?? null, opts.aceitarVencido ?? false],
+  );
+  return r.r;
+}
+
+const DENIED = /permission denied/;
 
 async function header(extra: Record<string, unknown> = {}) {
   return {
@@ -132,8 +154,9 @@ describe("RLS: matriz de papéis", () => {
       // edição enquanto aguardando
       await salvar(uid, id, await header({ titulo: "Editado" }), [{ descricao: "Novo", quantidade: 2, preco_unitario: 75 }]);
       expect(Number((await quote(id)).total)).toBe(150);
-      await asUser(db, uid, `update public.quote_items set quantidade = 3 where quote_id = $1`, [id]);
-      expect(Number((await quote(id)).total)).toBe(225);
+      await expect(
+        asUser(db, uid, `update public.quote_items set quantidade = 3 where quote_id = $1`, [id]),
+      ).rejects.toThrow(DENIED);
 
       // view com cliente/prédio (técnico não lê clients pela RLS)
       const [v] = await asUser<{ client_razao_social: string; building_nome: string }>(
@@ -150,25 +173,23 @@ describe("RLS: matriz de papéis", () => {
       expect((await quote(dup.id)).status).toBe("aguardando");
 
       // proibido
-      const del = await asUser(db, uid, `delete from public.quotes where id = $1 returning id`, [id]);
-      expect(del).toHaveLength(0);
+      await expect(asUser(db, uid, `delete from public.quotes where id = $1`, [id])).rejects.toThrow(DENIED);
+      await expect(asUser(db, uid, `select public.excluir_orcamento($1)`, [id])).rejects.toThrow(/Apenas admin/);
       await expect(
         asUser(db, uid, `insert into public.service_catalog (nome, preco) values ('x', 1)`),
       ).rejects.toThrow(/row-level security/);
       const upd = await asUser(db, uid, `update public.service_catalog set preco = 1 returning id`);
       expect(upd).toHaveLength(0);
-      await expect(asUser(db, uid, `select public.aprovar_orcamento($1, public.hoje_brt())`, [id])).rejects.toThrow(
-        /Apenas admin/,
-      );
+      await expect(aprovar(uid, id)).rejects.toThrow(/Apenas admin/);
       await expect(asUser(db, uid, `select public.declinar_orcamento($1, null)`, [id])).rejects.toThrow(/Apenas admin/);
       await expect(
         asUser(db, uid, `update public.quotes set status = 'aprovado' where id = $1`, [id]),
-      ).rejects.toThrow(/Aprovar\/Declinar/);
+      ).rejects.toThrow(DENIED);
 
       const [r] = await asUser<{ qtd_emitidos: number }>(db, uid, `select * from public.orcamentos_resumo(null, null)`);
       expect(r.qtd_emitidos).toBeGreaterThanOrEqual(2);
 
-      await asUser(db, ADMIN, `delete from public.quotes where id in ($1, $2)`, [id, dup.id]);
+      await asService(db, `delete from public.quotes where id in ($1, $2)`, [id, dup.id]);
     }
   });
 
@@ -190,7 +211,7 @@ describe("RLS: matriz de papéis", () => {
 });
 
 describe("totais", () => {
-  it("subtotal/total recalculam com itens e desconto; escrita direta é ignorada", async () => {
+  it("subtotal/total recalculam com itens e desconto (trigger vale até para o serviço)", async () => {
     const id = await salvar(ADMIN, null, await header({ desconto: 100 }), [
       { catalog_item_id: catalogId, descricao: "Instalação split 12k", quantidade: 2, preco_unitario: 1200 },
       { descricao: "Tubulação de cobre", unidade: "m", quantidade: 3.5, preco_unitario: 85.5 },
@@ -200,22 +221,22 @@ describe("totais", () => {
     expect(Number(q.subtotal)).toBe(2699.25);
     expect(Number(q.total)).toBe(2599.25);
 
-    await asUser(db, ADMIN, `insert into public.quote_items (quote_id, descricao, quantidade, preco_unitario) values ($1, 'Visita', 1, 150)`, [id]);
+    await asService(db, `insert into public.quote_items (quote_id, descricao, quantidade, preco_unitario) values ($1, 'Visita', 1, 150)`, [id]);
     q = await quote(id);
     expect(Number(q.subtotal)).toBe(2849.25);
     expect(Number(q.total)).toBe(2749.25);
 
-    await asUser(db, ADMIN, `update public.quotes set subtotal = 1, total = 1, desconto = 49.25 where id = $1`, [id]);
+    await asService(db, `update public.quotes set subtotal = 1, total = 1, desconto = 49.25 where id = $1`, [id]);
     q = await quote(id);
     expect(Number(q.subtotal)).toBe(2849.25);
     expect(Number(q.total)).toBe(2800);
 
-    await asUser(db, ADMIN, `delete from public.quote_items where quote_id = $1 and descricao = 'Visita'`, [id]);
+    await asService(db, `delete from public.quote_items where quote_id = $1 and descricao = 'Visita'`, [id]);
     q = await quote(id);
     expect(Number(q.total)).toBe(2650);
 
     await expect(
-      asUser(db, ADMIN, `update public.quotes set desconto = 999999 where id = $1`, [id]),
+      asService(db, `update public.quotes set desconto = 999999 where id = $1`, [id]),
     ).rejects.toThrow(/desconto/);
 
     // edição via RPC substitui itens atomicamente
@@ -227,18 +248,100 @@ describe("totais", () => {
     expect(itens).toHaveLength(1);
   });
 
-  it("API não muda status nem grava decisão direto", async () => {
+  it("escrita direta em quotes/quote_items é negada aos 3 papéis (inclusive admin)", async () => {
     const id = await salvar(ADMIN, null, await header(), [{ descricao: "x", quantidade: 1, preco_unitario: 10 }]);
-    await expect(
-      asUser(db, ADMIN, `update public.quotes set status = 'aprovado' where id = $1`, [id]),
-    ).rejects.toThrow(/Aprovar\/Declinar/);
-    const [ins] = await asUser<{ status: string }>(
+    for (const uid of [ADMIN, ATEND, TEC]) {
+      await expect(
+        asUser(db, uid, `insert into public.quotes (client_id, building_id, titulo, validade) values ($1, $2, 'y', public.hoje_brt())`, [
+          CLIENT_A,
+          BUILD_A,
+        ]),
+      ).rejects.toThrow(DENIED);
+      await expect(asUser(db, uid, `update public.quotes set titulo = 'z' where id = $1`, [id])).rejects.toThrow(DENIED);
+      await expect(asUser(db, uid, `update public.quotes set status = 'aprovado' where id = $1`, [id])).rejects.toThrow(
+        DENIED,
+      );
+      await expect(asUser(db, uid, `delete from public.quotes where id = $1`, [id])).rejects.toThrow(DENIED);
+      await expect(
+        asUser(db, uid, `insert into public.quote_items (quote_id, descricao, quantidade, preco_unitario) values ($1, 'x', 1, 1)`, [id]),
+      ).rejects.toThrow(DENIED);
+      await expect(asUser(db, uid, `update public.quote_items set quantidade = 5 where quote_id = $1`, [id])).rejects.toThrow(
+        DENIED,
+      );
+      await expect(asUser(db, uid, `delete from public.quote_items where quote_id = $1`, [id])).rejects.toThrow(DENIED);
+      // sequence: ninguém queima/ajusta a numeração
+      await expect(asUser(db, uid, `select nextval('public.quote_numero_seq')`)).rejects.toThrow(DENIED);
+      await expect(asUser(db, uid, `select setval('public.quote_numero_seq', 5000)`)).rejects.toThrow(DENIED);
+    }
+    expect((await quote(id)).status).toBe("aguardando");
+    expect(Number((await quote(id)).total)).toBe(10);
+  });
+
+  it("numero e created_at não são manipuláveis (nem pelo serviço)", async () => {
+    const id = await salvar(ADMIN, null, await header(), [{ descricao: "x", quantidade: 1, preco_unitario: 10 }]);
+    const [antes] = await asService<{ numero: string; created_at: string; created_by: string }>(
       db,
-      ADMIN,
-      `insert into public.quotes (client_id, building_id, titulo, validade, status) values ($1, $2, 'y', public.hoje_brt(), 'aprovado') returning status`,
+      `select numero, created_at::text, created_by from public.quotes where id = $1`,
+      [id],
+    );
+    expect(antes.created_by).toBe(ADMIN);
+    await asService(
+      db,
+      `update public.quotes set numero = -1, created_at = now() - interval '400 days', created_by = $2 where id = $1`,
+      [id, TEC],
+    );
+    const [depois] = await asService<{ numero: string; created_at: string; created_by: string }>(
+      db,
+      `select numero, created_at::text, created_by from public.quotes where id = $1`,
+      [id],
+    );
+    expect(depois).toEqual(antes);
+
+    // INSERT ignora numero/created_at informados: sempre nextval/now()
+    const [ins] = await asService<{ numero: string; velho: boolean }>(
+      db,
+      `insert into public.quotes (numero, created_at, client_id, building_id, titulo, validade)
+       values (-1, now() - interval '400 days', $1, $2, 'svc', public.hoje_brt())
+       returning numero, created_at < now() - interval '1 day' as velho`,
       [CLIENT_A, BUILD_A],
     );
-    expect(ins.status).toBe("aguardando");
+    expect(Number(ins.numero)).toBeGreaterThan(Number(antes.numero));
+    expect(ins.velho).toBe(false);
+    // e salvar_orcamento continua funcionando (sem duplicate key)
+    await salvar(ATEND, null, await header(), [{ descricao: "x", quantidade: 1, preco_unitario: 1 }]);
+  });
+
+  it("cliente inativo é recusado ao criar/trocar cliente", async () => {
+    const CLIENT_INAT = "22222222-2222-4222-8222-0000000000a9";
+    const BUILD_INAT = "33333333-3333-4333-8333-0000000000a9";
+    await asService(db, `insert into public.clients (id, razao_social, ativo) values ($1, 'Cliente Inativo', false)`, [
+      CLIENT_INAT,
+    ]);
+    await asService(db, `insert into public.buildings (id, client_id, nome) values ($1, $2, 'Prédio I')`, [
+      BUILD_INAT,
+      CLIENT_INAT,
+    ]);
+    const item = [{ descricao: "x", quantidade: 1, preco_unitario: 1 }];
+    await expect(
+      salvar(ADMIN, null, await header({ client_id: CLIENT_INAT, building_id: BUILD_INAT }), item),
+    ).rejects.toThrow(/Cliente inativo/);
+    const id = await salvar(ADMIN, null, await header(), item);
+    await expect(
+      salvar(ADMIN, id, await header({ client_id: CLIENT_INAT, building_id: BUILD_INAT }), item),
+    ).rejects.toThrow(/Cliente inativo/);
+  });
+
+  it("_quote_building_ok e demais auxiliares não são executáveis pela API", async () => {
+    for (const fn of [
+      `public._quote_building_ok($1::uuid, $2::uuid)`,
+      `public._quote_client_ativo($1::uuid)`,
+      `public._quote_require_admin()`,
+      `public._quote_require_user()`,
+      `public._quote_insert_items($1::uuid, '[]'::jsonb)`,
+    ]) {
+      const params = fn.includes("$2") ? [BUILD_A, CLIENT_A] : fn.includes("$1") ? [BUILD_A] : [];
+      await expect(asUser(db, ADMIN, `select ${fn}`, params)).rejects.toThrow(DENIED);
+    }
   });
 
   it("prédio de outro cliente é recusado", async () => {
@@ -258,12 +361,7 @@ describe("aprovar", () => {
       { descricao: "Split 18k", quantidade: 1, preco_unitario: 3050 },
     ]);
     const venc = await hoje(10);
-    const [r] = await asUser<{ r: { service_order_id: string; invoice_id: string; contract_id: string } }>(
-      db,
-      ADMIN,
-      `select public.aprovar_orcamento($1, $2::date) as r`,
-      [id, venc],
-    );
+    const r = { r: await aprovar(ADMIN, id, { venc }) };
     const q = await quote(id);
     expect(q.status).toBe("aprovado");
     expect(q.service_order_id).toBe(r.r.service_order_id);
@@ -297,9 +395,7 @@ describe("aprovar", () => {
     expect(inv.competencia).toBe(`${(await hoje()).slice(0, 7)}-01`);
 
     // idempotência
-    await expect(
-      asUser(db, ADMIN, `select public.aprovar_orcamento($1, $2::date)`, [id, venc]),
-    ).rejects.toThrow(/já foi aprovado/);
+    await expect(aprovar(ADMIN, id, { venc })).rejects.toThrow(/já foi aprovado/);
     const [n] = await asService<{ os: number; ct: number; inv: number }>(
       db,
       `select (select count(*)::int from public.service_orders where descricao like 'Orçamento ORC-' || $2 || ':%') as os,
@@ -309,28 +405,33 @@ describe("aprovar", () => {
     );
     expect(n).toEqual({ os: 1, ct: 1, inv: 1 });
 
-    // imutável
+    // imutável (trigger vale até para o serviço; a API nem tem grant)
     await expect(
-      asUser(db, ADMIN, `update public.quotes set titulo = 'outro' where id = $1`, [id]),
+      asService(db, `update public.quotes set titulo = 'outro' where id = $1`, [id]),
     ).rejects.toThrow(/não pode mais ser alterado/);
     await expect(
-      asUser(db, ADMIN, `update public.quote_items set quantidade = 2 where quote_id = $1`, [id]),
+      asService(db, `update public.quote_items set quantidade = 2 where quote_id = $1`, [id]),
     ).rejects.toThrow(/itens não podem mais ser alterados/);
     await expect(
-      asUser(db, ADMIN, `insert into public.quote_items (quote_id, descricao, quantidade, preco_unitario) values ($1, 'x', 1, 1)`, [id]),
+      asService(db, `insert into public.quote_items (quote_id, descricao, quantidade, preco_unitario) values ($1, 'x', 1, 1)`, [id]),
     ).rejects.toThrow(/itens não podem mais ser alterados/);
-    await expect(asUser(db, ADMIN, `delete from public.quotes where id = $1`, [id])).rejects.toThrow(/não pode ser excluído/);
+    await expect(asService(db, `delete from public.quotes where id = $1`, [id])).rejects.toThrow(/não pode ser excluído/);
+    await expect(asUser(db, ADMIN, `select public.excluir_orcamento($1)`, [id])).rejects.toThrow(/não pode ser excluído/);
     await expect(salvar(ADMIN, id, await header(), [{ descricao: "x", quantidade: 1, preco_unitario: 1 }])).rejects.toThrow(
       /não pode mais ser alterado/,
     );
-    for (const uid of [ATEND, TEC]) {
+    // anulação do vínculo com OS/fatura ainda existentes: recusada (P1-1)
+    for (const uid of [ADMIN, ATEND, TEC]) {
       await expect(
-        asUser(db, uid, `update public.quotes set titulo = 'outro' where id = $1`, [id]),
-      ).rejects.toThrow(/não pode mais ser alterado/);
-      await expect(
-        asUser(db, uid, `delete from public.quote_items where quote_id = $1`, [id]),
-      ).rejects.toThrow(/itens não podem mais ser alterados/);
+        asUser(db, uid, `update public.quotes set service_order_id = null, invoice_id = null where id = $1`, [id]),
+      ).rejects.toThrow(DENIED);
     }
+    await expect(
+      asService(db, `update public.quotes set service_order_id = null where id = $1`, [id]),
+    ).rejects.toThrow(/não pode mais ser alterado/);
+    await expect(
+      asService(db, `update public.quotes set invoice_id = null where id = $1`, [id]),
+    ).rejects.toThrow(/não pode mais ser alterado/);
     // nem o serviço (owner) altera um orçamento decidido
     await expect(asService(db, `update public.quotes set total = 1, titulo = 'z' where id = $1`, [id])).rejects.toThrow(
       /não pode mais ser alterado/,
@@ -352,12 +453,47 @@ describe("aprovar", () => {
 
   it("recusa vencimento no passado e orçamento sem valor", async () => {
     const id = await salvar(ADMIN, null, await header(), [{ descricao: "Brinde", quantidade: 1, preco_unitario: 0 }]);
-    await expect(
-      asUser(db, ADMIN, `select public.aprovar_orcamento($1, public.hoje_brt() - 1)`, [id]),
-    ).rejects.toThrow(/vencimento/);
-    await expect(
-      asUser(db, ADMIN, `select public.aprovar_orcamento($1, public.hoje_brt())`, [id]),
-    ).rejects.toThrow(/sem valor/);
+    await expect(aprovar(ADMIN, id, { venc: await hoje(-1) })).rejects.toThrow(/vencimento/);
+    await expect(aprovar(ADMIN, id)).rejects.toThrow(/sem valor/);
+  });
+
+  it("recusa aprovar com updated_at velho (orçamento alterado depois de aberto)", async () => {
+    const id = await salvar(ADMIN, null, await header(), [{ descricao: "A", quantidade: 1, preco_unitario: 100 }]);
+    const [v] = await asService<{ u: string }>(db, `select updated_at::text as u from public.quotes where id = $1`, [id]);
+    // outra pessoa edita (novo total) — em outra transação
+    await salvar(ATEND, id, await header(), [{ descricao: "A", quantidade: 1, preco_unitario: 900 }]);
+    await expect(aprovar(ADMIN, id, { updatedAt: v.u })).rejects.toThrow(/alterado por outra pessoa; recarregue/);
+    expect((await quote(id)).status).toBe("aguardando");
+    // com o updated_at atual aprova pelo total novo
+    const r = await aprovar(ADMIN, id);
+    const [inv] = await asService<{ valor: string }>(db, `select valor from public.invoices where id = $1`, [r.invoice_id]);
+    expect(Number(inv.valor)).toBe(900);
+  });
+
+  it("orçamento vencido: sem confirmação falha, com p_aceitar_vencido aprova", async () => {
+    const id = await salvar(ADMIN, null, await header({ validade: await hoje(-3) }), [
+      { descricao: "A", quantidade: 1, preco_unitario: 100 },
+    ]);
+    const [d] = await asService<{ d: string }>(db, `select to_char(public.hoje_brt() - 3, 'DD/MM/YYYY') as d`);
+    await expect(aprovar(ADMIN, id)).rejects.toThrow(`Orçamento vencido em ${d.d}. Confirme para aprovar mesmo assim`);
+    expect((await quote(id)).status).toBe("aguardando");
+    await aprovar(ADMIN, id, { aceitarVencido: true });
+    expect((await quote(id)).status).toBe("aprovado");
+  });
+
+  it("recusa aprovar orçamento de cliente inativo", async () => {
+    const id = await salvar(ADMIN, null, await header({ client_id: CLIENT_B, building_id: BUILD_B }), [
+      { descricao: "A", quantidade: 1, preco_unitario: 100 },
+    ]);
+    await asService(db, `update public.clients set ativo = false where id = $1`, [CLIENT_B]);
+    try {
+      await expect(aprovar(ADMIN, id)).rejects.toThrow(/Cliente inativo/);
+      // declinar continua possível
+      await asUser(db, ADMIN, `select public.declinar_orcamento($1)`, [id]);
+      expect((await quote(id)).status).toBe("declinado");
+    } finally {
+      await asService(db, `update public.clients set ativo = true where id = $1`, [CLIENT_B]);
+    }
   });
 });
 
@@ -377,9 +513,7 @@ describe("declinar e duplicar", () => {
     await expect(
       asUser(db, ADMIN, `select public.declinar_orcamento($1, null)`, [id]),
     ).rejects.toThrow(/já foi declinado/);
-    await expect(
-      asUser(db, ADMIN, `select public.aprovar_orcamento($1, public.hoje_brt())`, [id]),
-    ).rejects.toThrow(/já foi declinado/);
+    await expect(aprovar(ADMIN, id)).rejects.toThrow(/já foi declinado/);
 
     const [dup] = await asUser<{ id: string }>(db, ADMIN, `select public.duplicar_orcamento($1) as id`, [id]);
     const [nq] = await asService<{ status: string; total: string; desconto: string; validade: string; created_by: string }>(
@@ -401,6 +535,33 @@ describe("declinar e duplicar", () => {
   });
 });
 
+describe("excluir_orcamento", () => {
+  it("só admin e só aguardando; itens vão junto", async () => {
+    const id = await salvar(ATEND, null, await header(), [{ descricao: "A", quantidade: 1, preco_unitario: 10 }]);
+    for (const uid of [ATEND, TEC]) {
+      await expect(asUser(db, uid, `select public.excluir_orcamento($1)`, [id])).rejects.toThrow(/Apenas admin/);
+    }
+    await asUser(db, ADMIN, `select public.excluir_orcamento($1)`, [id]);
+    expect(await asService(db, `select id from public.quotes where id = $1`, [id])).toHaveLength(0);
+    expect(await asService(db, `select id from public.quote_items where quote_id = $1`, [id])).toHaveLength(0);
+    await expect(asUser(db, ADMIN, `select public.excluir_orcamento($1)`, [id])).rejects.toThrow(/não encontrado/);
+
+    const dec = await salvar(ADMIN, null, await header(), [{ descricao: "A", quantidade: 1, preco_unitario: 10 }]);
+    await asUser(db, ADMIN, `select public.declinar_orcamento($1)`, [dec]);
+    await expect(asUser(db, ADMIN, `select public.excluir_orcamento($1)`, [dec])).rejects.toThrow(/não pode ser excluído/);
+  });
+});
+
+describe("vw_quotes", () => {
+  it("é security_barrier", async () => {
+    const [r] = await asService<{ opts: string[] | null }>(
+      db,
+      `select reloptions as opts from pg_class where oid = 'public.vw_quotes'::regclass`,
+    );
+    expect(r.opts).toContain("security_barrier=true");
+  });
+});
+
 describe("orcamentos_resumo", () => {
   it("soma por status no período", async () => {
     await asService(db, `delete from public.quotes where status = 'aguardando'`);
@@ -409,7 +570,7 @@ describe("orcamentos_resumo", () => {
     const a = await salvar(ADMIN, null, await header(), [{ descricao: "x", quantidade: 1, preco_unitario: 1000 }]);
     const b = await salvar(ADMIN, null, await header(), [{ descricao: "y", quantidade: 2, preco_unitario: 250 }]);
     await salvar(ADMIN, null, await header(), [{ descricao: "z", quantidade: 1, preco_unitario: 300 }]);
-    await asUser(db, ADMIN, `select public.aprovar_orcamento($1, public.hoje_brt())`, [a]);
+    await aprovar(ADMIN, a);
     await asUser(db, ADMIN, `select public.declinar_orcamento($1)`, [b]);
 
     const [r] = await asUser<Record<string, string | number>>(

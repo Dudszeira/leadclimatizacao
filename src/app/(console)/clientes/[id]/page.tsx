@@ -510,30 +510,33 @@ export default async function ClienteDetalhePage({ params, searchParams }: PageP
                   <li key={q.id}>
                     <Link
                       href={`/orcamentos/${q.id}`}
+                      aria-label={`Abrir orçamento ${quoteNumeroLabel(q.numero)}: ${q.titulo}`}
                       className="flex items-center gap-3 px-4 py-3.5 outline-none hover:bg-console-2/60 focus-visible:bg-console-2 md:px-5"
                     >
-                      <IconTile icon={FileTextIcon} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <p className="min-w-0 truncate text-[0.9375rem] text-ink">
-                            <span className="font-medium text-ink-dim tabular-nums">{quoteNumeroLabel(q.numero)}</span>
-                            <span>{` · ${q.titulo}`}</span>
-                          </p>
-                          <p className="shrink-0 font-display text-base font-medium text-ink tabular-nums">
-                            {formatBRL(q.total)}
-                          </p>
+                      <span className="shrink-0 max-md:hidden">
+                        <IconTile icon={FileTextIcon} />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[0.8125rem] font-medium text-ink-dim tabular-nums">
+                            {quoteNumeroLabel(q.numero)}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {vencido && <VencidoPill />}
+                            <QuoteStatusPill status={q.status} />
+                          </span>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                          <p className="truncate text-[0.8125rem] text-ink-dim">
-                            {q.building.nome}, válido até{" "}
+                        <p className="line-clamp-2 text-[0.9375rem] leading-snug text-ink">{q.titulo}</p>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="min-w-0 truncate text-[0.8125rem] text-ink-dim">
+                            Válido até{" "}
                             <span className={vencido ? "text-danger tabular-nums" : "tabular-nums"}>
                               {formatDateBR(q.validade)}
                             </span>
                           </p>
-                          <span className="flex items-center gap-1.5">
-                            {vencido && <VencidoPill />}
-                            <QuoteStatusPill status={q.status} />
-                          </span>
+                          <p className="shrink-0 font-display text-base font-medium text-ink tabular-nums">
+                            {formatBRL(q.total)}
+                          </p>
                         </div>
                       </div>
                     </Link>

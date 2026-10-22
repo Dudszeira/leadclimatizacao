@@ -75,13 +75,29 @@ export default async function OrcamentoPage({ params }: PageParams) {
   return (
     <div className="flex flex-1 flex-col">
       <QuotesBackLink />
-      <PageHeader
-        title={numero}
-        description={q.titulo}
-        actions={
-          <QuoteActions id={q.id} numeroLabel={numero} aguardando={q.status === "aguardando"} role={me.role} />
-        }
-      >
+      {/* Mesmo layout do PageHeader, sem data-page-title: o número do orçamento
+          não substitui o título compacto da barra superior ("Orçamentos"). */}
+      <header className="flex flex-col gap-5 pb-6 md:pb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-8">
+          <div className="min-w-0 space-y-1.5">
+            <h1 className="font-display text-[1.75rem] leading-[1.1] font-medium tracking-[-0.03em] text-ink tabular-nums md:text-[2.25rem]">
+              {numero}
+            </h1>
+            <p className="max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-dim">{q.titulo}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-md:[&>*]:flex-1">
+            <QuoteActions
+              id={q.id}
+              numeroLabel={numero}
+              aguardando={q.status === "aguardando"}
+              role={me.role}
+              total={q.total}
+              clienteNome={clienteNome}
+              updatedAt={q.updated_at}
+              vencido={vencido}
+            />
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <QuoteStatusPill status={q.status} />
           {vencido && <VencidoPill />}
@@ -89,7 +105,7 @@ export default async function OrcamentoPage({ params }: PageParams) {
             {OS_TYPE_META[q.tipo_servico].label}
           </span>
         </div>
-      </PageHeader>
+      </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="flex min-w-0 flex-col gap-4">

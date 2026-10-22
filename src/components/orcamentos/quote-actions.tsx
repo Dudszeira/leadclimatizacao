@@ -11,13 +11,15 @@ import {
   FileDownIcon,
   LoaderCircleIcon,
   PencilIcon,
+  RotateCwIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import type { UserRole } from "@/lib/types"
-import { addDaysToDateKey, todayBRT } from "@/lib/format"
+import { addDaysToDateKey, formatBRL, todayBRT } from "@/lib/format"
 import type { QuoteActionResult } from "@/lib/quotes/schemas"
 import { approveQuote, declineQuote, deleteQuote, duplicateQuote } from "@/server/actions/quotes"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -36,9 +38,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ConfirmDialog, Field, invalidProps } from "@/components/clientes/form-kit"
+import { DateField } from "./date-field"
 import { Segmented } from "./segmented"
 
 type QuoteActionsProps = {
@@ -46,6 +48,13 @@ type QuoteActionsProps = {
   numeroLabel: string
   aguardando: boolean
   role: UserRole
+  /** Total do orçamento (mostrado no diálogo Aprovar). */
+  total: number
+  clienteNome: string
+  /** quote.updated_at (ISO): o servidor recusa a aprovação se o orçamento mudou depois. */
+  updatedAt: string
+  /** Aguardando com validade já passada. */
+  vencido: boolean
 }
 
 type DialogKind = "aprovar" | "declinar" | "excluir" | null
@@ -54,7 +63,16 @@ type DialogKind = "aprovar" | "declinar" | "excluir" | null
  * Ações do orçamento. Os 3 papéis: PDF, editar (só aguardando) e duplicar.
  * Só admin: aprovar, declinar e excluir (escondidos para os demais).
  */
-export function QuoteActions({ id, numeroLabel, aguardando, role }: QuoteActionsProps) {
+export function QuoteActions({
+  id,
+  numeroLabel,
+  aguardando,
+  role,
+  total,
+  clienteNome,
+  updatedAt,
+  vencido,
+}: QuoteActionsProps) {
   const router = useRouter()
   const [dialog, setDialog] = React.useState<DialogKind>(null)
   const [duplicating, startDuplicate] = React.useTransition()
@@ -160,7 +178,11 @@ export function QuoteActions({ id, numeroLabel, aguardando, role }: QuoteActions
 
       {admin && aguardando && (
         <>
-          <ApproveDialog id={id} numeroLabel={numeroLabel} open={dialog === "aprovar"} onOpenChange={close} />
+          <ApproveDialog
+            info={{ id, numeroLabel, total, clienteNome, updatedAt, vencido }}
+            open={dialog === "aprovar"}
+            onOpenChange={close}
+          />
           <DeclineDialog id={id} numeroLabel={numeroLabel} open={dialog === "declinar"} onOpenChange={close} />
           <ConfirmDialog
             open={dialog === "excluir"}
@@ -184,60 +206,88 @@ export function QuoteActions({ id, numeroLabel, aguardando, role }: QuoteActions
 // Aprovar: vencimento + método; mostra o resultado (OS e cobrança)
 // ---------------------------------------------------------------------------
 
+type ApproveInfo = {
+  id: string
+  numeroLabel: string
+  total: number
+  clienteNome: string
+  updatedAt: string
+  vencido: boolean
+}
+
 function ApproveDialog({
-  id,
-  numeroLabel,
+  info,
   open,
   onOpenChange,
 }: {
-  id: string
-  numeroLabel: string
+  info: ApproveInfo
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const [pending, setPending] = React.useState(false)
+  // Sem foco inicial num campo: no celular o foco abriria o teclado/seletor de data.
+  const popupRef = React.useRef<HTMLDivElement>(null)
   return (
     <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-md">
-        {open && (
-          <ApproveBody id={id} numeroLabel={numeroLabel} onClose={() => onOpenChange(false)} onPending={setPending} />
-        )}
+      <DialogContent ref={popupRef} initialFocus={popupRef} className="sm:max-w-md">
+        {open && <ApproveBody info={info} onClose={() => onOpenChange(false)} onPending={setPending} />}
       </DialogContent>
     </Dialog>
   )
 }
 
 function ApproveBody({
-  id,
-  numeroLabel,
+  info,
   onClose,
   onPending,
 }: {
-  id: string
-  numeroLabel: string
+  info: ApproveInfo
   onClose: () => void
   onPending: (pending: boolean) => void
 }) {
+  const { id, numeroLabel, total, clienteNome, updatedAt } = info
   const router = useRouter()
   const [pending, startTransition] = React.useTransition()
   const [vencimento, setVencimento] = React.useState(() => addDaysToDateKey(todayBRT(), 7))
   const [metodo, setMetodo] = React.useState<"pix" | "boleto">("pix")
+  // Vencido pelo relógio local ou porque o servidor respondeu code "vencido".
+  const [vencido, setVencido] = React.useState(info.vencido)
+  const [aceitarVencido, setAceitarVencido] = React.useState(false)
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [result, setResult] = React.useState<QuoteActionResult | null>(null)
+  const [conflito, setConflito] = React.useState<string | null>(null)
 
   React.useEffect(() => onPending(pending), [pending, onPending])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (vencido && !aceitarVencido) {
+      setErrors({ aceitarVencido: "Marque para aprovar um orçamento com a validade vencida." })
+      return
+    }
     startTransition(async () => {
       let r: QuoteActionResult
       try {
-        r = await approveQuote(id, { vencimento, metodo })
+        r = await approveQuote(id, {
+          vencimento,
+          metodo,
+          updatedAt,
+          ...(vencido ? { aceitarVencido: true } : {}),
+        })
       } catch {
         r = { ok: false, message: "Falha de conexão. Tente novamente." }
       }
       setErrors(r.fieldErrors ?? {})
       if (!r.ok) {
+        if (r.code === "alterado") {
+          setConflito(r.message)
+          return
+        }
+        if (r.code === "vencido") {
+          setVencido(true)
+          setErrors({ aceitarVencido: r.message })
+          return
+        }
         toast.error(r.message)
         return
       }
@@ -300,21 +350,78 @@ function ApproveBody({
           </DialogFooter>
         </>
       ) : (
-        <form onSubmit={submit} noValidate className="grid gap-5">
+        <form onSubmit={submit} noValidate className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
           <DialogHeader>
             <DialogTitle>Aprovar {numeroLabel}?</DialogTitle>
             <DialogDescription>
-              Abre a ordem de serviço, cria a fatura e tenta gerar a cobrança no Asaas. Depois de aprovado, o orçamento
-              não pode mais ser editado.
+              Você vai aprovar {numeroLabel} de <span className="text-ink">{formatBRL(total)}</span> para{" "}
+              <span className="text-ink">{clienteNome}</span>; isso cria a OS e a cobrança. Depois de aprovado, o
+              orçamento não pode mais ser editado.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex min-w-0 flex-col gap-1.5 rounded-2xl bg-console px-4 py-3.5 ring-1 ring-line">
+            <span className="truncate text-[0.8125rem] text-ink-dim">Total para {clienteNome}</span>
+            <span className="font-display text-[1.75rem] leading-none font-medium tracking-[-0.03em] text-ink tabular-nums">
+              {formatBRL(total)}
+            </span>
+          </div>
+          {conflito ? (
+            <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-amber-dim px-4 py-3.5">
+              <p className="flex gap-2 text-sm leading-snug text-ink">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
+                {conflito}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full sm:w-fit"
+                onClick={() => {
+                  router.refresh()
+                  onClose()
+                }}
+              >
+                <RotateCwIcon aria-hidden="true" />
+                Recarregar
+              </Button>
+            </div>
+          ) : null}
+          {vencido ? (
+            <div className="flex flex-col gap-3 rounded-2xl bg-danger-dim px-4 py-3.5">
+              <p className="flex gap-2 text-sm leading-snug text-ink">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
+                A validade deste orçamento já passou. Confirme preços e condições com o cliente antes de aprovar.
+              </p>
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-ink md:min-h-0">
+                <input
+                  type="checkbox"
+                  checked={aceitarVencido}
+                  onChange={(e) => {
+                    setAceitarVencido(e.target.checked)
+                    setErrors((prev) => {
+                      const next = { ...prev }
+                      delete next.aceitarVencido
+                      return next
+                    })
+                  }}
+                  aria-invalid={errors.aceitarVencido ? true : undefined}
+                  aria-describedby={errors.aceitarVencido ? "aprovar-vencido-erro" : undefined}
+                  className="size-5 shrink-0 cursor-pointer accent-ink"
+                />
+                Aprovar mesmo vencido
+              </label>
+              {errors.aceitarVencido ? (
+                <p id="aprovar-vencido-erro" role="alert" className="text-[0.8125rem] text-danger">
+                  {errors.aceitarVencido}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <Field id="aprovar-vencimento" label="Vencimento da cobrança" error={errors.vencimento}>
-            <Input
+            <DateField
               id="aprovar-vencimento"
-              type="date"
               value={vencimento}
               min={todayBRT()}
-              onChange={(e) => setVencimento(e.target.value)}
+              onChange={setVencimento}
               {...invalidProps("aprovar-vencimento", errors.vencimento)}
             />
           </Field>
@@ -341,7 +448,7 @@ function ApproveBody({
             <Button type="button" variant="outline" onClick={() => onClose()} disabled={pending}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pending} aria-busy={pending}>
+            <Button type="submit" disabled={pending || conflito !== null} aria-busy={pending}>
               {pending ? (
                 <>
                   <LoaderCircleIcon className="animate-spin" aria-hidden="true" />

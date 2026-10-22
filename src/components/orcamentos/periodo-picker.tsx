@@ -6,9 +6,9 @@ import { CalendarIcon, ChevronDownIcon } from "lucide-react"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DateField } from "./date-field"
 import { atalhosPeriodo, rotuloPeriodo, type PeriodoDatas } from "./periodo"
 
 /**
@@ -88,21 +88,19 @@ export function QuotesPeriodoPicker({ periodo }: { periodo: PeriodoDatas }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="periodo-inicio">De</Label>
-              <Input
+              <DateField
                 id="periodo-inicio"
-                type="date"
                 value={draft.inicio}
-                onChange={(e) => setDraft((d) => ({ ...d, inicio: e.target.value }))}
+                onChange={(iso) => setDraft((d) => ({ ...d, inicio: iso }))}
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="periodo-fim">Até</Label>
-              <Input
+              <DateField
                 id="periodo-fim"
-                type="date"
                 value={draft.fim}
                 min={draft.inicio || undefined}
-                onChange={(e) => setDraft((d) => ({ ...d, fim: e.target.value }))}
+                onChange={(iso) => setDraft((d) => ({ ...d, fim: iso }))}
               />
             </div>
           </div>

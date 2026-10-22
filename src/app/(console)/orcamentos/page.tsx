@@ -187,15 +187,15 @@ async function KpisSection({ inicio, fim }: { inicio: string; fim: string }) {
 // ---------------------------------------------------------------------------
 
 function StatusTabs({ filters }: { filters: Filters }) {
-  const tabs: Array<{ label: string; status: Filters["status"] }> = [
+  const tabs: Array<{ label: string; short?: string; status: Filters["status"] }> = [
     { label: "Todos", status: "todos" },
-    { label: QUOTE_STATUS_META.aguardando.label, status: "aguardando" },
+    { label: QUOTE_STATUS_META.aguardando.label, short: "Aguardando", status: "aguardando" },
     { label: "Aprovados", status: "aprovado" },
     { label: "Declinados", status: "declinado" },
   ]
   return (
     <nav aria-label="Filtrar por status" className="no-scrollbar -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-      <ul className="flex h-11 w-max min-w-full items-center gap-1 rounded-full bg-console-2 p-1 sm:min-w-0 md:h-10">
+      <ul className="flex h-11 w-max min-w-full items-center gap-0.5 rounded-full bg-console-2 p-1 sm:min-w-0 md:h-10">
         {tabs.map((tab) => {
           const active = filters.status === tab.status
           return (
@@ -204,11 +204,18 @@ function StatusTabs({ filters }: { filters: Filters }) {
                 href={buildHref({ ...filters, status: tab.status, page: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex h-full w-full items-center justify-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-[color,background-color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50 sm:px-4",
+                  "inline-flex h-full w-full items-center justify-center rounded-full px-1.5 text-[0.8125rem] font-medium min-[375px]:px-2.5 min-[400px]:px-3 sm:px-4 sm:text-sm whitespace-nowrap transition-[color,background-color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/50",
                   active ? "bg-ink text-void" : "text-ink-dim hover:text-ink",
                 )}
               >
-                {tab.label}
+                {tab.short ? (
+                  <>
+                    <span className="sm:hidden">{tab.short}</span>
+                    <span className="max-sm:hidden">{tab.label}</span>
+                  </>
+                ) : (
+                  tab.label
+                )}
               </Link>
             </li>
           )

@@ -47,12 +47,12 @@ export function QuotesTable({ items, hoje }: { items: QuoteWithClient[]; hoje: s
                   {quoteNumeroLabel(q.numero)}
                 </Link>
               </TableCell>
-              <TableCell className="max-w-56">
-                <span className="block truncate font-medium text-ink">{clienteNome(q)}</span>
+              <TableCell className="max-w-64 min-w-44 py-3 whitespace-normal">
+                <span className="line-clamp-2 leading-snug font-medium text-ink">{clienteNome(q)}</span>
                 <span className="mt-0.5 block truncate text-[0.8125rem] text-ink-faint">{q.building.nome}</span>
               </TableCell>
-              <TableCell className="max-w-64">
-                <span className="block truncate text-ink-dim">{q.titulo}</span>
+              <TableCell className="max-w-80 min-w-52 py-3 whitespace-normal">
+                <span className="line-clamp-2 leading-snug text-ink-dim">{q.titulo}</span>
               </TableCell>
               <TableCell className="text-right font-medium whitespace-nowrap text-ink tabular-nums">
                 {formatBRL(q.total)}
@@ -100,10 +100,10 @@ export function QuoteCards({ items, hoje }: { items: QuoteWithClient[]; hoje: st
                 </span>
               </span>
               <span className="min-w-0">
-                <span className="block truncate font-display text-[1.0625rem] leading-snug font-medium tracking-[-0.01em] text-ink">
+                <span className="line-clamp-2 font-display text-[1.0625rem] leading-snug font-medium tracking-[-0.01em] text-ink">
                   {clienteNome(q)}
                 </span>
-                <span className="mt-0.5 block truncate text-sm text-ink-dim">{q.titulo}</span>
+                <span className="mt-0.5 line-clamp-2 text-sm leading-snug text-ink-dim">{q.titulo}</span>
               </span>
               <span className="flex items-center justify-between gap-3 text-[0.8125rem] text-ink-dim">
                 <span className="flex min-w-0 items-center gap-1.5">

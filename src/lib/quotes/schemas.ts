@@ -134,6 +134,18 @@ export function quoteSubtotal(items: Array<{ quantidade: number; preco_unitario:
 export const approveQuoteSchema = z.object({
   vencimento: dataISO("Vencimento"),
   metodo: z.enum(PAYMENT_METHODS, "Selecione Pix ou boleto."),
+  /**
+   * quote.updated_at exatamente como veio do banco (ISO). O banco recusa a
+   * aprovação se o orçamento mudou depois disso (code "alterado").
+   */
+  updatedAt: z
+    .string("Recarregue o orçamento antes de aprovar.")
+    .trim()
+    .min(1, "Recarregue o orçamento antes de aprovar.")
+    .max(64, "Recarregue o orçamento antes de aprovar.")
+    .refine((v) => !Number.isNaN(Date.parse(v)), "Recarregue o orçamento antes de aprovar."),
+  /** Confirma a aprovação de orçamento com validade vencida (code "vencido"). */
+  aceitarVencido: z.boolean().optional().default(false),
 })
 export type ApproveQuoteInput = z.input<typeof approveQuoteSchema>
 
@@ -211,6 +223,12 @@ export interface QuoteActionResult {
   invoiceId?: string
   /** approveQuote: "gerada" | "pendente" (orçamento aprovado, cobrança a gerar no Financeiro). */
   cobranca?: "gerada" | "pendente"
+  /**
+   * approveQuote recusado por motivo tratável pela UI:
+   * - "alterado": o orçamento mudou depois de aberto — recarregar;
+   * - "vencido": validade passou — confirmar e reenviar com aceitarVencido.
+   */
+  code?: "alterado" | "vencido"
 }
 
 /** Rotas do módulo (revalidação e links). */

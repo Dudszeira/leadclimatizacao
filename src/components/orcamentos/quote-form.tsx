@@ -43,6 +43,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Textarea } from "@/components/ui/textarea"
 import { Field, SelectField, invalidProps } from "@/components/clientes/form-kit"
 import { numeroParaCampo } from "./form-utils"
+import { DateField } from "./date-field"
 import { Segmented } from "./segmented"
 
 // ---------------------------------------------------------------------------
@@ -345,12 +346,11 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
                 </p>
               </div>
               <Field id="orc-validade" label="Válido até" error={errors.validade}>
-                <Input
+                <DateField
                   id="orc-validade"
-                  type="date"
                   value={validade}
-                  onChange={(e) => {
-                    setValidade(e.target.value)
+                  onChange={(iso) => {
+                    setValidade(iso)
                     clearError("validade")
                   }}
                   {...invalidProps("orc-validade", errors.validade)}
@@ -450,18 +450,22 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
               <Field id="orc-prazo_execucao" label="Prazo de execução" error={errors.prazo_execucao}>
-                <Input
+                <Textarea
                   id="orc-prazo_execucao"
+                  rows={2}
                   maxLength={500}
+                  className="min-h-0"
                   value={prazo}
                   onChange={(e) => setPrazo(e.target.value)}
                   {...invalidProps("orc-prazo_execucao", errors.prazo_execucao)}
                 />
               </Field>
               <Field id="orc-garantia" label="Garantia" error={errors.garantia}>
-                <Input
+                <Textarea
                   id="orc-garantia"
+                  rows={2}
                   maxLength={500}
+                  className="min-h-0"
                   value={garantia}
                   onChange={(e) => setGarantia(e.target.value)}
                   {...invalidProps("orc-garantia", errors.garantia)}
@@ -539,25 +543,35 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
       {/* Celular: barra fixa acima do dock com total e salvar */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-30 border-t border-line-soft bg-void/95 px-4 pt-3 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1.25rem)] backdrop-blur-xl md:hidden",
+          "fixed inset-x-2 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+0.875rem)] z-30 flex h-14 items-center gap-3 rounded-[1.5rem] bg-console-2/95 pr-1.5 pl-4 shadow-[0_-8px_32px_rgba(0,0,0,0.55)] ring-1 ring-line backdrop-blur-xl min-[400px]:inset-x-3 md:hidden",
           typing && "hidden",
         )}
       >
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-ink-faint">Total</p>
-            <p className="truncate font-display text-lg leading-tight font-medium text-ink">{formatBRL(total)}</p>
-          </div>
-          <SaveButton pending={pending} label={saveLabel} className="shrink-0" />
-        </div>
+        <p className="flex min-w-0 flex-1 items-baseline gap-2">
+          <span className="text-[0.8125rem] text-ink-faint">Total</span>
+          <span className="truncate font-display text-lg leading-tight font-medium text-ink tabular-nums">
+            {formatBRL(total)}
+          </span>
+        </p>
+        <SaveButton pending={pending} label={saveLabel} size="default" className="shrink-0" />
       </div>
     </form>
   )
 }
 
-function SaveButton({ pending, label, className }: { pending: boolean; label: string; className?: string }) {
+function SaveButton({
+  pending,
+  label,
+  className,
+  size = "lg",
+}: {
+  pending: boolean
+  label: string
+  className?: string
+  size?: "default" | "lg"
+}) {
   return (
-    <Button type="submit" size="lg" disabled={pending} aria-busy={pending} className={className}>
+    <Button type="submit" size={size} disabled={pending} aria-busy={pending} className={className}>
       {pending ? (
         <>
           <LoaderCircleIcon className="animate-spin" aria-hidden="true" />

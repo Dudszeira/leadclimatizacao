@@ -9,8 +9,18 @@
 --  * Acesso: admin, atendente e técnico leem, criam, editam (enquanto
 --    aguardando) e duplicam; excluir, aprovar (gera cobrança) e declinar
 --    são só admin; catálogo: todos leem, só admin escreve
---  * vw_quotes: quote + dados mínimos de cliente/prédio para quem não lê
---    clients/buildings pela RLS (técnico)
+--  * ESCRITA SÓ POR RPC: quotes/quote_items não têm INSERT/UPDATE/DELETE
+--    para anon/authenticated (nem admin). Toda escrita passa por
+--    salvar_orcamento, duplicar_orcamento, aprovar_orcamento,
+--    declinar_orcamento e excluir_orcamento (security definer, cada uma
+--    checa o papel). SELECT continua pela RLS. Os triggers ficam como
+--    defesa em profundidade (numero/created_at/created_by imutáveis,
+--    totais pelo banco, decidido congelado).
+--  * vw_quotes: quote + dados de cliente/prédio para os 3 papéis. DECISÃO DO
+--    DONO: o técnico tem acesso geral ao orçamento, inclusive ao contato do
+--    cliente (nome/e-mail/telefone/CNPJ) — exposição intencional. A view
+--    roda como owner (o linter security_definer_view do Supabase vai
+--    apontar: esperado) com security_barrier e filtro de usuário ativo.
 -- Idempotente: pode ser reaplicada.
 -- ============================================================================
 
@@ -40,7 +50,7 @@ create sequence if not exists public.quote_numero_seq start with 1000;
 
 create table if not exists public.quotes (
   id                   uuid primary key default gen_random_uuid(),
-  numero               bigint not null unique default nextval('public.quote_numero_seq'),
+  numero               bigint not null unique, -- sempre nextval pelo trigger
   client_id            uuid not null references public.clients (id) on delete restrict,
   building_id          uuid not null references public.buildings (id) on delete restrict,
   tipo_servico         public.os_type not null default 'instalacao'
@@ -78,6 +88,9 @@ create table if not exists public.quote_items (
   updated_at       timestamptz not null default now()
 );
 
+-- numero só pelo trigger (sem default: reaplicação remove o antigo)
+alter table public.quotes alter column numero drop default;
+
 -- Contrato avulso gerado na aprovação (rastreio; 1 por orçamento)
 alter table public.contracts
   add column if not exists quote_id uuid unique references public.quotes (id) on delete set null;
@@ -110,10 +123,16 @@ end $$;
 
 -- ----------------------------------------------------------------------------
 -- 4. Guard + recálculo do cabeçalho (quotes)
---    API (current_user anon/authenticated): status, decisão e vínculos
---    (OS/fatura) nunca são gravados direto — só pelas RPCs security definer.
---    Todos: subtotal/total sempre recalculados a partir dos itens; fora de
---    'aguardando' nada muda (exceto FK on delete set null de OS/fatura).
+--    Escrita direta está revogada (seção 6); este trigger é defesa em
+--    profundidade e vale para qualquer caminho (RPCs, service_role, FK):
+--    * INSERT: numero := nextval, created_at := now(), nasce aguardando sem
+--      decisão/vínculos; cliente precisa estar ativo.
+--    * UPDATE: numero, created_at e created_by nunca mudam.
+--    * Decidido: nada muda, exceto service_order_id/invoice_id virarem null
+--      quando a OS/fatura referenciada não existe mais (on delete set null).
+--    * subtotal/total sempre recalculados a partir dos itens.
+--    Se alguém regrantar escrita à API (anon/authenticated), status/decisão
+--    continuam bloqueados.
 -- ----------------------------------------------------------------------------
 create or replace function public._quote_building_ok(p_building uuid, p_client uuid)
 returns boolean
@@ -128,8 +147,19 @@ as $$
   );
 $$;
 
-revoke all on function public._quote_building_ok(uuid, uuid) from public, anon;
-grant execute on function public._quote_building_ok(uuid, uuid) to authenticated;
+revoke all on function public._quote_building_ok(uuid, uuid) from public, anon, authenticated;
+
+create or replace function public._quote_client_ativo(p_client uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.clients c where c.id = p_client and c.ativo);
+$$;
+
+revoke all on function public._quote_client_ativo(uuid) from public, anon, authenticated;
 
 create or replace function public.quotes_before_write()
 returns trigger
@@ -150,6 +180,9 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
+    new.numero     := nextval('public.quote_numero_seq');
+    new.created_at := now();
+    new.updated_at := now();
     if v_api then
       new.status           := 'aguardando';
       new.decidido_em      := null;
@@ -157,16 +190,29 @@ begin
       new.service_order_id := null;
       new.invoice_id       := null;
       new.created_by       := auth.uid();
-    elsif new.status <> 'aguardando' then
+    elsif new.status <> 'aguardando' or new.decidido_em is not null or new.motivo_declinio is not null
+          or new.service_order_id is not null or new.invoice_id is not null then
       raise exception 'Orçamento novo nasce aguardando resposta' using errcode = '22023';
     end if;
+    if not public._quote_client_ativo(new.client_id) then
+      raise exception 'Cliente inativo: reative o cliente antes de criar o orçamento' using errcode = '23514';
+    end if;
   else
-    -- UPDATE
+    -- UPDATE: identidade e trilha nunca mudam
+    new.numero     := old.numero;
+    new.created_at := old.created_at;
+    new.created_by := old.created_by;
+
     if old.status <> 'aguardando' then
       if (to_jsonb(new) - v_pos_decisao - 'subtotal' - 'total')
            is distinct from (to_jsonb(old) - v_pos_decisao - 'subtotal' - 'total')
-         or (new.service_order_id is distinct from old.service_order_id and new.service_order_id is not null)
-         or (new.invoice_id is distinct from old.invoice_id and new.invoice_id is not null) then
+         -- vínculo só pode sumir se a OS/fatura não existe mais (FK set null)
+         or (new.service_order_id is distinct from old.service_order_id
+             and (new.service_order_id is not null
+                  or exists (select 1 from public.service_orders so where so.id = old.service_order_id)))
+         or (new.invoice_id is distinct from old.invoice_id
+             and (new.invoice_id is not null
+                  or exists (select 1 from public.invoices i where i.id = old.invoice_id))) then
         raise exception 'Orçamento ORC-% já foi %; não pode mais ser alterado (use "duplicar" para refazer)',
           old.numero, old.status
           using errcode = '42501';
@@ -176,9 +222,6 @@ begin
       new.total    := old.total;
       return new;
     end if;
-
-    new.numero     := old.numero;
-    new.created_by := old.created_by;
 
     if v_api then
       if new.status is distinct from old.status then
@@ -196,9 +239,13 @@ begin
          new.decidido_em is not null or new.service_order_id is not null or new.invoice_id is not null) then
       raise exception 'Orçamento aguardando não tem decisão/vínculos' using errcode = '22023';
     end if;
+
+    if new.client_id is distinct from old.client_id and not public._quote_client_ativo(new.client_id) then
+      raise exception 'Cliente inativo: escolha um cliente ativo' using errcode = '23514';
+    end if;
   end if;
 
-  -- prédio precisa ser do cliente (helper definer: técnico não lê buildings)
+  -- prédio precisa ser do cliente
   if not public._quote_building_ok(new.building_id, new.client_id) then
     raise exception 'O prédio selecionado não pertence ao cliente do orçamento' using errcode = '23514';
   end if;
@@ -237,9 +284,12 @@ begin
     raise exception 'Item não pode ser movido para outro orçamento' using errcode = '42501';
   end if;
 
+  -- trava o pai: serializa com aprovar/declinar/excluir (que também usam
+  -- FOR UPDATE) e relê o status já confirmado por elas
   select q.status, q.numero into v_status, v_numero
   from public.quotes q
-  where q.id = case when tg_op = 'DELETE' then old.quote_id else new.quote_id end;
+  where q.id = case when tg_op = 'DELETE' then old.quote_id else new.quote_id end
+  for update;
 
   -- not found: cascata da exclusão do próprio orçamento (já validada no pai)
   if found and v_status <> 'aguardando' then
@@ -290,10 +340,11 @@ create trigger quote_items_recalc
   for each row execute function public.quote_items_recalc();
 
 -- ----------------------------------------------------------------------------
--- 6. RLS
---    quotes/quote_items: os 3 papéis ativos leem e escrevem (a trigger
---    garante a imutabilidade fora de 'aguardando'); DELETE de quote só admin.
---    service_catalog: os 3 leem; escrita só admin.
+-- 6. RLS e grants
+--    quotes/quote_items: os 3 papéis ativos só LEEM pela RLS; nenhuma
+--    escrita direta (INSERT/UPDATE/DELETE revogados de anon/authenticated,
+--    inclusive admin) — escrita só pelas RPCs security definer.
+--    service_catalog: os 3 leem; escrita direta só admin (RLS).
 -- ----------------------------------------------------------------------------
 alter table public.service_catalog enable row level security;
 alter table public.quotes          enable row level security;
@@ -314,24 +365,19 @@ drop policy if exists quotes_update       on public.quotes;
 drop policy if exists quotes_delete_admin on public.quotes;
 create policy quotes_select on public.quotes
   for select using (public.get_my_role() is not null);
-create policy quotes_insert on public.quotes
-  for insert with check (public.get_my_role() is not null);
-create policy quotes_update on public.quotes
-  for update using (public.get_my_role() is not null)
-  with check (public.get_my_role() is not null);
-create policy quotes_delete_admin on public.quotes
-  for delete using (public.get_my_role() = 'admin');
 
 drop policy if exists quote_items_admin_all on public.quote_items;
 drop policy if exists quote_items_all       on public.quote_items;
-create policy quote_items_all on public.quote_items
-  for all using (public.get_my_role() is not null)
-  with check (public.get_my_role() is not null);
+drop policy if exists quote_items_select    on public.quote_items;
+create policy quote_items_select on public.quote_items
+  for select using (public.get_my_role() is not null);
 
 revoke all on table public.service_catalog from anon;
-revoke all on table public.quotes          from anon;
-revoke all on table public.quote_items     from anon;
-revoke all on sequence public.quote_numero_seq from anon;
+revoke all on table public.quotes          from public, anon, authenticated;
+revoke all on table public.quote_items     from public, anon, authenticated;
+grant select on table public.quotes      to authenticated;
+grant select on table public.quote_items to authenticated;
+revoke all on sequence public.quote_numero_seq from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 7. Helpers internos
@@ -350,8 +396,7 @@ begin
 end;
 $$;
 
-revoke all on function public._quote_require_admin() from public, anon;
-grant execute on function public._quote_require_admin() to authenticated;
+revoke all on function public._quote_require_admin() from public, anon, authenticated;
 
 -- qualquer papel ativo (admin, atendente, técnico)
 create or replace function public._quote_require_user()
@@ -368,8 +413,7 @@ begin
 end;
 $$;
 
-revoke all on function public._quote_require_user() from public, anon;
-grant execute on function public._quote_require_user() to authenticated;
+revoke all on function public._quote_require_user() from public, anon, authenticated;
 
 -- Grava os itens (jsonb array) de um orçamento aguardando. Ordem = posição.
 create or replace function public._quote_insert_items(p_quote uuid, p_items jsonb)
@@ -399,13 +443,14 @@ begin
 end;
 $$;
 
-revoke all on function public._quote_insert_items(uuid, jsonb) from public, anon;
-grant execute on function public._quote_insert_items(uuid, jsonb) to authenticated;
+revoke all on function public._quote_insert_items(uuid, jsonb) from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 8. salvar_orcamento: cria (p_quote null) ou edita cabeçalho + SUBSTITUI os
---    itens numa transação. security invoker: RLS e guards da API valem.
---    Os 3 papéis (edição só enquanto aguardando, garantida pela trigger).
+--    itens numa transação. security definer (escrita direta revogada):
+--    checa usuário ativo; os 3 papéis (edição só enquanto aguardando,
+--    garantida aqui e pela trigger; cliente ativo e prédio do cliente
+--    validados pela trigger).
 --    p_header: {client_id, building_id, tipo_servico, titulo, observacoes,
 --      validade, condicoes_pagamento, prazo_execucao, garantia, desconto}
 --    p_items: [{catalog_item_id?, descricao, unidade, quantidade, preco_unitario}]
@@ -413,7 +458,7 @@ grant execute on function public._quote_insert_items(uuid, jsonb) to authenticat
 create or replace function public.salvar_orcamento(p_quote uuid, p_header jsonb, p_items jsonb)
 returns uuid
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
@@ -430,7 +475,7 @@ begin
   if v_id is null then
     insert into public.quotes (
       client_id, building_id, tipo_servico, titulo, observacoes, validade,
-      condicoes_pagamento, prazo_execucao, garantia, desconto
+      condicoes_pagamento, prazo_execucao, garantia, desconto, created_by
     ) values (
       (p_header ->> 'client_id')::uuid,
       (p_header ->> 'building_id')::uuid,
@@ -441,7 +486,8 @@ begin
       nullif(btrim(p_header ->> 'condicoes_pagamento'), ''),
       nullif(btrim(p_header ->> 'prazo_execucao'), ''),
       nullif(btrim(p_header ->> 'garantia'), ''),
-      0
+      0,
+      auth.uid()
     )
     returning id into v_id;
   else
@@ -488,8 +534,19 @@ grant execute on function public.salvar_orcamento(uuid, jsonb, jsonb) to authent
 -- 9. aprovar_orcamento: OS + contrato avulso (encerrado) + fatura pendente.
 --    Contrato corretiva_avulsa/encerrado fica fora do faturamento mensal
 --    (_generate_monthly_invoices_job filtra status='ativo' e tipo<>avulsa).
+--    p_updated_at: o updated_at que a tela exibiu; se o orçamento mudou
+--      depois disso, recusa (hint 'quote_alterado') — cobra o que foi visto.
+--    p_aceitar_vencido: validade < hoje só aprova com confirmação explícita
+--      (hint 'quote_vencido').
 -- ----------------------------------------------------------------------------
-create or replace function public.aprovar_orcamento(p_quote uuid, p_vencimento date)
+drop function if exists public.aprovar_orcamento(uuid, date);
+
+create or replace function public.aprovar_orcamento(
+  p_quote uuid,
+  p_vencimento date,
+  p_updated_at timestamptz,
+  p_aceitar_vencido boolean default false
+)
 returns jsonb
 language plpgsql
 security definer
@@ -517,6 +574,19 @@ begin
   end if;
   if v_q.status <> 'aguardando' then
     raise exception 'Orçamento ORC-% já foi %', v_q.numero, v_q.status using errcode = 'P0001';
+  end if;
+  -- precisão de ms: a tela pode ter passado o valor por Date (JS)
+  if p_updated_at is null
+     or date_trunc('milliseconds', v_q.updated_at) <> date_trunc('milliseconds', p_updated_at) then
+    raise exception 'O orçamento foi alterado por outra pessoa; recarregue antes de aprovar'
+      using errcode = 'P0001', hint = 'quote_alterado';
+  end if;
+  if not public._quote_client_ativo(v_q.client_id) then
+    raise exception 'Cliente inativo: reative o cliente antes de aprovar o orçamento' using errcode = 'P0001';
+  end if;
+  if v_q.validade < v_hoje and not coalesce(p_aceitar_vencido, false) then
+    raise exception 'Orçamento vencido em %. Confirme para aprovar mesmo assim', to_char(v_q.validade, 'DD/MM/YYYY')
+      using errcode = 'P0001', hint = 'quote_vencido';
   end if;
   if v_q.total <= 0 then
     raise exception 'Orçamento sem valor: inclua itens antes de aprovar' using errcode = 'P0001';
@@ -564,8 +634,8 @@ begin
 end;
 $$;
 
-revoke all on function public.aprovar_orcamento(uuid, date) from public, anon;
-grant execute on function public.aprovar_orcamento(uuid, date) to authenticated;
+revoke all on function public.aprovar_orcamento(uuid, date, timestamptz, boolean) from public, anon;
+grant execute on function public.aprovar_orcamento(uuid, date, timestamptz, boolean) to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 10. declinar_orcamento
@@ -607,6 +677,40 @@ $$;
 
 revoke all on function public.declinar_orcamento(uuid, text) from public, anon;
 grant execute on function public.declinar_orcamento(uuid, text) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 10b. excluir_orcamento: só admin, só aguardando (itens vão em cascata)
+-- ----------------------------------------------------------------------------
+create or replace function public.excluir_orcamento(p_quote uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_q public.quotes;
+begin
+  perform public._quote_require_admin();
+  if p_quote is null then
+    raise exception 'Orçamento obrigatório' using errcode = '22004';
+  end if;
+
+  select * into v_q from public.quotes where id = p_quote for update;
+  if not found then
+    raise exception 'Orçamento não encontrado' using errcode = 'P0002';
+  end if;
+  if v_q.status <> 'aguardando' then
+    raise exception 'Orçamento ORC-% já foi %; não pode ser excluído', v_q.numero, v_q.status
+      using errcode = 'P0001';
+  end if;
+
+  delete from public.quotes where id = p_quote;
+  return p_quote;
+end;
+$$;
+
+revoke all on function public.excluir_orcamento(uuid) from public, anon;
+grant execute on function public.excluir_orcamento(uuid) to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 11. duplicar_orcamento (os 3 papéis): novo orçamento aguardando, mesmos itens.
@@ -696,12 +800,15 @@ grant execute on function public.orcamentos_resumo(date, date) to authenticated,
 
 -- ----------------------------------------------------------------------------
 -- 13. vw_quotes: orçamento + campos mínimos de cliente e prédio.
---     O técnico não lê clients e só lê buildings das OS dele (0002); como o
---     dono liberou orçamentos para os 3 papéis, a view roda como owner
---     (security definer, deliberado) e se restringe a usuário ativo.
---     Só expõe cliente/prédio de quem tem orçamento.
+--     O técnico não lê clients e só lê buildings das OS dele (0002). DECISÃO
+--     DO DONO: acesso geral do técnico ao orçamento, INCLUSIVE contato do
+--     cliente (nome, e-mail, telefone, CNPJ) — exposição intencional. Por
+--     isso a view roda como owner (security definer deliberado; o linter
+--     security_definer_view do Supabase vai acusar, é esperado), com
+--     security_barrier (o filtro de usuário ativo roda antes de qualquer
+--     predicado do chamador) e só expõe cliente/prédio de quem tem orçamento.
 -- ----------------------------------------------------------------------------
-create or replace view public.vw_quotes as
+create or replace view public.vw_quotes with (security_barrier = true) as
 select
   q.*,
   c.razao_social      as client_razao_social,

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { isDemoMode } from "@/lib/env"
+import { quotesFixture, serviceOrdersFixture } from "@/lib/fixtures"
 import {
   QUOTES_PATH,
   approveQuoteSchema,
@@ -55,6 +56,26 @@ function dbMessage(error: unknown, fallback: string): string {
   return message.slice(0, 300)
 }
 
+/** Recusa de aprovar_orcamento que a UI trata (hint definido em 0010). */
+function approveErrorCode(error: unknown): QuoteActionResult["code"] {
+  if (!error || typeof error !== "object") return undefined
+  const { hint, message } = error as { hint?: unknown; message?: unknown }
+  if (hint === "quote_alterado") return "alterado"
+  if (hint === "quote_vencido") return "vencido"
+  if (typeof message === "string") {
+    if (/foi alterado por outra pessoa/.test(message)) return "alterado"
+    if (/Orçamento vencido em/.test(message)) return "vencido"
+  }
+  return undefined
+}
+
+/**
+ * Modo demonstração: nada é gravado; devolve ids de fixtures existentes para a
+ * UI poder navegar (criar/duplicar → um orçamento "aguardando"; aprovar → uma OS).
+ */
+const DEMO_NEW_QUOTE_ID = (quotesFixture.find((q) => q.status === "aguardando") ?? quotesFixture[0])?.id
+const DEMO_SERVICE_ORDER_ID = serviceOrdersFixture[0]?.id
+
 function revalidateQuote(id?: string) {
   revalidatePath(QUOTES_PATH)
   if (id) revalidatePath(`${QUOTES_PATH}/${id}`)
@@ -75,7 +96,7 @@ async function saveQuote(quoteId: string | null, input: QuoteInput): Promise<Quo
   if (quoteId !== null && !idSchema.safeParse(quoteId).success) return fail("Orçamento inválido.")
   const parsed = quoteSchema.safeParse(input)
   if (!parsed.success) return fail(INVALID, { fieldErrors: quoteFieldErrors(parsed.error) })
-  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE, id: quoteId ?? undefined }
+  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE, id: quoteId ?? DEMO_NEW_QUOTE_ID }
 
   const fallback = quoteId ? "Não foi possível atualizar o orçamento. Tente novamente." : "Não foi possível criar o orçamento. Tente novamente."
   try {
@@ -119,12 +140,11 @@ export async function deleteQuote(id: string): Promise<QuoteActionResult> {
   const fallback = "Não foi possível excluir o orçamento. Tente novamente."
   try {
     const supabase = await createSupabase()
-    const { data, error } = await supabase.from("quotes").delete().eq("id", id).select("id")
+    const { error } = await supabase.rpc("excluir_orcamento", { p_quote: id })
     if (error) {
       console.error("[actions/quotes] deleteQuote:", safeErrorLog(error))
       return fail(dbMessage(error, fallback))
     }
-    if (!data || data.length === 0) return fail("Orçamento não encontrado ou sem permissão — atualize a página.")
     revalidatePath(QUOTES_PATH)
     return { ok: true, message: "Orçamento excluído.", id }
   } catch (error) {
@@ -138,7 +158,7 @@ export async function duplicateQuote(id: string): Promise<QuoteActionResult> {
   const auth = await authorizeAction(...ALL_ROLES)
   if (auth.error !== null) return fail(auth.error)
   if (!idSchema.safeParse(id).success) return fail("Orçamento inválido.")
-  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE }
+  if (isDemoMode) return { ok: true, demo: true, message: DEMO_MESSAGE, id: DEMO_NEW_QUOTE_ID }
 
   const fallback = "Não foi possível duplicar o orçamento. Tente novamente."
   try {
@@ -178,6 +198,7 @@ export async function approveQuote(id: string, input: ApproveQuoteInput): Promis
       ok: true,
       demo: true,
       id,
+      serviceOrderId: DEMO_SERVICE_ORDER_ID,
       message:
         "Modo demonstração: no banco real a aprovação gera a OS, a fatura e a cobrança no Asaas. Nada foi gravado.",
     }
@@ -191,10 +212,13 @@ export async function approveQuote(id: string, input: ApproveQuoteInput): Promis
     const { data, error } = await supabase.rpc("aprovar_orcamento", {
       p_quote: id,
       p_vencimento: parsed.data.vencimento,
+      p_updated_at: parsed.data.updatedAt,
+      p_aceitar_vencido: parsed.data.aceitarVencido,
     })
     if (error) {
       console.error("[actions/quotes] aprovar_orcamento:", safeErrorLog(error))
-      return fail(dbMessage(error, fallback))
+      const code = approveErrorCode(error)
+      return fail(dbMessage(error, fallback), code ? { code } : {})
     }
     const r = (data ?? {}) as { service_order_id?: string; invoice_id?: string }
     if (!r.service_order_id || !r.invoice_id) {
