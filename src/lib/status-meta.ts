@@ -10,6 +10,7 @@ import type {
   OsStatus,
   OsType,
   PaymentMethod,
+  QuoteStatus,
 } from "@/lib/types"
 
 /**
@@ -250,4 +251,31 @@ export const CONVERSATION_STATUS_META: Record<
     badgeClassName: "border-line bg-console-2 text-ink-dim",
     dotClassName: "bg-ink-faint",
   },
+}
+
+// ---------------------------------------------------------------------------
+// Orçamentos
+// ---------------------------------------------------------------------------
+
+export const QUOTE_STATUS_META: Record<
+  QuoteStatus,
+  { label: string; badgeClassName: string }
+> = {
+  aguardando: {
+    label: "Aguardando resposta",
+    badgeClassName: "border-transparent bg-amber-dim text-amber",
+  },
+  aprovado: {
+    label: "Aprovado",
+    badgeClassName: "border-transparent bg-clear-dim text-clear",
+  },
+  declinado: {
+    label: "Declinado",
+    badgeClassName: "border-line bg-console-2 text-ink-faint",
+  },
+}
+
+/** "ORC-1004" (mesmo padrão de "OS-1004"). */
+export function quoteNumeroLabel(numero: number): string {
+  return `ORC-${numero}`
 }
