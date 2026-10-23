@@ -10,7 +10,7 @@ import type { UserRole } from "@/lib/types"
 import { useSidebar } from "@/components/ui/sidebar"
 
 const tabClass =
-  "flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-[1.125rem] text-xs font-medium transition-[background-color,color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/60"
+  "flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-[1.125rem] text-xs font-medium tracking-[-0.01em] transition-[background-color,color] duration-150 outline-none focus-visible:ring-3 focus-visible:ring-signal/60"
 
 /**
  * Barra de abas inferior (só no celular): os destinos do dia a dia do papel
@@ -28,9 +28,9 @@ export function MobileTabBar({ role }: { role: UserRole }) {
   return (
     <nav
       aria-label="Navegação principal"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-40 px-3 pb-2 md:hidden"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 px-2 pb-2 min-[400px]:px-3 md:hidden"
     >
-      <div className="mb-1 flex h-(--tabbar-h) items-stretch gap-1 rounded-[1.5rem] bg-console-2/92 p-1.5 shadow-[0_-8px_32px_rgba(0,0,0,0.55)] ring-1 ring-line backdrop-blur-xl">
+      <div className="mb-1 flex h-(--tabbar-h) items-stretch gap-0.5 rounded-[1.5rem] bg-console-2/92 p-1.5 shadow-[0_-8px_32px_rgba(0,0,0,0.55)] ring-1 ring-line backdrop-blur-xl">
         {tabs.map((item) => {
           const active = isNavItemActive(item, pathname)
           return (
@@ -44,7 +44,7 @@ export function MobileTabBar({ role }: { role: UserRole }) {
               )}
             >
               <item.icon className="size-5" aria-hidden="true" />
-              <span className="max-w-full truncate px-1">{item.short ?? item.title}</span>
+              <span className="max-w-full truncate">{item.short ?? item.title}</span>
             </Link>
           )
         })}

@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // O indicador do modo dev cobria a barra de abas do celular.
   devIndicators: false,
+  // O PDF de orçamento lê fontes/logo do disco (process.cwd()); garante src/assets
+  // no bundle serverless da rota. @react-pdf/renderer já é externo por padrão.
+  outputFileTracingIncludes: {
+    "/api/orcamentos/\\[id\\]/pdf": ["./src/assets/**/*"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

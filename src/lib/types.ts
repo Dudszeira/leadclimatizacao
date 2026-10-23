@@ -244,6 +244,11 @@ export interface Contract {
   inicio: string;
   fim: string | null;
   observacoes: string | null;
+  /**
+   * Orçamento que gerou o contrato (0010). Não nulo = contrato avulso criado
+   * na aprovação do orçamento: não conta como plano/MRR do cliente.
+   */
+  quote_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -346,8 +351,10 @@ export interface ContractWithRelations extends ContractWithClient {
 }
 
 export interface InvoiceWithContract extends Invoice {
-  contract: Pick<Contract, "id" | "tipo" | "valor_mensal" | "dia_vencimento"> & {
+  contract: Pick<Contract, "id" | "tipo" | "valor_mensal" | "dia_vencimento" | "quote_id"> & {
     client: Pick<Client, "id" | "razao_social" | "nome_fantasia">;
+    /** Orçamento de origem (contrato gerado na aprovação); null nos demais. */
+    quote?: Pick<Quote, "numero" | "titulo"> | null;
   };
 }
 
@@ -606,4 +613,115 @@ export interface MapBounds {
   west: number;
   north: number;
   east: number;
+}
+
+// ----------------------------------------------------------------------------
+// Orçamentos (0010_orcamentos.sql)
+// Acesso: admin, atendente e técnico leem/criam/editam (só "aguardando") e
+// duplicam; aprovar, declinar, excluir e escrever no catálogo: só admin.
+// ----------------------------------------------------------------------------
+
+export type QuoteStatus = "aguardando" | "aprovado" | "declinado";
+
+/** Tipos de OS que um orçamento pode gerar ao ser aprovado. */
+export type QuoteServiceType = Extract<OsType, "instalacao" | "corretiva">;
+
+/** public.service_catalog */
+export interface CatalogItem {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  unidade: string;
+  preco: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** public.quotes — subtotal/total são mantidos pelo banco (somente leitura). */
+export interface Quote {
+  id: string;
+  /** Exibido como ORC-1004 (sequência a partir de 1000). */
+  numero: number;
+  client_id: string;
+  building_id: string;
+  tipo_servico: QuoteServiceType;
+  titulo: string;
+  observacoes: string | null;
+  validade: string;
+  condicoes_pagamento: string | null;
+  prazo_execucao: string | null;
+  garantia: string | null;
+  desconto: number;
+  subtotal: number;
+  total: number;
+  status: QuoteStatus;
+  motivo_declinio: string | null;
+  decidido_em: string | null;
+  /** OS gerada na aprovação (só o id; técnico pode não ler a OS). */
+  service_order_id: string | null;
+  /** Fatura gerada na aprovação (só o id; não-admin não lê invoices). */
+  invoice_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** public.quote_items — valor = round(quantidade × preco_unitario, 2) (coluna gerada). */
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  catalog_item_id: string | null;
+  descricao: string;
+  unidade: string;
+  quantidade: number;
+  preco_unitario: number;
+  valor: number;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteWithClient extends Quote {
+  client: Pick<
+    Client,
+    | "id"
+    | "razao_social"
+    | "nome_fantasia"
+    | "cnpj"
+    | "contato_nome"
+    | "contato_email"
+    | "contato_telefone"
+  >;
+  building: Pick<
+    Building,
+    "id" | "nome" | "logradouro" | "numero" | "bairro" | "cidade" | "uf" | "cep"
+  >;
+}
+
+export interface QuoteWithItems extends QuoteWithClient {
+  items: QuoteItem[];
+}
+
+/** Retorno de public.orcamentos_resumo(p_inicio, p_fim). */
+export interface QuoteSummary {
+  qtd_emitidos: number;
+  valor_emitido: number;
+  qtd_aprovados: number;
+  valor_aprovado: number;
+  qtd_aguardando: number;
+  valor_aguardando: number;
+  qtd_declinados: number;
+  valor_declinado: number;
+}
+
+/** Linha de public.orcamento_opcoes_clientes(): cliente ativo × prédio. */
+export interface QuoteClientOption {
+  client_id: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  building_id: string;
+  building_nome: string;
+  bairro: string | null;
+  cidade: string;
 }

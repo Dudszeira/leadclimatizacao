@@ -115,14 +115,16 @@ const RESUMO_ERROR = "Não foi possível carregar o resumo dos contratos. Tente 
 
 /**
  * Totais da aba Contratos sem o teto de uma página: count(head) para as
- * quantidades e soma paginada (collectPaged) para o MRR.
+ * quantidades e soma paginada (collectPaged) para o MRR. Contratos gerados
+ * pela aprovação de orçamento (quote_id não nulo) ficam de fora.
  */
 export async function getContratosResumo(): Promise<Result<ContratosResumo>> {
   try {
     if (isDemoMode) {
-      const ativos = contractsFixture.filter((c) => c.status === "ativo");
+      const planos = contractsFixture.filter((c) => c.quote_id === null);
+      const ativos = planos.filter((c) => c.status === "ativo");
       return ok({
-        total: contractsFixture.length,
+        total: planos.length,
         ativos: ativos.length,
         mrr: sumBy(ativos, (c) => c.valor_mensal, (c) => c.tipo === "pmoc_recorrente"),
       });
@@ -130,12 +132,17 @@ export async function getContratosResumo(): Promise<Result<ContratosResumo>> {
 
     const supabase = await createSupabase();
     const [totalRes, ativosRes, recorrentes] = await Promise.all([
-      supabase.from("contracts").select("id", { count: "exact", head: true }),
-      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("status", "ativo"),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).is("quote_id", null),
+      supabase
+        .from("contracts")
+        .select("id", { count: "exact", head: true })
+        .is("quote_id", null)
+        .eq("status", "ativo"),
       collectPaged<{ valor_mensal: number }>((from, to) =>
         supabase
           .from("contracts")
           .select("valor_mensal")
+          .is("quote_id", null)
           .eq("status", "ativo")
           .eq("tipo", "pmoc_recorrente")
           .order("id")

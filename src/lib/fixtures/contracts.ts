@@ -40,6 +40,7 @@ export const contractsFixture: Contract[] = rows.map(
     inicio: monthsAgoDate(inicioMeses),
     fim: fimMeses === null ? null : dateOnly(addMonths(today(), fimMeses)),
     observacoes,
+    quote_id: null,
     ...stamps(),
   }),
 );

@@ -18,6 +18,9 @@ import { updateSession } from "@/lib/supabase/proxy";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
+/** Route Handlers que devolvem PDF (ex.: /api/orcamentos/<id>/pdf). */
+const PDF_ROUTE = /^\/api\/orcamentos\/[^/]+\/pdf$/;
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
@@ -115,7 +118,9 @@ export async function proxy(request: NextRequest) {
     response.cookies.set(name, value, options),
   );
   Object.entries(pendingHeaders).forEach(([key, value]) => response.headers.set(key, value));
-  response.headers.set("Content-Security-Policy", csp);
+  // PDF não é HTML: a CSP de página (object-src 'none', frame-ancestors) só
+  // atrapalha o visualizador de PDF do navegador ao abrir em nova aba.
+  if (!PDF_ROUTE.test(pathname)) response.headers.set("Content-Security-Policy", csp);
   return response;
 }
 

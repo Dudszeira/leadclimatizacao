@@ -4,6 +4,7 @@ import type {
   PaymentMethod,
   Result,
 } from "@/lib/types";
+import { quoteNumeroLabel } from "@/lib/status-meta";
 import { AsaasError, asaasFetch, isAsaasConfigured } from "./client";
 import { dueDateForCharge, todayBRT } from "./dates";
 import type { NfseFiscal } from "./fiscal";
@@ -53,6 +54,29 @@ function competenciaLabel(competencia: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Limite do campo description de /payments no Asaas. */
+export const ASAAS_DESCRIPTION_MAX = 500;
+
+/**
+ * Descrição da cobrança: contrato gerado por orçamento aprovado leva
+ * "Orçamento ORC-1004: <título>"; os demais, a manutenção da competência.
+ * Truncada ao limite do Asaas.
+ */
+export function chargeDescription(
+  invoice: Pick<InvoiceWithContract, "competencia"> & {
+    contract: Pick<InvoiceWithContract["contract"], "quote_id" | "quote">;
+  },
+): string {
+  const quote = invoice.contract.quote;
+  const text =
+    invoice.contract.quote_id && quote
+      ? `Orçamento ${quoteNumeroLabel(Number(quote.numero))}: ${quote.titulo.trim()}`
+      : `Manutenção de climatização — competência ${competenciaLabel(invoice.competencia)}`;
+  return text.length > ASAAS_DESCRIPTION_MAX
+    ? `${text.slice(0, ASAAS_DESCRIPTION_MAX - 1).trimEnd()}…`
+    : text;
 }
 
 // ----------------------------------------------------------------------------
@@ -122,7 +146,7 @@ export async function createPayment(
       billingType: BILLING_TYPE[metodo],
       value: invoice.valor,
       dueDate: dueDateForCharge(invoice.vencimento),
-      description: `Manutenção de climatização — competência ${competenciaLabel(invoice.competencia)}`,
+      description: chargeDescription(invoice),
       externalReference: invoice.id,
     };
     const payment = await asaasFetch<AsaasPayment>("/payments", {
