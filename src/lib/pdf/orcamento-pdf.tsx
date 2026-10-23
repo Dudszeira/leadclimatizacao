@@ -283,7 +283,10 @@ export function OrcamentoPdf({ quote }: { quote: QuoteWithItems }) {
     client.contato_nome,
     client.contato_telefone ? formatTelefoneBR(client.contato_telefone) : null,
   ].filter(Boolean) as string[];
-  const empresaContato = [EMPRESA.telefone, `WhatsApp ${EMPRESA.whatsapp}`].join(" · ");
+  const empresaContato =
+    EMPRESA.telefone === EMPRESA.whatsapp
+      ? `${EMPRESA.telefone} (WhatsApp)`
+      : [EMPRESA.telefone, `WhatsApp ${EMPRESA.whatsapp}`].join(" · ");
 
   const termos: Array<{ label: string; text: string }> = [];
   if (quote.condicoes_pagamento?.trim())
@@ -320,7 +323,7 @@ export function OrcamentoPdf({ quote }: { quote: QuoteWithItems }) {
             <View style={s.brandRow}>
               {EMPRESA.logo ? (
                 // eslint-disable-next-line jsx-a11y/alt-text -- Image do react-pdf não tem alt
-                <Image src={path.join(ASSETS_DIR, EMPRESA.logo)} style={{ height: 30 }} />
+                <Image src={path.join(ASSETS_DIR, EMPRESA.logo)} style={{ height: 44 }} />
               ) : (
                 <>
                   <BrandSymbol />
@@ -334,7 +337,7 @@ export function OrcamentoPdf({ quote }: { quote: QuoteWithItems }) {
             <Text style={s.companyLine}>{enderecoEmpresa()}</Text>
             <Text style={s.companyLine}>{empresaContato}</Text>
             <Text style={s.companyLine}>
-              {EMPRESA.email} · {EMPRESA.site}
+              {[EMPRESA.email, EMPRESA.site].filter(Boolean).join(" · ")}
             </Text>
           </View>
 

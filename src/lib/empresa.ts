@@ -3,8 +3,7 @@
  * sistema (PDF de orçamento, rodapés). Módulo puro, sem segredos — pode ser
  * importado no cliente e no servidor.
  *
- * Os dados reais ainda não chegaram: tudo marcado com // PREENCHER é
- * placeholder e precisa ser trocado antes de enviar orçamento a cliente.
+ * Dados conferidos com o cartão CNPJ (Receita, situação ativa) em 23/10/2026.
  */
 
 export interface Empresa {
@@ -23,7 +22,8 @@ export interface Empresa {
   };
   telefone: string;
   whatsapp: string;
-  email: string;
+  /** null = não imprime e-mail nos documentos. */
+  email: string | null;
   site: string;
   /**
    * Logo para documentos (PNG ou JPG), caminho relativo a src/assets
@@ -34,30 +34,30 @@ export interface Empresa {
 }
 
 export const EMPRESA: Empresa = {
-  razaoSocial: "Lead Climatização Ltda.", // PREENCHER
+  razaoSocial: "Lead Climatização Ltda.",
   nomeFantasia: "Lead Climatização",
-  cnpj: "00.000.000/0001-00", // PREENCHER
-  inscricaoMunicipal: null, // PREENCHER (opcional)
+  cnpj: "57.635.198/0001-05",
+  inscricaoMunicipal: null,
   endereco: {
-    logradouro: "Rua Exemplo", // PREENCHER
-    numero: "000", // PREENCHER
-    complemento: null, // PREENCHER (opcional)
-    bairro: "Centro", // PREENCHER
-    cidade: "Curitiba", // PREENCHER
-    uf: "PR", // PREENCHER
-    cep: "80000-000", // PREENCHER
+    logradouro: "R. Bom Jesus",
+    numero: "212",
+    complemento: "Sala 1904, 19º andar",
+    bairro: "Juvevê",
+    cidade: "Curitiba",
+    uf: "PR",
+    cep: "80035-010",
   },
-  telefone: "(41) 0000-0000", // PREENCHER
-  whatsapp: "(41) 90000-0000", // PREENCHER
-  email: "contato@leadclimatizacao.com.br", // PREENCHER (confirmar)
-  site: "leadclimatizacao.com.br",
-  logo: null, // PREENCHER quando o cliente enviar o logotipo
+  telefone: "(41) 99868-5249",
+  whatsapp: "(41) 99868-5249",
+  email: null,
+  site: "www.leadclimatizacao.com.br",
+  logo: "logo-lead.png",
 };
 
 /** "Rua X, 123, Bairro, Cidade/UF, CEP 00000-000". */
 export function enderecoEmpresa(e: Empresa["endereco"] = EMPRESA.endereco): string {
   const rua = [e.logradouro, e.numero].filter(Boolean).join(", ");
-  const comp = e.complemento ? ` ${e.complemento}` : "";
+  const comp = e.complemento ? `, ${e.complemento}` : "";
   return `${rua}${comp}, ${e.bairro}, ${e.cidade}/${e.uf}, CEP ${e.cep}`;
 }
 
@@ -68,10 +68,12 @@ export function enderecoEmpresa(e: Empresa["endereco"] = EMPRESA.endereco): stri
 export const ORCAMENTO_PADROES = {
   /** Validade da proposta em dias corridos a partir da emissão. */
   validadeDias: 15,
-  condicoesPagamento:
-    "50% na aprovação e 50% na conclusão do serviço, via Pix ou boleto bancário.",
+  condicoesPagamento: "À vista.",
   prazoExecucao:
     "Início em até 5 dias úteis após a aprovação, conforme disponibilidade de agenda e de materiais.",
   garantia:
     "90 dias para os serviços executados (art. 26, II, do Código de Defesa do Consumidor). Equipamentos e peças conforme garantia do fabricante.",
 } as const;
+
+/** Condições de pagamento aceitas pela Lead (atalhos no formulário). */
+export const CONDICOES_PAGAMENTO_OPCOES = ["À vista", "05 DDL", "10 DDL", "15 DDL", "28 DDL"] as const;

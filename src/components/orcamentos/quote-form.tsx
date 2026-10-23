@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner"
 
 import type { CatalogItem, QuoteClientOption, QuoteServiceType } from "@/lib/types"
+import { CONDICOES_PAGAMENTO_OPCOES } from "@/lib/empresa"
 import { formatBRL } from "@/lib/format"
 import {
   MAX_QUOTE_ITEMS,
@@ -447,6 +448,24 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
                 onChange={(e) => setCondicoes(e.target.value)}
                 {...invalidProps("orc-condicoes_pagamento", errors.condicoes_pagamento)}
               />
+              <div role="group" aria-label="Atalhos de condição de pagamento" className="flex flex-wrap gap-2 pt-1">
+                {CONDICOES_PAGAMENTO_OPCOES.map((opcao) => {
+                  const ativo = condicoes.trim().replace(/\.$/, "") === opcao
+                  return (
+                    <Button
+                      key={opcao}
+                      type="button"
+                      size="sm"
+                      variant={ativo ? "default" : "outline"}
+                      aria-pressed={ativo}
+                      className="min-h-11 rounded-full px-4"
+                      onClick={() => setCondicoes(`${opcao}.`)}
+                    >
+                      {opcao}
+                    </Button>
+                  )
+                })}
+              </div>
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
               <Field id="orc-prazo_execucao" label="Prazo de execução" error={errors.prazo_execucao}>
