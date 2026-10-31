@@ -13,7 +13,7 @@ import {
   formatDateTimeFullBR,
   todayBRT,
 } from "@/lib/format"
-import { OS_TYPE_META, quoteNumeroLabel } from "@/lib/status-meta"
+import { QUOTE_SERVICE_TYPE_LABEL, quoteNumeroLabel } from "@/lib/status-meta"
 import { requireRole } from "@/server/auth"
 import { getQuote } from "@/server/quotes"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -102,7 +102,7 @@ export default async function OrcamentoPage({ params }: PageParams) {
           <QuoteStatusPill status={q.status} />
           {vencido && <VencidoPill />}
           <span className="inline-flex h-6 items-center rounded-full border border-line px-2.5 text-xs font-medium text-ink-dim">
-            {OS_TYPE_META[q.tipo_servico].label}
+            {QUOTE_SERVICE_TYPE_LABEL[q.tipo_servico]}
           </span>
         </div>
       </header>

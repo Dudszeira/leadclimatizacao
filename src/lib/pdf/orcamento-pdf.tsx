@@ -70,8 +70,10 @@ const C = {
 };
 
 const TIPO_LABEL: Record<QuoteServiceType, string> = {
+  diagnostico: "Diagnóstico",
   instalacao: "Instalação",
   corretiva: "Manutenção corretiva",
+  preventiva: "Manutenção preventiva",
 };
 
 const COL = { desc: "50%", unid: "8%", qtd: "10%", unit: "16%", total: "16%" } as const;

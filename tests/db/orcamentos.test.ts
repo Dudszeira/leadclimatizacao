@@ -128,11 +128,13 @@ afterAll(async () => {
   await db?.close();
 });
 
-describe("migration 0010", () => {
-  it("é idempotente (reaplicar não falha)", async () => {
-    const file = migrationFiles().find((f) => f.includes("0010_orcamentos"));
-    expect(file).toBeDefined();
-    await db.exec(stripCron(readFileSync(file as string, "utf8")));
+describe("migrations 0010 e 0011", () => {
+  it("são idempotentes (reaplicar em ordem não falha)", async () => {
+    for (const nome of ["0010_orcamentos", "0011_orcamento_tipos"]) {
+      const file = migrationFiles().find((f) => f.includes(nome));
+      expect(file).toBeDefined();
+      await db.exec(stripCron(readFileSync(file as string, "utf8")));
+    }
   });
 });
 
@@ -449,6 +451,33 @@ describe("aprovar", () => {
     // OS excluída: vínculo vira null (FK set null passa pela imutabilidade)
     await asService(db, `delete from public.service_orders where id = $1`, [r.r.service_order_id]);
     expect((await quote(id)).service_order_id).toBeNull();
+  });
+
+  it("tipo do orçamento vira tipo da OS: diagnóstico → corretiva, preventiva → preventiva PMOC", async () => {
+    const casos = [
+      ["diagnostico", "corretiva"],
+      ["instalacao", "instalacao"],
+      ["corretiva", "corretiva"],
+      ["preventiva", "preventiva_pmoc"],
+    ] as const;
+    for (const [tipoOrc, tipoOs] of casos) {
+      const id = await salvar(ADMIN, null, await header({ tipo_servico: tipoOrc, titulo: `Tipo ${tipoOrc}` }), [
+        { descricao: "Visita", quantidade: 1, preco_unitario: 150 },
+      ]);
+      const [q] = await asService<{ tipo_servico: string }>(db, `select tipo_servico from public.quotes where id = $1`, [id]);
+      expect(q.tipo_servico).toBe(tipoOrc);
+      const r = await aprovar(ADMIN, id);
+      const [os] = await asService<{ tipo: string }>(db, `select tipo::text from public.service_orders where id = $1`, [
+        r.service_order_id,
+      ]);
+      expect(os.tipo).toBe(tipoOs);
+    }
+  });
+
+  it("recusa tipo de serviço fora dos 4 do orçamento", async () => {
+    await expect(
+      salvar(ADMIN, null, await header({ tipo_servico: "orcamento" }), [{ descricao: "Item", quantidade: 1, preco_unitario: 10 }]),
+    ).rejects.toThrow(/quotes_tipo_servico_check/);
   });
 
   it("recusa vencimento no passado e orçamento sem valor", async () => {

@@ -10,6 +10,7 @@ import type {
   OsStatus,
   OsType,
   PaymentMethod,
+  QuoteServiceType,
   QuoteStatus,
 } from "@/lib/types"
 
@@ -256,6 +257,13 @@ export const CONVERSATION_STATUS_META: Record<
 // ---------------------------------------------------------------------------
 // Orçamentos
 // ---------------------------------------------------------------------------
+
+export const QUOTE_SERVICE_TYPE_LABEL: Record<QuoteServiceType, string> = {
+  diagnostico: "Diagnóstico",
+  instalacao: "Instalação",
+  corretiva: "Corretiva",
+  preventiva: "Preventiva",
+}
 
 export const QUOTE_STATUS_META: Record<
   QuoteStatus,
