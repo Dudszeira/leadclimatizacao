@@ -86,8 +86,10 @@ function parseOuZero(v: string): number {
 }
 
 const TIPO_OPTIONS: Array<{ value: QuoteServiceType; label: string }> = [
+  { value: "diagnostico", label: "Diagnóstico" },
   { value: "instalacao", label: "Instalação" },
   { value: "corretiva", label: "Corretiva" },
+  { value: "preventiva", label: "Preventiva" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -331,21 +333,35 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
                 />
               </Field>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid min-w-0 gap-1.5">
-                <span id="orc-tipo-label" className="text-sm font-medium text-ink-dim">
-                  Tipo de serviço
-                </span>
-                <Segmented
-                  labelledBy="orc-tipo-label"
-                  value={tipo}
-                  onChange={(v) => setTipo(v as QuoteServiceType)}
-                  options={TIPO_OPTIONS}
+            <div className="grid min-w-0 gap-1.5">
+              <span id="orc-tipo-label" className="text-sm font-medium text-ink-dim">
+                Tipo de serviço
+              </span>
+              <Segmented
+                labelledBy="orc-tipo-label"
+                value={tipo}
+                onChange={(v) => setTipo(v as QuoteServiceType)}
+                options={TIPO_OPTIONS}
+                wrap
+              />
+              <p className="text-[0.8125rem] leading-snug text-ink-faint">
+                Define o tipo da OS aberta quando o orçamento for aprovado (diagnóstico abre uma corretiva).
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)]">
+              <Field id="orc-titulo" label="Título" error={errors.titulo}>
+                <Input
+                  id="orc-titulo"
+                  value={titulo}
+                  maxLength={200}
+                  placeholder="Ex.: Instalação de 3 splits no 2º andar"
+                  onChange={(e) => {
+                    setTitulo(e.target.value)
+                    clearError("titulo")
+                  }}
+                  {...invalidProps("orc-titulo", errors.titulo)}
                 />
-                <p className="text-[0.8125rem] leading-snug text-ink-faint">
-                  Define o tipo da OS aberta quando o orçamento for aprovado.
-                </p>
-              </div>
+              </Field>
               <Field id="orc-validade" label="Válido até" error={errors.validade}>
                 <DateField
                   id="orc-validade"
@@ -358,19 +374,6 @@ export function QuoteForm({ quoteId, initial, clientOptions, catalog, cancelHref
                 />
               </Field>
             </div>
-            <Field id="orc-titulo" label="Título" error={errors.titulo}>
-              <Input
-                id="orc-titulo"
-                value={titulo}
-                maxLength={200}
-                placeholder="Ex.: Instalação de 3 splits no 2º andar"
-                onChange={(e) => {
-                  setTitulo(e.target.value)
-                  clearError("titulo")
-                }}
-                {...invalidProps("orc-titulo", errors.titulo)}
-              />
-            </Field>
           </CardContent>
         </Card>
 

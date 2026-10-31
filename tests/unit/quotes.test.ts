@@ -35,6 +35,16 @@ describe("schemas de orçamento", () => {
       expect(ok.data.items[0]).toMatchObject({ unidade: "un", quantidade: 2, preco_unitario: 1000, catalog_item_id: null });
       expect(ok.data.observacoes).toBeNull();
     }
+    for (const tipo of ["diagnostico", "instalacao", "corretiva", "preventiva"]) {
+      expect(
+        quoteSchema.safeParse({ ...base, tipo_servico: tipo, items: [{ descricao: "x", quantidade: 1, preco_unitario: 1 }] })
+          .success,
+      ).toBe(true);
+    }
+    expect(
+      quoteSchema.safeParse({ ...base, tipo_servico: "orcamento", items: [{ descricao: "x", quantidade: 1, preco_unitario: 1 }] })
+        .success,
+    ).toBe(false);
     expect(quoteSchema.safeParse({ ...base, items: [] }).success).toBe(false);
     expect(
       quoteSchema.safeParse({ ...base, desconto: 500, items: [{ descricao: "x", quantidade: 1, preco_unitario: 100 }] })

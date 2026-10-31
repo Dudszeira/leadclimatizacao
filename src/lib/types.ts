@@ -623,8 +623,11 @@ export interface MapBounds {
 
 export type QuoteStatus = "aguardando" | "aprovado" | "declinado";
 
-/** Tipos de OS que um orçamento pode gerar ao ser aprovado. */
-export type QuoteServiceType = Extract<OsType, "instalacao" | "corretiva">;
+/**
+ * Tipo de serviço do orçamento. Na aprovação vira o tipo da OS:
+ * diagnostico -> corretiva, preventiva -> preventiva_pmoc (0011).
+ */
+export type QuoteServiceType = "diagnostico" | "instalacao" | "corretiva" | "preventiva";
 
 /** public.service_catalog */
 export interface CatalogItem {

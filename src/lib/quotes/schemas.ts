@@ -52,7 +52,7 @@ const uuidOpcional = z
   .transform((v) => (v ? v : null))
   .pipe(z.uuid("Item de catálogo inválido.").nullable())
 
-export const QUOTE_SERVICE_TYPES = ["instalacao", "corretiva"] as const
+export const QUOTE_SERVICE_TYPES = ["diagnostico", "instalacao", "corretiva", "preventiva"] as const
 export const QUOTE_STATUSES = ["aguardando", "aprovado", "declinado"] as const
 export const PAYMENT_METHODS = ["pix", "boleto"] as const
 
